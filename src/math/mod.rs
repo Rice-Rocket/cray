@@ -5,11 +5,12 @@ pub mod dim;
 pub mod numeric;
 pub mod ray;
 pub mod sphere;
+pub mod transform;
 
 pub use bounds::{direction::DirectionCone, Bounds2, Bounds3, IBounds2, IBounds3, UBounds2, UBounds3};
 pub use dim::Dimension;
 #[allow(unused_imports)]
-pub use nalgebra::{self as na, Transform3, Unit};
+pub use nalgebra::{self as na, Unit};
 #[allow(unused_imports)]
 pub use nalgebra_glm::{self as glm, vec2, vec3, vec4};
 pub use nalgebra_glm::{Qua, TMat2, TMat3, TMat4, TVec2, TVec3, TVec4};
