@@ -1,8 +1,11 @@
+// Pbrt 3.7 Bounding Boxes
+
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Index};
 
 use crate::math::*;
 
 /// A 2-dimensional axis-aligned bounding box of type `T`
+// TODO: Test this
 pub struct TBounds2<T> {
     pub min: TVec2<T>,
     pub max: TVec2<T>,
@@ -10,7 +13,7 @@ pub struct TBounds2<T> {
 
 impl<T> TBounds2<T>
 where
-    T: Numeric<T> + PartialOrd + Clone + Copy,
+    T: Numeric + PartialOrd + Clone + Copy,
 {
     /// Creates a new [`TBounds2`] with no points.
     #[inline]
@@ -162,7 +165,7 @@ where
 }
 
 
-impl<T: Numeric<T> + Clone + Copy> TBounds2<T> {
+impl<T: Numeric + Clone + Copy> TBounds2<T> {
     /// Takes the union of two bounding boxes, extending the `min` and
     /// `max` as needed.
     #[doc(alias = "|, |=")]
@@ -230,7 +233,7 @@ impl<T> Index<u8> for TBounds2<T> {
 }
 
 
-impl<T: Numeric<T> + Clone + Copy> BitOr<&TBounds2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitOr<&TBounds2<T>> for TBounds2<T> {
     type Output = TBounds2<T>;
 
     /// Takes the union of two bounding boxes, extending the `min` and
@@ -242,7 +245,7 @@ impl<T: Numeric<T> + Clone + Copy> BitOr<&TBounds2<T>> for TBounds2<T> {
 }
 
 
-impl<T: Numeric<T> + Clone + Copy> BitOr<TBounds2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitOr<TBounds2<T>> for TBounds2<T> {
     type Output = TBounds2<T>;
 
     /// Takes the union of two bounding boxes, extending the `min` and
@@ -253,7 +256,7 @@ impl<T: Numeric<T> + Clone + Copy> BitOr<TBounds2<T>> for TBounds2<T> {
     }
 }
 
-impl<T: Numeric<T> + Clone + Copy> BitOr<TVec2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitOr<TVec2<T>> for TBounds2<T> {
     type Output = TBounds2<T>;
 
     /// Takes the union of a vector with this bounding box, extending the `min`
@@ -264,7 +267,7 @@ impl<T: Numeric<T> + Clone + Copy> BitOr<TVec2<T>> for TBounds2<T> {
     }
 }
 
-impl<T: Numeric<T> + Clone + Copy> BitOr<&TVec2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitOr<&TVec2<T>> for TBounds2<T> {
     type Output = TBounds2<T>;
 
     /// Takes the union of a vector with this bounding box, extending the `min`
@@ -275,7 +278,7 @@ impl<T: Numeric<T> + Clone + Copy> BitOr<&TVec2<T>> for TBounds2<T> {
     }
 }
 
-impl<T: Numeric<T> + Clone + Copy> BitAnd<&TBounds2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitAnd<&TBounds2<T>> for TBounds2<T> {
     type Output = TBounds2<T>;
 
     /// Takes the union of two bounding boxes, extending the `min` and
@@ -287,7 +290,7 @@ impl<T: Numeric<T> + Clone + Copy> BitAnd<&TBounds2<T>> for TBounds2<T> {
 }
 
 
-impl<T: Numeric<T> + Clone + Copy> BitAnd<TBounds2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitAnd<TBounds2<T>> for TBounds2<T> {
     type Output = TBounds2<T>;
 
     /// Takes the union of two bounding boxes, extending the `min` and
@@ -298,7 +301,7 @@ impl<T: Numeric<T> + Clone + Copy> BitAnd<TBounds2<T>> for TBounds2<T> {
     }
 }
 
-impl<T: Numeric<T> + Clone + Copy> BitOrAssign<TBounds2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitOrAssign<TBounds2<T>> for TBounds2<T> {
     /// Takes the union of two bounding boxes, extending the `min` and
     /// `max` as needed.
     #[inline]
@@ -307,7 +310,7 @@ impl<T: Numeric<T> + Clone + Copy> BitOrAssign<TBounds2<T>> for TBounds2<T> {
     }
 }
 
-impl<T: Numeric<T> + Clone + Copy> BitOrAssign<&TBounds2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitOrAssign<&TBounds2<T>> for TBounds2<T> {
     /// Takes the union of two bounding boxes, extending the `min` and
     /// `max` as needed.
     #[inline]
@@ -316,7 +319,7 @@ impl<T: Numeric<T> + Clone + Copy> BitOrAssign<&TBounds2<T>> for TBounds2<T> {
     }
 }
 
-impl<T: Numeric<T> + Clone + Copy> BitOrAssign<TVec2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitOrAssign<TVec2<T>> for TBounds2<T> {
     /// Takes the union of a vector with this bounding box, extending the `min`
     /// and `max` of the bounding box as needed.
     #[inline]
@@ -325,7 +328,7 @@ impl<T: Numeric<T> + Clone + Copy> BitOrAssign<TVec2<T>> for TBounds2<T> {
     }
 }
 
-impl<T: Numeric<T> + Clone + Copy> BitOrAssign<&TVec2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitOrAssign<&TVec2<T>> for TBounds2<T> {
     /// Takes the union of a vector with this bounding box, extending the `min`
     /// and `max` of the bounding box as needed.
     #[inline]
@@ -334,7 +337,7 @@ impl<T: Numeric<T> + Clone + Copy> BitOrAssign<&TVec2<T>> for TBounds2<T> {
     }
 }
 
-impl<T: Numeric<T> + Clone + Copy> BitAndAssign<&TBounds2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitAndAssign<&TBounds2<T>> for TBounds2<T> {
     /// Takes the union of two bounding boxes, extending the `min` and
     /// `max` as needed.
     #[inline]
@@ -344,7 +347,7 @@ impl<T: Numeric<T> + Clone + Copy> BitAndAssign<&TBounds2<T>> for TBounds2<T> {
 }
 
 
-impl<T: Numeric<T> + Clone + Copy> BitAndAssign<TBounds2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitAndAssign<TBounds2<T>> for TBounds2<T> {
     /// Takes the union of two bounding boxes, extending the `min` and
     /// `max` as needed.
     #[inline]

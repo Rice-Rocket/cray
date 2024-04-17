@@ -2,8 +2,8 @@ use super::na;
 
 /// A trait that provides a blanket implementation for many traits a number
 /// should have.
-pub trait Numeric<T>: NumericRealField + na::Scalar + na::Field + na::ComplexField<RealField = T> {}
-impl<T: NumericRealField + na::Scalar + na::Field + na::ComplexField<RealField = T>> Numeric<T> for T {}
+pub trait Numeric: NumericRealField + na::Scalar + na::Field + na::ComplexField<RealField = Self> {}
+impl<T: NumericRealField + na::Scalar + na::Field + na::ComplexField<RealField = T>> Numeric for T {}
 
 
 pub trait NumericRealField {

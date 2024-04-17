@@ -1,5 +1,6 @@
 pub mod bounds2;
 pub mod bounds3;
+pub mod direction;
 
 pub use bounds2::TBounds2;
 pub use bounds3::TBounds3;
