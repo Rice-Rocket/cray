@@ -6,6 +6,7 @@ pub mod numeric;
 pub mod ray;
 pub mod sphere;
 pub mod transform;
+pub mod bivec;
 
 pub use bounds::{direction::DirectionCone, Bounds2, Bounds3, IBounds2, IBounds3, UBounds2, UBounds3};
 pub use dim::Dimension;
@@ -17,6 +18,7 @@ pub use nalgebra_glm::{Qua, TMat2, TMat3, TMat4, TVec2, TVec3, TVec4};
 pub use numeric::Numeric;
 pub use ray::Ray;
 pub use sphere::OctahedralVec3;
+pub use bivec::{Bivec2, Bivec3, Bivec4};
 
 
 #[allow(clippy::module_inception)]

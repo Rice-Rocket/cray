@@ -26,7 +26,7 @@ impl Transform {
         Self { m, m_inv: Some(m_inv) }
     }
 
-    pub fn from_translation(delta: Vec3) -> Transform {
+    pub fn from_translation(delta: &Vec3) -> Transform {
         Self {
             m: Mat4::new_translation(&Vec3::new(delta.x, delta.y, delta.z)),
             m_inv: Some(Mat4::new_translation(&Vec3::new(-delta.x, -delta.y, -delta.z))),
@@ -76,17 +76,17 @@ impl Transform {
         Self { m: Mat4::new_rotation(axisangle), m_inv: Some(Mat4::new_rotation(axisangle).transpose()) }
     }
 
-    pub fn from_delta(from: Unit<Vec3>, to: Unit<Vec3>) -> Transform {
-        let refl = if from.x.abs() < 0.72 && to.x.abs() < 0.72 {
+    pub fn from_delta(from: &Bivec3, to: &Bivec3) -> Transform {
+        let refl = if from.x().abs() < 0.72 && to.x().abs() < 0.72 {
             Vec3::new(1.0, 0.0, 0.0)
-        } else if from.y.abs() < 0.72 && to.y.abs() < 0.72 {
+        } else if from.y().abs() < 0.72 && to.y().abs() < 0.72 {
             Vec3::new(0.0, 1.0, 0.0)
         } else {
             Vec3::new(0.0, 0.0, 1.0)
         };
 
-        let u = refl - from.into_inner();
-        let v = refl - to.into_inner();
+        let u = refl - from.get();
+        let v = refl - to.get();
         let mut r = Mat4::default();
         for i in 0..3 {
             for j in 0..3 {
@@ -103,15 +103,15 @@ impl Transform {
         }
     }
 
-    pub fn looking_at(pos: Vec3, target: Vec3, up: Unit<Vec3>) -> Transform {
-        let dir = Unit::new_normalize(target - pos);
-        let right = Unit::new_normalize(up.cross(&dir));
+    pub fn looking_at(pos: &Vec3, target: &Vec3, up: &Bivec3) -> Transform {
+        let dir = Bivec3::new_normalize(target - pos);
+        let right = Bivec3::new_normalize(up.cross(&dir));
         let new_up = dir.cross(&right);
 
         let m_inv = Mat4::new(
-            right.x, new_up.x, dir.x, pos.x,
-            right.y, new_up.y, dir.y, pos.y, 
-            right.z, new_up.z, dir.z, pos.z, 
+            right.x(), new_up.x, dir.x(), pos.x,
+            right.y(), new_up.y, dir.y(), pos.y, 
+            right.z(), new_up.z, dir.z(), pos.z, 
             0.0, 0.0, 0.0, 1.0
         );
 
@@ -119,7 +119,7 @@ impl Transform {
         Self { m, m_inv: Some(m_inv) }
     }
 
-    pub fn from_scale(scale: Vec3) -> Transform {
+    pub fn from_scale(scale: &Vec3) -> Transform {
         Self {
             m: Mat4::new_nonuniform_scaling(&Vec3::new(scale.x, scale.y, scale.z)),
             m_inv: Some(Mat4::new_nonuniform_scaling(&Vec3::new(1.0 / scale.x, 1.0 / scale.y, 1.0 / scale.z))),

@@ -78,7 +78,7 @@ where
     /// This essentially allows you to select an arbitrary point inside the
     /// bounding box.
     #[inline]
-    pub fn lerp(&self, t: TVec2<T>) -> TVec2<T> {
+    pub fn lerp(&self, t: &TVec2<T>) -> TVec2<T> {
         TVec2::new(math::lerp(self.min.x, self.max.x, t.x), math::lerp(self.min.y, self.max.y, t.y))
     }
 
@@ -87,7 +87,7 @@ where
     /// That is, if `p = self.min`, the offset is `(0, 0, 0)`. If `p =
     /// self.max`, the offset is `(1, 1, 1)` and so on for values in between.
     #[inline]
-    pub fn offset(&self, p: TVec2<T>) -> TVec2<T> {
+    pub fn offset(&self, p: &TVec2<T>) -> TVec2<T> {
         let mut o = p - self.min;
         if self.max.x > self.min.x {
             o.x /= self.max.x - self.min.x
@@ -102,7 +102,7 @@ where
     #[inline]
     pub fn bounding_sphere(&self) -> (TVec2<T>, T) {
         let center = (self.min + self.max) / T::TWO;
-        let radius = if self.inside(center) { (center - self.max).magnitude() } else { T::ZERO };
+        let radius = if self.inside(&center) { (center - self.max).magnitude() } else { T::ZERO };
         (center, radius)
     }
 
@@ -121,13 +121,13 @@ where
 
     /// Computes whether or not the given point `p` is inside the bounding box.
     #[inline]
-    pub fn inside(&self, p: TVec2<T>) -> bool {
+    pub fn inside(&self, p: &TVec2<T>) -> bool {
         p.x >= self.min.x && p.x <= self.max.x && p.y >= self.min.y && p.y <= self.max.y
     }
 
     /// Same as `inside`, but excludes points on the upper boundary.
     #[inline]
-    pub fn inside_exclusive(&self, p: TVec2<T>) -> bool {
+    pub fn inside_exclusive(&self, p: &TVec2<T>) -> bool {
         p.x >= self.min.x && p.x < self.max.x && p.y >= self.min.y && p.y < self.max.y
     }
 
@@ -142,7 +142,7 @@ where
     ///
     /// If `p` is inside the bounding box, the returned distance is zero.
     #[inline]
-    pub fn distance_sqr(&self, p: TVec2<T>) -> T {
+    pub fn distance_sqr(&self, p: &TVec2<T>) -> T {
         let dx = T::ZERO.maxi(self.min.x - p.x).maxi(p.x - self.max.x);
         let dy = T::ZERO.maxi(self.min.y - p.y).maxi(p.y - self.max.y);
         dx * dx + dy * dy
@@ -152,7 +152,7 @@ where
     ///
     /// If `p` is inside the bounding box, the returned distance is zero.
     #[inline]
-    pub fn distance(&self, p: TVec2<T>) -> T {
+    pub fn distance(&self, p: &TVec2<T>) -> T {
         self.distance_sqr(p).sqrt()
     }
 
