@@ -6,25 +6,28 @@ pub mod numeric;
 pub mod ray;
 pub mod sphere;
 pub mod transform;
-pub mod bivec;
+pub mod mat;
+pub mod vect;
+pub mod assert;
 
+pub use mat::{TMat2, TMat3, TMat4};
+pub use vect::{TVec2, TVec3, TVec4};
 pub use bounds::{direction::DirectionCone, Bounds2, Bounds3, IBounds2, IBounds3, UBounds2, UBounds3};
 pub use dim::Dimension;
-#[allow(unused_imports)]
-pub use nalgebra::{self as na, Unit};
-#[allow(unused_imports)]
-pub use nalgebra_glm::{self as glm, vec2, vec3, vec4};
-pub use nalgebra_glm::{Qua, TMat2, TMat3, TMat4, TVec2, TVec3, TVec4};
-pub use numeric::Numeric;
+pub use numeric::{Numeric, NumericNegative, NumericFloat};
 pub use ray::Ray;
 pub use sphere::OctahedralVec3;
-pub use bivec::{Bivec2, Bivec3, Bivec4};
+pub use crate::math_assert;
+
+use self::vect::{TPoint2, TPoint3, TPoint4, TUnitVec2, TUnitVec3, TUnitVec4};
 
 
 #[allow(clippy::module_inception)]
 #[allow(clippy::excessive_precision)]
 pub mod math {
     // Pbrt B.2 Mathematical Infrastructure
+
+    use std::ops::Mul;
 
     pub use super::sphere::*;
     use super::ScalarAsBits;
@@ -81,7 +84,7 @@ pub mod math {
 
     /// Computes the square of a number.
     #[inline]
-    pub fn sqr<T: Numeric + Clone + Copy>(x: T) -> T {
+    pub fn sqr<T: Numeric + Clone + Copy + Mul<T, Output = T>>(x: T) -> T {
         x * x
     }
 
@@ -253,11 +256,11 @@ pub mod math {
 
 
     pub mod safe {
-        use crate::math::{Numeric, Scalar};
+        use crate::{math::{Numeric, Scalar}, NumericFloat};
 
         #[inline]
-        pub fn sqrt<T: Numeric>(x: T) -> T {
-            (x.maxi(T::ZERO)).sqrt()
+        pub fn sqrt<T: Numeric + NumericFloat>(x: T) -> T {
+            (x.nmax(T::ZERO)).nsqrt()
         }
 
         #[inline]
@@ -276,10 +279,15 @@ pub mod math {
 pub type Scalar = f32;
 pub type ScalarAsBits = u32;
 
-pub type Quat = Qua<Scalar>;
 pub type Mat2 = TMat2<Scalar>;
 pub type Mat3 = TMat3<Scalar>;
 pub type Mat4 = TMat4<Scalar>;
+pub type Point2 = TPoint2<Scalar>;
+pub type Point3 = TPoint3<Scalar>;
+pub type Point4 = TPoint4<Scalar>;
 pub type Vec2 = TVec2<Scalar>;
 pub type Vec3 = TVec3<Scalar>;
 pub type Vec4 = TVec4<Scalar>;
+pub type UnitVec2 = TUnitVec2<Scalar>;
+pub type UnitVec3 = TUnitVec3<Scalar>;
+pub type UnitVec4 = TUnitVec4<Scalar>;

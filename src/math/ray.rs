@@ -4,41 +4,41 @@ use crate::math::*;
 
 
 pub trait RayLike {
-    fn at(&self, t: Scalar) -> Vec3;
+    fn at(&self, t: Scalar) -> Point3;
 }
 
 
 // TODO: Test this
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Ray {
-    pub origin: Vec3,
-    pub direction: Bivec3,
+    pub origin: Point3,
+    pub direction: UnitVec3,
 }
 
 impl Default for Ray {
     fn default() -> Self {
-        Self { origin: Vec3::new(0.0, 0.0, 0.0), direction: Bivec3::new(Vec3::new(0.0, 0.0, 1.0)) }
+        Self { origin: Point3::new(0.0, 0.0, 0.0), direction: UnitVec3::new(0.0, 0.0, 1.0) }
     }
 }
 
 impl Ray {
     /// Create a new [`Ray`] from an `origin` and `direction`.
     #[inline]
-    pub const fn new(origin: Vec3, direction: Bivec3) -> Self {
+    pub const fn new(origin: Point3, direction: UnitVec3) -> Self {
         Self { origin, direction }
     }
 
     /// Create a new [`Ray`] from an `origin` with a direction pointing along
     /// the positive Z axis.
     #[inline]
-    pub const fn from_origin(origin: Vec3) -> Self {
-        Self { origin, direction: Bivec3::new(Vec3::new(0.0, 0.0, 1.0)) }
+    pub const fn from_origin(origin: Point3) -> Self {
+        Self { origin, direction: UnitVec3::new(0.0, 0.0, 1.0) }
     }
 
     /// Create a new [`Ray`] from a `direction` with an origin at `(0, 0, 0)`.
     #[inline]
-    pub const fn from_direction(direction: Bivec3) -> Self {
-        Self { origin: Vec3::new(0.0, 0.0, 0.0), direction }
+    pub const fn from_direction(direction: UnitVec3) -> Self {
+        Self { origin: Point3::new(0.0, 0.0, 0.0), direction }
     }
 
     /// Returns whether or not this [`Ray`] contains an infinite value.
@@ -80,7 +80,7 @@ impl Ray {
 impl RayLike for Ray {
     /// Computes the point along this [`Ray`] at a given `t`.
     #[inline]
-    fn at(&self, t: Scalar) -> Vec3 {
+    fn at(&self, t: Scalar) -> Point3 {
         self.origin + self.direction.get() * t
     }
 }
@@ -104,10 +104,10 @@ impl RayDifferential {
             aux.rx_origin = self.ray.origin + (aux.rx_origin - self.ray.origin) * s;
             aux.ry_origin = self.ray.origin + (aux.ry_origin - self.ray.origin) * s;
 
-            aux.rx_direction = Bivec3::new_normalize(
+            aux.rx_direction = UnitVec3::new_normalize(
                 self.ray.direction.get() + (aux.rx_direction.get() - self.ray.direction.get()) * s,
             );
-            aux.ry_direction = Bivec3::new_normalize(
+            aux.ry_direction = UnitVec3::new_normalize(
                 self.ray.direction.get() + (aux.ry_direction.get() - self.ray.direction.get()) * s,
             );
         }
@@ -117,23 +117,23 @@ impl RayDifferential {
 impl RayLike for RayDifferential {
     /// Computes the point along this [`Ray`] at a given `t`.
     #[inline]
-    fn at(&self, t: Scalar) -> Vec3 {
+    fn at(&self, t: Scalar) -> Point3 {
         self.ray.at(t)
     }
 }
 
 
 pub struct AuxiliaryRays {
-    pub rx_origin: Vec3,
-    pub rx_direction: Bivec3,
-    pub ry_origin: Vec3,
-    pub ry_direction: Bivec3,
+    pub rx_origin: Point3,
+    pub rx_direction: UnitVec3,
+    pub ry_origin: Point3,
+    pub ry_direction: UnitVec3,
 }
 
 impl AuxiliaryRays {
     /// Creates a new [`AuxiliaryRays`].
     #[inline]
-    pub fn new(rx_origin: Vec3, rx_direction: Bivec3, ry_origin: Vec3, ry_direction: Bivec3) -> AuxiliaryRays {
+    pub fn new(rx_origin: Point3, rx_direction: UnitVec3, ry_origin: Point3, ry_direction: UnitVec3) -> AuxiliaryRays {
         AuxiliaryRays { rx_origin, rx_direction, ry_origin, ry_direction }
     }
 }

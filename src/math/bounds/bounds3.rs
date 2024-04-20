@@ -30,7 +30,7 @@ where
     /// Creates a new [`TBounds3`] containing the given `points`.
     #[inline]
     pub fn from_points(points: Vec<TVec3<T>>) -> Self {
-        points.iter().fold(TBounds3::new(), |bounds, p| bounds | p)
+        points.iter().fold(TBounds3::new(), |bounds, p| bounds | *p)
     }
 
     /// Returns the position of the given `corner`.
@@ -87,7 +87,7 @@ where
     /// This essentially allows you to select an arbitrary point inside the
     /// bounding box.
     #[inline]
-    pub fn lerp(&self, t: &TVec3<T>) -> TVec3<T> {
+    pub fn lerp(&self, t: TVec3<T>) -> TVec3<T> {
         TVec3::new(
             math::lerp(self.min.x, self.max.x, t.x),
             math::lerp(self.min.y, self.max.y, t.y),
@@ -100,7 +100,7 @@ where
     /// That is, if `p = self.min`, the offset is `(0, 0, 0)`. If `p =
     /// self.max`, the offset is `(1, 1, 1)` and so on for values in between.
     #[inline]
-    pub fn offset(&self, p: &TVec3<T>) -> TVec3<T> {
+    pub fn offset(&self, p: TVec3<T>) -> TVec3<T> {
         let mut o = p - self.min;
         if self.max.x > self.min.x {
             o.x /= self.max.x - self.min.x
@@ -118,7 +118,7 @@ where
     #[inline]
     pub fn bounding_sphere(&self) -> (TVec3<T>, T) {
         let center = (self.min + self.max) / T::TWO;
-        let radius = if self.inside(&center) { (center - self.max).magnitude() } else { T::ZERO };
+        let radius = if self.inside(center) { (center - self.max).magnitude() } else { T::ZERO };
         (center, radius)
     }
 
@@ -137,13 +137,13 @@ where
 
     /// Computes whether or not the given point `p` is inside the bounding box.
     #[inline]
-    pub fn inside(&self, p: &TVec3<T>) -> bool {
+    pub fn inside(&self, p: TVec3<T>) -> bool {
         p.x >= self.min.x && p.x <= self.max.x && p.y >= self.min.y && p.y <= self.max.y && p.z >= self.min.z && p.z <= self.max.z
     }
 
     /// Same as `inside`, but excludes points on the upper boundary.
     #[inline]
-    pub fn inside_exclusive(&self, p: &TVec3<T>) -> bool {
+    pub fn inside_exclusive(&self, p: TVec3<T>) -> bool {
         p.x >= self.min.x && p.x < self.max.x && p.y >= self.min.y && p.y < self.max.y && p.z >= self.min.z && p.z < self.max.z
     }
 
@@ -160,7 +160,7 @@ where
     ///
     /// If `p` is inside the bounding box, the returned distance is zero.
     #[inline]
-    pub fn distance_sqr(&self, p: &TVec3<T>) -> T {
+    pub fn distance_sqr(&self, p: TVec3<T>) -> T {
         let dx = T::ZERO.maxi(self.min.x - p.x).maxi(p.x - self.max.x);
         let dy = T::ZERO.maxi(self.min.y - p.y).maxi(p.y - self.max.y);
         let dz = T::ZERO.maxi(self.min.z - p.z).maxi(p.z - self.max.z);
@@ -171,7 +171,7 @@ where
     ///
     /// If `p` is inside the bounding box, the returned distance is zero.
     #[inline]
-    pub fn distance(&self, p: &TVec3<T>) -> T {
+    pub fn distance(&self, p: TVec3<T>) -> T {
         self.distance_sqr(p).sqrt()
     }
 
@@ -205,14 +205,14 @@ impl<T: Numeric + Clone + Copy> TBounds3<T> {
     /// and `max` of the bounding box as needed.
     #[doc(alias = "|, |=")]
     #[inline]
-    pub fn union_vect(self, rhs: &TVec3<T>) -> Self {
+    pub fn union_vect(self, rhs: TVec3<T>) -> Self {
         Self {
             min: TVec3::new(self.min.x.mini(rhs.x), self.min.y.mini(rhs.y), self.min.z.mini(rhs.z)),
             max: TVec3::new(self.max.x.maxi(rhs.x), self.max.y.maxi(rhs.y), self.max.z.maxi(rhs.z)),
         }
     }
 
-    fn union_vect_assign(&mut self, rhs: &TVec3<T>) {
+    fn union_vect_assign(&mut self, rhs: TVec3<T>) {
         self.min = TVec3::new(self.min.x.mini(rhs.x), self.min.y.mini(rhs.y), self.min.z.mini(rhs.z));
         self.max = TVec3::new(self.max.x.maxi(rhs.x), self.max.y.maxi(rhs.y), self.max.z.maxi(rhs.z));
     }
@@ -252,18 +252,6 @@ impl<T> Index<u8> for TBounds3<T> {
 }
 
 
-impl<T: Numeric + Clone + Copy> BitOr<&TBounds3<T>> for TBounds3<T> {
-    type Output = TBounds3<T>;
-
-    /// Takes the union of two bounding boxes, extending the `min` and
-    /// `max` as needed.
-    #[inline]
-    fn bitor(self, rhs: &TBounds3<T>) -> Self::Output {
-        self.union_box(rhs)
-    }
-}
-
-
 impl<T: Numeric + Clone + Copy> BitOr<TBounds3<T>> for TBounds3<T> {
     type Output = TBounds3<T>;
 
@@ -282,32 +270,9 @@ impl<T: Numeric + Clone + Copy> BitOr<TVec3<T>> for TBounds3<T> {
     /// and `max` of the bounding box as needed.
     #[inline]
     fn bitor(self, rhs: TVec3<T>) -> Self::Output {
-        self.union_vect(&rhs)
-    }
-}
-
-impl<T: Numeric + Clone + Copy> BitOr<&TVec3<T>> for TBounds3<T> {
-    type Output = TBounds3<T>;
-
-    /// Takes the union of a vector with this bounding box, extending the `min`
-    /// and `max` of the bounding box as needed.
-    #[inline]
-    fn bitor(self, rhs: &TVec3<T>) -> Self::Output {
         self.union_vect(rhs)
     }
 }
-
-impl<T: Numeric + Clone + Copy> BitAnd<&TBounds3<T>> for TBounds3<T> {
-    type Output = TBounds3<T>;
-
-    /// Takes the union of two bounding boxes, extending the `min` and
-    /// `max` as needed.
-    #[inline]
-    fn bitand(self, rhs: &TBounds3<T>) -> Self::Output {
-        self.intersect(rhs)
-    }
-}
-
 
 impl<T: Numeric + Clone + Copy> BitAnd<TBounds3<T>> for TBounds3<T> {
     type Output = TBounds3<T>;
@@ -329,39 +294,12 @@ impl<T: Numeric + Clone + Copy> BitOrAssign<TBounds3<T>> for TBounds3<T> {
     }
 }
 
-impl<T: Numeric + Clone + Copy> BitOrAssign<&TBounds3<T>> for TBounds3<T> {
-    /// Takes the union of two bounding boxes, extending the `min` and
-    /// `max` as needed.
-    #[inline]
-    fn bitor_assign(&mut self, rhs: &TBounds3<T>) {
-        self.union_box_assign(rhs);
-    }
-}
-
 impl<T: Numeric + Clone + Copy> BitOrAssign<TVec3<T>> for TBounds3<T> {
     /// Takes the union of a vector with this bounding box, extending the `min`
     /// and `max` of the bounding box as needed.
     #[inline]
     fn bitor_assign(&mut self, rhs: TVec3<T>) {
-        self.union_vect_assign(&rhs);
-    }
-}
-
-impl<T: Numeric + Clone + Copy> BitOrAssign<&TVec3<T>> for TBounds3<T> {
-    /// Takes the union of a vector with this bounding box, extending the `min`
-    /// and `max` of the bounding box as needed.
-    #[inline]
-    fn bitor_assign(&mut self, rhs: &TVec3<T>) {
         self.union_vect_assign(rhs);
-    }
-}
-
-impl<T: Numeric + Clone + Copy> BitAndAssign<&TBounds3<T>> for TBounds3<T> {
-    /// Takes the union of two bounding boxes, extending the `min` and
-    /// `max` as needed.
-    #[inline]
-    fn bitand_assign(&mut self, rhs: &TBounds3<T>) {
-        self.intersect_assign(rhs);
     }
 }
 

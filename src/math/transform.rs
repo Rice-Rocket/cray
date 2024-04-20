@@ -26,10 +26,10 @@ impl Transform {
         Self { m, m_inv: Some(m_inv) }
     }
 
-    pub fn from_translation(delta: &Vec3) -> Transform {
-        Self {
-            m: Mat4::new_translation(&Vec3::new(delta.x, delta.y, delta.z)),
-            m_inv: Some(Mat4::new_translation(&Vec3::new(-delta.x, -delta.y, -delta.z))),
+    pub fn from_translation(delta: Point3) -> Transform {
+        Transform {
+            m: Mat4::new_translation(&Point3::new(delta.x, delta.y, delta.z)),
+            m_inv: Some(Mat4::new_translation(&Point3::new(-delta.x, -delta.y, -delta.z))),
         }
     }
 
@@ -40,9 +40,9 @@ impl Transform {
             0.0, sin_theta, cos_theta, 0.0,
             0.0, 0.0, 0.0, 1.0
         );
-        Self {
+        Transform {
             m,
-            m_inv: Some(m.transpose())
+            m_inv: Some(m.transpose()),
         }
     }
 
@@ -53,7 +53,7 @@ impl Transform {
             -sin_theta, 0.0, cos_theta, 0.0,
             0.0, 0.0, 0.0, 1.0
         );
-        Self {
+        Transform {
             m,
             m_inv: Some(m.transpose())
         }
@@ -66,63 +66,63 @@ impl Transform {
             0.0, 0.0, 1.0, 0.0,
             0.0, 0.0, 0.0, 1.0
         );
-        Self {
+        Transform {
             m,
             m_inv: Some(m.transpose())
         }
     }
 
-    pub fn from_rotation(axisangle: Vec3) -> Transform {
-        Self { m: Mat4::new_rotation(axisangle), m_inv: Some(Mat4::new_rotation(axisangle).transpose()) }
+    pub fn from_rotation(axisangle: Point3) -> Transform {
+        Transform { m: Mat4::new_rotation(axisangle), m_inv: Some(Mat4::new_rotation(axisangle).transpose()) }
     }
 
-    pub fn from_delta(from: &Bivec3, to: &Bivec3) -> Transform {
-        let refl = if from.x().abs() < 0.72 && to.x().abs() < 0.72 {
-            Vec3::new(1.0, 0.0, 0.0)
-        } else if from.y().abs() < 0.72 && to.y().abs() < 0.72 {
-            Vec3::new(0.0, 1.0, 0.0)
+    pub fn from_rotation_delta(from: UnitVec3, to: UnitVec3) -> Transform {
+        let refl = if from.x.abs() < 0.72 && to.x.abs() < 0.72 {
+            Point3::new(1.0, 0.0, 0.0)
+        } else if from.y.abs() < 0.72 && to.y.abs() < 0.72 {
+            Point3::new(0.0, 1.0, 0.0)
         } else {
-            Vec3::new(0.0, 0.0, 1.0)
+            Point3::new(0.0, 0.0, 1.0)
         };
 
-        let u = refl - from.get();
-        let v = refl - to.get();
+        let u = refl - from;
+        let v = refl - to;
         let mut r = Mat4::default();
         for i in 0..3 {
             for j in 0..3 {
                 r[(i, j)] = if i == j { 1.0 } else { 0.0 }
-                    - 2.0 / u.dot(&u) * u[i] * u[j]
-                    - 2.0 / v.dot(&v) * v[i] * v[j]
-                    + 4.0 * u.dot(&v) / (u.dot(&u) * v.dot(&v)) * v[i] * u[j];
+                    - 2.0 / u.dot(u) * u[i] * u[j]
+                    - 2.0 / v.dot(v) * v[i] * v[j]
+                    + 4.0 * u.dot(v) / (u.dot(u) * v.dot(v)) * v[i] * u[j];
             }
         }
 
-        Self {
+        Transform {
             m: r,
             m_inv: Some(r.transpose())
         }
     }
 
-    pub fn looking_at(pos: &Vec3, target: &Vec3, up: &Bivec3) -> Transform {
-        let dir = Bivec3::new_normalize(target - pos);
-        let right = Bivec3::new_normalize(up.cross(&dir));
-        let new_up = dir.cross(&right);
+    pub fn looking_at(pos: Point3, target: Point3, up: UnitVec3) -> Transform {
+        let dir = UnitVec3::from((target - pos).normalize());
+        let right = UnitVec3::from(up.cross(dir).normalize());
+        let new_up = dir.cross(right);
 
         let m_inv = Mat4::new(
-            right.x(), new_up.x, dir.x(), pos.x,
-            right.y(), new_up.y, dir.y(), pos.y, 
-            right.z(), new_up.z, dir.z(), pos.z, 
+            right.x, new_up.x, dir.x, pos.x,
+            right.y, new_up.y, dir.y, pos.y, 
+            right.z, new_up.z, dir.z, pos.z, 
             0.0, 0.0, 0.0, 1.0
         );
 
         let m = m_inv.try_inverse().unwrap();
-        Self { m, m_inv: Some(m_inv) }
+        Transform { m, m_inv: Some(m_inv) }
     }
 
-    pub fn from_scale(scale: &Vec3) -> Transform {
-        Self {
-            m: Mat4::new_nonuniform_scaling(&Vec3::new(scale.x, scale.y, scale.z)),
-            m_inv: Some(Mat4::new_nonuniform_scaling(&Vec3::new(1.0 / scale.x, 1.0 / scale.y, 1.0 / scale.z))),
+    pub fn from_scale(scale: Point3) -> Transform {
+        Transform {
+            m: Mat4::new_nonuniform_scaling(&Point3::new(scale.x, scale.y, scale.z)),
+            m_inv: Some(Mat4::new_nonuniform_scaling(&Point3::new(1.0 / scale.x, 1.0 / scale.y, 1.0 / scale.z))),
         }
     }
 
@@ -140,15 +140,11 @@ impl Transform {
         }
     }
 
-    pub fn transpose(&mut self) {
+    pub fn transpose(self) {
         self.m.transpose_mut();
         if let Some(inv) = self.m_inv.as_mut() {
             inv.transpose_mut();
         }
-    }
-
-    pub fn transposed(&self) -> Transform {
-        Self { m: self.m.transpose(), m_inv: self.m_inv.map(|inv| inv.transpose()) }
     }
 
     pub fn is_identity(&self) -> bool {
@@ -156,42 +152,10 @@ impl Transform {
     }
 
     pub fn has_scale(&self, epsilon: Scalar) -> bool {
-        let la2 = (self * Vec3::new(1.0, 0.0, 0.0)).magnitude_squared();
-        let lb2 = (self * Vec3::new(0.0, 1.0, 0.0)).magnitude_squared();
-        let lc2 = (self * Vec3::new(0.0, 0.0, 1.0)).magnitude_squared();
+        let la2 = (self * Point3::new(1.0, 0.0, 0.0)).length_squared();
+        let lb2 = (self * Point3::new(0.0, 1.0, 0.0)).length_squared();
+        let lc2 = (self * Point3::new(0.0, 0.0, 1.0)).length_squared();
         (la2 - 1.0).abs() > epsilon || (lb2 - 1.0).abs() > epsilon || (lc2 - 1.0).abs() > epsilon
-    }
-}
-
-impl Mul<&Vec3> for &Transform {
-    type Output = Vec3;
-
-    fn mul(self, rhs: &Vec3) -> Self::Output {
-        (self.m * Vec4::new(rhs.x, rhs.y, rhs.z, 1.0)).xyz()
-    }
-}
-
-impl Mul<&Vec4> for &Transform {
-    type Output = Vec4;
-
-    fn mul(self, rhs: &Vec4) -> Self::Output {
-        self.m * rhs
-    }
-}
-
-impl Mul<&Vec3> for Transform {
-    type Output = Vec3;
-
-    fn mul(self, rhs: &Vec3) -> Self::Output {
-        (self.m * Vec4::new(rhs.x, rhs.y, rhs.z, 1.0)).xyz()
-    }
-}
-
-impl Mul<&Vec4> for Transform {
-    type Output = Vec4;
-
-    fn mul(self, rhs: &Vec4) -> Self::Output {
-        self.m * rhs
     }
 }
 
@@ -199,15 +163,11 @@ impl Mul<Vec3> for &Transform {
     type Output = Vec3;
 
     fn mul(self, rhs: Vec3) -> Self::Output {
-        (self.m * Vec4::new(rhs.x, rhs.y, rhs.z, 1.0)).xyz()
-    }
-}
-
-impl Mul<Vec4> for &Transform {
-    type Output = Vec4;
-
-    fn mul(self, rhs: Vec4) -> Self::Output {
-        self.m * rhs
+        Vec3::new(
+            self.m[(0, 0)] * rhs.x + self.m[(0, 1)] * rhs.y + self.m[(0, 2)] * rhs.z,
+            self.m[(1, 0)] * rhs.x + self.m[(1, 1)] * rhs.y + self.m[(1, 2)] * rhs.z,
+            self.m[(2, 0)] * rhs.x + self.m[(2, 1)] * rhs.y + self.m[(2, 2)] * rhs.z,
+        )
     }
 }
 
@@ -215,15 +175,78 @@ impl Mul<Vec3> for Transform {
     type Output = Vec3;
 
     fn mul(self, rhs: Vec3) -> Self::Output {
-        (self.m * Vec4::new(rhs.x, rhs.y, rhs.z, 1.0)).xyz()
+        Vec3::new(
+            self.m[(0, 0)] * rhs.x + self.m[(0, 1)] * rhs.y + self.m[(0, 2)] * rhs.z,
+            self.m[(1, 0)] * rhs.x + self.m[(1, 1)] * rhs.y + self.m[(1, 2)] * rhs.z,
+            self.m[(2, 0)] * rhs.x + self.m[(2, 1)] * rhs.y + self.m[(2, 2)] * rhs.z,
+        )
     }
 }
 
-impl Mul<Vec4> for Transform {
-    type Output = Vec4;
+impl Mul<UnitVec3> for &Transform {
+    type Output = Vec3;
 
-    fn mul(self, rhs: Vec4) -> Self::Output {
+    fn mul(self, rhs: UnitVec3) -> Self::Output {
+        Vec3::new(
+            self.m[(0, 0)] * rhs.x + self.m[(0, 1)] * rhs.y + self.m[(0, 2)] * rhs.z,
+            self.m[(1, 0)] * rhs.x + self.m[(1, 1)] * rhs.y + self.m[(1, 2)] * rhs.z,
+            self.m[(2, 0)] * rhs.x + self.m[(2, 1)] * rhs.y + self.m[(2, 2)] * rhs.z,
+        )
+    }
+}
+
+impl Mul<UnitVec3> for Transform {
+    type Output = Vec3;
+
+    fn mul(self, rhs: UnitVec3) -> Self::Output {
+        Vec3::new(
+            self.m[(0, 0)] * rhs.x + self.m[(0, 1)] * rhs.y + self.m[(0, 2)] * rhs.z,
+            self.m[(1, 0)] * rhs.x + self.m[(1, 1)] * rhs.y + self.m[(1, 2)] * rhs.z,
+            self.m[(2, 0)] * rhs.x + self.m[(2, 1)] * rhs.y + self.m[(2, 2)] * rhs.z,
+        )
+    }
+}
+
+impl Mul<Point3> for &Transform {
+    type Output = Point3;
+
+    fn mul(self, rhs: Point3) -> Self::Output {
+        (self.m * Point4::new(rhs.x, rhs.y, rhs.z, 1.0)).xyz()
+    }
+}
+
+impl Mul<Point4> for &Transform {
+    type Output = Point4;
+
+    fn mul(self, rhs: Point4) -> Self::Output {
         self.m * rhs
+    }
+}
+
+impl Mul<Point3> for Transform {
+    type Output = Point3;
+
+    fn mul(self, rhs: Point3) -> Self::Output {
+        (self.m * Point4::new(rhs.x, rhs.y, rhs.z, 1.0)).xyz()
+    }
+}
+
+impl Mul<Point4> for Transform {
+    type Output = Point4;
+
+    fn mul(self, rhs: Point4) -> Self::Output {
+        self.m * rhs
+    }
+}
+
+impl Mul<Transform> for Transform {
+    type Output = Transform;
+
+    fn mul(self, rhs: Transform) -> Self::Output {
+        Transform {
+            m: self.m * rhs.m,
+            m_inv: self.m_inv.zip(rhs.m_inv).map(|(a, b)| a * b),
+        }
     }
 }
 
