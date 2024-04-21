@@ -61,7 +61,7 @@ impl DirectionCone {
             return Self::entire_sphere();
         }
 
-        let w = Mat4::new_rotation(wr * theta_r) * Point4::new(self.w.x, self.w.y, self.w.z, 1.0);
+        let w = Mat4::from_rotation(theta_r.sin(), theta_r.sin(), wr) * Point4::new(self.w.x, self.w.y, self.w.z, 1.0);
         Self { w: UnitVec3::from(w.xyz()), cos_theta: theta_o.cos() }
     }
 

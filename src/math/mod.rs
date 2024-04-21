@@ -11,15 +11,13 @@ pub mod vect;
 pub mod assert;
 
 pub use mat::{TMat2, TMat3, TMat4};
-pub use vect::{TVec2, TVec3, TVec4};
+pub use vect::{TVec2, TVec3, TVec4, TPoint2, TPoint3, TPoint4, TUnitVec2, TUnitVec3, TUnitVec4};
 pub use bounds::{direction::DirectionCone, Bounds2, Bounds3, IBounds2, IBounds3, UBounds2, UBounds3};
 pub use dim::Dimension;
 pub use numeric::{Numeric, NumericNegative, NumericFloat};
 pub use ray::Ray;
 pub use sphere::OctahedralVec3;
 pub use crate::math_assert;
-
-use self::vect::{TPoint2, TPoint3, TPoint4, TUnitVec2, TUnitVec3, TUnitVec4};
 
 
 #[allow(clippy::module_inception)]
@@ -252,6 +250,12 @@ pub mod math {
     #[inline]
     pub fn trimmed_logistic(x: Scalar, s: Scalar, a: Scalar, b: Scalar) -> Scalar {
         logistic(x, s) / (logistic_cdf(b, s) - logistic_cdf(a, s))
+    }
+
+
+    #[inline]
+    pub fn sin_cos(x: Scalar) -> (Scalar, Scalar) {
+        Scalar::sin_cos(x)
     }
 
 

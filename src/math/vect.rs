@@ -1,4 +1,5 @@
-use std::ops::{Add, Sub, Mul, Div, Index, IndexMut};
+use std::ops::{Add, Sub, Mul, Div, Neg, Index, IndexMut};
+use approx::{AbsDiffEq, RelativeEq, UlpsEq};
 
 use crate::math::*;
 
@@ -18,30 +19,30 @@ macro_rules! create_vect {
         create_vect!($name; $a, $($b),*; $a; $($b),*; $alias0:$out0:$a-$($b)-*, $($alias:$out:$x-$($y)-*),*; $($alias:$x-$($y)-*),*);
     };
     ($name:ident; $($v:ident),*; $x:ident; $($y:ident),*; $($alias:ident:$out:ident:$($z:ident)-*),*; $($alias0:ident:$($z0:ident)-*),*) => {
-        impl<T> $name<T> {
+        impl<T: Clone + Copy> $name<T> {
             #[inline]
-            pub fn new($($v: T,)*) -> Self {
+            pub const fn new($($v: T,)*) -> Self {
                 Self {$(
                     $v,
                 )*}
             }
 
             #[inline]
-            pub fn splat(v: T) -> Self {
+            pub const fn splat(v: T) -> Self {
                 Self {$(
                     $v: v,
                 )*}
             }
 
             #[inline]
-            pub fn map<U, F: FnOnce(T) -> U>(self, f: F) -> $name<U> {
+            pub fn map<U, F: Fn(T) -> U>(self, f: F) -> $name<U> {
                 $name::<U> {$(
                     $v: f(self.$v),
                 )*}
             }
         }
 
-        impl<T: Numeric + PartialOrd> $name<T> {
+        impl<T: Clone + Copy + Numeric + PartialOrd> $name<T> {
             pub const MIN: Self = Self::splat(T::MIN);
             pub const MAX: Self = Self::splat(T::MAX);
             pub const ZERO: Self = Self::splat(T::ZERO);
@@ -82,7 +83,7 @@ macro_rules! create_vect {
             }
         }
 
-        impl<T: Add<T, Output = T> + Sub<T, Output = T> + Mul<T, Output = T> + Div<T, Output = T>> $name<T> {
+        impl<T: Clone + Copy + Add<T, Output = T> + Sub<T, Output = T> + Mul<T, Output = T> + Div<T, Output = T>> $name<T> {
             #[inline]
             pub fn lerp(self, rhs: Self, t: T) -> Self {
                 self + (rhs - self) * t
@@ -110,7 +111,14 @@ macro_rules! create_vect {
             }
         }
 
-        impl<T: Numeric + NumericNegative + NumericFloat + PartialOrd + Add<T, Output = T> + Sub<T, Output = T> + Mul<T, Output = T> + Div<T, Output = T>> $name<T> {
+        impl<T: Clone + Copy + Add<T, Output = T> + Mul<T, Output = T>> $name<T> {
+            #[inline]
+            pub fn dot(self, rhs: Self) -> T {
+                self.$x * rhs.$x $(+ self.$y * rhs.$y)*
+            }
+        }
+
+        impl<T: Clone + Copy + Numeric + NumericNegative + NumericFloat + PartialOrd + Add<T, Output = T> + Sub<T, Output = T> + Mul<T, Output = T> + Div<T, Output = T>> $name<T> {
             #[inline]
             pub fn length_squared(self) -> T {
                 self.dot(self)
@@ -122,18 +130,18 @@ macro_rules! create_vect {
             }
 
             #[inline]
-            pub fn length_squared_inv(self) -> T {
+            pub fn length_squared_recip(self) -> T {
                 self.length_squared().ninv()
             }
 
             #[inline]
-            pub fn length_inv(self) -> T {
+            pub fn length_recip(self) -> T {
                 self.length().ninv()
             }
 
             #[inline]
             pub fn normalize(self) -> Self {
-                self * self.length_inv()
+                self * self.length_recip()
             }
 
             #[inline]
@@ -156,13 +164,8 @@ macro_rules! create_vect {
             }
 
             #[inline]
-            pub fn dot(self, rhs: Self) -> T {
-                self.$x * rhs.$x $(+ self.$y * rhs.$y)*
-            }
-
-            #[inline]
             pub fn project_onto(self, rhs: Self) -> Self {
-                rhs * self.dot(rhs) * rhs.length_squared_inv()
+                rhs * self.dot(rhs) * rhs.length_squared_recip()
             }
 
             #[inline]
@@ -259,7 +262,16 @@ macro_rules! create_vect {
             }
         }
 
-        impl<T: Mul<T, Output = T>> Mul<T> for $name<T> {
+        impl<T: Neg<Output = T>> Neg for $name<T> {
+            type Output = $name<T>;
+            fn neg(self) -> Self::Output {
+                $name {$(
+                    $v: -self.$v,
+                )*}
+            }
+        }
+
+        impl<T: Clone + Copy + Mul<T, Output = T>> Mul<T> for $name<T> {
             type Output = $name<T>;
             fn mul(self, rhs: T) -> Self::Output {
                 $name {$(
@@ -268,7 +280,7 @@ macro_rules! create_vect {
             }
         }
 
-        impl<T: Div<T, Output = T> + Numeric + PartialEq> Div<T> for $name<T> {
+        impl<T: Clone + Copy + Div<T, Output = T> + Numeric + PartialEq> Div<T> for $name<T> {
             type Output = $name<T>;
             fn div(self, rhs: T) -> Self::Output {
                 math_assert!(rhs != T::ZERO);
@@ -360,7 +372,7 @@ create_vect!(TUnitVec4; x,y,z,w; TUnitVec4:TUnitVec4, TPoint4:TPoint4:x-y-z-w, T
 
 
 macro_rules! impl_index {
-    ($($ty:ident: $($index:expr => $v:ident),*);* $(;)*) => {
+    ($($ty:ident; $dim:expr; $($index:expr => $itoken:tt => $v:ident),*);* $(;)*) => {
         $(
             impl<T> Index<usize> for $ty<T> {
                 type Output = T;
@@ -384,28 +396,59 @@ macro_rules! impl_index {
                     }
                 }
             }
+
+            impl<T: Clone + Copy> From<[T; $dim]> for $ty<T> {
+                #[inline]
+                fn from(value: [T; $dim]) -> Self {
+                    Self {$(
+                        $v: value[$index],
+                    )*}
+                }
+            }
+
+            impl<T> From<$ty<T>> for [T; $dim] {
+                #[inline]
+                fn from(value: $ty<T>) -> [T; $dim] {
+                    [$(value.$v,)*]
+                }
+            }
+
+            impl<T> From<($(impl_index!($v),)*)> for $ty<T> {
+                fn from(value: ($(impl_index!($v),)*)) -> Self {
+                    Self {$(
+                        $v: value.$itoken,
+                    )*}
+                }
+            }
+
+            impl<T> From<$ty<T>> for ($(impl_index!($v),)*) {
+                fn from(value: $ty<T>) -> Self {
+                    ($(value.$v,)*)
+                }
+            }
         )*
-    }
+    };
+    ($i:ident) => { T }
 }
 
 
 impl_index!(
-    TPoint2: 0 => x, 1 => y;
-    TPoint3: 0 => x, 1 => y, 2 => z;
-    TPoint4: 0 => x, 1 => y, 2 => z, 3 => w;
-    TVec2: 0 => x, 1 => y;
-    TVec3: 0 => x, 1 => y, 2 => z;
-    TVec4: 0 => x, 1 => y, 2 => z, 3 => w;
-    TUnitVec2: 0 => x, 1 => y;
-    TUnitVec3: 0 => x, 1 => y, 2 => z;
-    TUnitVec4: 0 => x, 1 => y, 2 => z, 3 => w;
+    TPoint2; 2; 0 => 0 => x, 1 => 1 => y;
+    TPoint3; 3; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z;
+    TPoint4; 4; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z, 3 => 3 => w;
+    TVec2; 2; 0 => 0 => x, 1 => 1 => y;
+    TVec3; 3; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z;
+    TVec4; 4; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z, 3 => 3 => w;
+    TUnitVec2; 2; 0 => 0 => x, 1 => 1 => y;
+    TUnitVec3; 3; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z;
+    TUnitVec4; 4; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z, 3 => 3 => w;
 );
 
 
 macro_rules! impl_cross {
     ($($ty:ident),*) => {
         $(
-            impl<T: Sub<T, Output = T> + Mul<T, Output = T>> $ty<T> {
+            impl<T: Clone + Copy + Sub<T, Output = T> + Mul<T, Output = T>> $ty<T> {
                 #[inline]
                 pub fn cross(self, rhs: Self) -> Self {
                     Self {
@@ -422,10 +465,99 @@ macro_rules! impl_cross {
 impl_cross!(TVec3, TUnitVec3);
 
 
+macro_rules! impl_debug {
+    ($($name:ident: $($v:ident),*);* $(;)*) => {
+        $(
+            impl<T: Clone + Copy + std::fmt::Debug> std::fmt::Debug for $name<T> {
+                fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(fmt, "{}{:?}", stringify!($name), <($(impl_debug!($v)),*)>::from(*self))
+                }
+            }
+        )*
+    };
+    ($v:ident) => { T }
+}
+
+impl_debug!(
+    TPoint2: x,y;
+    TPoint3: x,y,z;
+    TPoint4: x,y,z,w;
+    TVec2: x,y;
+    TVec3: x,y,z;
+    TVec4: x,y,z,w;
+    TUnitVec2: x,y;
+    TUnitVec3: x,y,z;
+    TUnitVec4: x,y,z,w;
+);
+
+
+macro_rules! impl_approx {
+    ($($name:ident: $x:ident, $($y:ident),*);* $(;)*) => {
+        $(
+            impl<T: AbsDiffEq> AbsDiffEq for $name<T> where
+                T::Epsilon: Copy,
+            {
+                type Epsilon = T::Epsilon;
+
+                fn default_epsilon() -> T::Epsilon {
+                    T::default_epsilon()
+                }
+
+                fn abs_diff_eq(&self, other: &Self, epsilon: T::Epsilon) -> bool {
+                    T::abs_diff_eq(&self.$x, &other.$x, epsilon) $(
+                        && T::abs_diff_eq(&self.$y, &other.$y, epsilon)
+                    )*
+                }
+            }
+
+            impl<T: RelativeEq> RelativeEq for $name<T> where
+                T::Epsilon: Copy,
+            {
+                fn default_max_relative() -> T::Epsilon {
+                    T::default_max_relative()
+                }
+
+                fn relative_eq(&self, other: &Self, epsilon: T::Epsilon, max_relative: T::Epsilon) -> bool {
+                    T::relative_eq(&self.$x, &other.$x, epsilon, max_relative) $(
+                        && T::relative_eq(&self.$y, &other.$y, epsilon, max_relative)
+                    )*
+                }
+            }
+
+            impl<T: UlpsEq> UlpsEq for $name<T> where
+                T::Epsilon: Copy,
+            {
+                fn default_max_ulps() -> u32 {
+                    T::default_max_ulps()
+                }
+
+                fn ulps_eq(&self, other: &Self, epsilon: T::Epsilon, max_ulps: u32) -> bool {
+                    T::ulps_eq(&self.$x, &other.$x, epsilon, max_ulps) $(
+                        && T::ulps_eq(&self.$y, &other.$y, epsilon, max_ulps)
+                    )*
+                }
+            }
+        )*
+    }
+}
+
+impl_approx!(
+    TPoint2: x,y;
+    TPoint3: x,y,z;
+    TPoint4: x,y,z,w;
+    TVec2: x,y;
+    TVec3: x,y,z;
+    TVec4: x,y,z,w;
+    TUnitVec2: x,y;
+    TUnitVec3: x,y,z;
+    TUnitVec4: x,y,z,w;
+);
+
+
 macro_rules! impl_new_normalize {
     ($($ty:ident: $($x:ident),*);* $(;)*) => {
         $(
-            impl<T: Numeric + NumericNegative + NumericFloat + PartialOrd + Add<T, Output = T> + Sub<T, Output = T> + Mul<T, Output = T> + Div<T, Output = T>> $ty<T> {
+            impl<T: Clone + Copy + Numeric + NumericNegative + NumericFloat + PartialOrd + Add<T, Output = T> + Sub<T, Output = T> + Mul<T, Output = T> + Div<T, Output = T>> $ty<T> {
                 #[inline]
                 pub fn new_normalize($($x: T,)*) -> Self {
                     Self {$(
@@ -444,7 +576,7 @@ impl_new_normalize!(TUnitVec2: x,y; TUnitVec3: x,y,z; TUnitVec4: x,y,z,w);
 macro_rules! impl_swizzle {
     ($($ty:ident: $($name:ident -> $out:ident[$($i:expr),+]),* $(,)*);* $(;)*) => {
         $(
-            impl<T> $ty<T> {
+            impl<T: Clone + Copy> $ty<T> {
                 $(
                     #[inline]
                     pub fn $name(self) -> $out<T> {

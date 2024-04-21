@@ -13,7 +13,7 @@ pub struct Transform {
 
 impl Default for Transform {
     fn default() -> Self {
-        Self { m: Mat4::identity(), m_inv: Some(Mat4::identity()) }
+        Self { m: Mat4::IDENTITY, m_inv: Some(Mat4::IDENTITY) }
     }
 }
 
@@ -28,18 +28,13 @@ impl Transform {
 
     pub fn from_translation(delta: Point3) -> Transform {
         Transform {
-            m: Mat4::new_translation(&Point3::new(delta.x, delta.y, delta.z)),
-            m_inv: Some(Mat4::new_translation(&Point3::new(-delta.x, -delta.y, -delta.z))),
+            m: Mat4::from_translation(delta),
+            m_inv: Some(Mat4::from_translation(-delta)),
         }
     }
 
     pub fn from_rotation_x(sin_theta: Scalar, cos_theta: Scalar) -> Transform {
-        let m = Mat4::new(
-            1.0, 0.0, 0.0, 0.0,
-            0.0, cos_theta, -sin_theta, 0.0,
-            0.0, sin_theta, cos_theta, 0.0,
-            0.0, 0.0, 0.0, 1.0
-        );
+        let m = Mat4::from_rotation_x(sin_theta, cos_theta);
         Transform {
             m,
             m_inv: Some(m.transpose()),
@@ -47,12 +42,7 @@ impl Transform {
     }
 
     pub fn from_rotation_y(sin_theta: Scalar, cos_theta: Scalar) -> Transform {
-        let m = Mat4::new(
-            cos_theta, 0.0, sin_theta, 0.0,
-            0.0, 1.0, 0.0, 0.0,
-            -sin_theta, 0.0, cos_theta, 0.0,
-            0.0, 0.0, 0.0, 1.0
-        );
+        let m = Mat4::from_rotation_y(sin_theta, cos_theta);
         Transform {
             m,
             m_inv: Some(m.transpose())
@@ -60,20 +50,16 @@ impl Transform {
     }
 
     pub fn from_rotation_z(sin_theta: Scalar, cos_theta: Scalar) -> Transform {
-        let m = Mat4::new(
-            cos_theta, -sin_theta, 0.0, 0.0,
-            sin_theta, cos_theta, 0.0, 0.0,
-            0.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 1.0
-        );
+        let m = Mat4::from_rotation_z(sin_theta, cos_theta);
         Transform {
             m,
             m_inv: Some(m.transpose())
         }
     }
 
-    pub fn from_rotation(axisangle: Point3) -> Transform {
-        Transform { m: Mat4::new_rotation(axisangle), m_inv: Some(Mat4::new_rotation(axisangle).transpose()) }
+    pub fn from_rotation(sin_theta: Scalar, cos_theta: Scalar, axis: UnitVec3) -> Transform {
+        let m = Mat4::from_rotation(sin_theta, cos_theta, axis);
+        Transform { m, m_inv: Some(m.transpose()) }
     }
 
     pub fn from_rotation_delta(from: UnitVec3, to: UnitVec3) -> Transform {
@@ -87,7 +73,7 @@ impl Transform {
 
         let u = refl - from;
         let v = refl - to;
-        let mut r = Mat4::default();
+        let mut r = Mat4::IDENTITY;
         for i in 0..3 {
             for j in 0..3 {
                 r[(i, j)] = if i == j { 1.0 } else { 0.0 }
@@ -115,14 +101,14 @@ impl Transform {
             0.0, 0.0, 0.0, 1.0
         );
 
-        let m = m_inv.try_inverse().unwrap();
+        let m = m_inv.inverse();
         Transform { m, m_inv: Some(m_inv) }
     }
 
-    pub fn from_scale(scale: Point3) -> Transform {
+    pub fn from_scale(scale: Vec3) -> Transform {
         Transform {
-            m: Mat4::new_nonuniform_scaling(&Point3::new(scale.x, scale.y, scale.z)),
-            m_inv: Some(Mat4::new_nonuniform_scaling(&Point3::new(1.0 / scale.x, 1.0 / scale.y, 1.0 / scale.z))),
+            m: Mat4::from_scale(scale),
+            m_inv: Some(Mat4::from_scale(scale.recip())),
         }
     }
 
@@ -134,21 +120,21 @@ impl Transform {
         match self.m_inv {
             Some(inv) => Some(inv),
             None => {
-                self.m_inv = self.m.try_inverse();
+                self.m_inv = Some(self.m.inverse());
                 self.m_inv
             },
         }
     }
 
-    pub fn transpose(self) {
-        self.m.transpose_mut();
-        if let Some(inv) = self.m_inv.as_mut() {
-            inv.transpose_mut();
+    pub fn transpose(self) -> Transform {
+        Transform {
+            m: self.m.transpose(),
+            m_inv: self.m_inv.map(|m| m.transpose())
         }
     }
 
     pub fn is_identity(&self) -> bool {
-        self.m.is_identity(Scalar::EPSILON)
+        self.m == Mat4::IDENTITY
     }
 
     pub fn has_scale(&self, epsilon: Scalar) -> bool {

@@ -47,9 +47,9 @@ impl Ray {
         self.origin.x.is_infinite()
             || self.origin.y.is_infinite()
             || self.origin.z.is_infinite()
-            || self.direction.x().is_infinite()
-            || self.direction.y().is_infinite()
-            || self.direction.z().is_infinite()
+            || self.direction.x.is_infinite()
+            || self.direction.y.is_infinite()
+            || self.direction.z.is_infinite()
     }
 
     /// Returns whether or not this [`Ray`] contains a NaN.
@@ -58,9 +58,9 @@ impl Ray {
         self.origin.x.is_nan()
             || self.origin.y.is_nan()
             || self.origin.z.is_nan()
-            || self.direction.x().is_nan()
-            || self.direction.y().is_nan()
-            || self.direction.z().is_nan()
+            || self.direction.x.is_nan()
+            || self.direction.y.is_nan()
+            || self.direction.z.is_nan()
     }
 
     /// Returns whether or not this [`Ray`] is entirely made up of finite
@@ -70,9 +70,9 @@ impl Ray {
         self.origin.x.is_finite()
             && self.origin.y.is_finite()
             && self.origin.z.is_finite()
-            && self.direction.x().is_finite()
-            && self.direction.y().is_finite()
-            && self.direction.z().is_finite()
+            && self.direction.x.is_finite()
+            && self.direction.y.is_finite()
+            && self.direction.z.is_finite()
     }
 }
 
@@ -81,7 +81,7 @@ impl RayLike for Ray {
     /// Computes the point along this [`Ray`] at a given `t`.
     #[inline]
     fn at(&self, t: Scalar) -> Point3 {
-        self.origin + self.direction.get() * t
+        self.origin + self.direction * t
     }
 }
 
@@ -104,12 +104,8 @@ impl RayDifferential {
             aux.rx_origin = self.ray.origin + (aux.rx_origin - self.ray.origin) * s;
             aux.ry_origin = self.ray.origin + (aux.ry_origin - self.ray.origin) * s;
 
-            aux.rx_direction = UnitVec3::new_normalize(
-                self.ray.direction.get() + (aux.rx_direction.get() - self.ray.direction.get()) * s,
-            );
-            aux.ry_direction = UnitVec3::new_normalize(
-                self.ray.direction.get() + (aux.ry_direction.get() - self.ray.direction.get()) * s,
-            );
+            aux.rx_direction = self.ray.direction + (aux.rx_direction - self.ray.direction) * s;
+            aux.ry_direction = self.ray.direction + (aux.ry_direction - self.ray.direction) * s;
         }
     }
 }
