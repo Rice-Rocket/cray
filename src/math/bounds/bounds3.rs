@@ -170,7 +170,7 @@ where
 
 impl<T> TBounds3<T>
 where
-    T: Numeric + NumericNegative + NumericFloat + PartialOrd + Clone + Copy + Add<T, Output = T> + Mul<T, Output = T> + Sub<T, Output = T> + Div<T, Output = T>
+    T: NumericField + NumericNegative + NumericFloat
 {
     /// Computes the bounding sphere that encompasses this bounding box.
     #[inline]

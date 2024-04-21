@@ -14,12 +14,16 @@ macro_rules! create_mat {
         }
 
         impl<T: Clone + Copy> $name<T> {
-            pub fn rowc<const N: usize>(self) -> $vect<T> {
-                $vect::<T>::from(self.0[N])
+            pub const fn rowc<const N: usize>(self) -> $vect<T> {
+                $vect::<T>::new($(self.0[N][$i],)*)
             }
 
-            pub fn colc<const N: usize>(self) -> $vect<T> {
-                $vect::<T>::new($(self[($i, N)],)*)
+            pub const fn colc<const N: usize>(self) -> $vect<T> {
+                $vect::<T>::new($(self.0[$i][N],)*)
+            }
+
+            pub const fn index<const R: usize, const C: usize>(self) -> T {
+                self.0[R][C]
             }
 
             #[inline]
@@ -105,6 +109,25 @@ macro_rules! impl_mul_vect {
 impl_mul_vect!(TMat2 -> TVec2:0,1; TPoint2:0,1; TUnitVec2:0,1);
 impl_mul_vect!(TMat3 -> TVec3:0,1,2; TPoint3:0,1,2; TUnitVec3:0,1,2);
 impl_mul_vect!(TMat4 -> TVec4:0,1,2,3; TPoint4:0,1,2,3; TUnitVec4:0,1,2,3);
+
+
+macro_rules! impl_interval {
+    ($($ty:ident -> $prim:ident: $($i:tt,$j:tt)-*);*) => {
+        $(
+            impl<T: NumericField + FloatInterval> From<$ty<$prim>> for $ty<T> {
+                fn from(value: $ty<$prim>) -> Self {
+                    Self::new($(
+                        T::new_interval(value.index::<$i, $j>(), value.index::<$i, $j>()),
+                    )*)
+                }
+            }
+        )*
+    }
+}
+
+impl_interval!(TMat2 -> Scalar: 0,0-0,1-1,0-1,1);
+impl_interval!(TMat3 -> Scalar: 0,0-0,1-0,2-1,0-1,1-1,2-2,0-2,1-2,2);
+impl_interval!(TMat4 -> Scalar: 0,0-0,1-0,2-0,3-1,0-1,1-1,2-1,3-2,0-2,1-2,2-2,3-3,0-3,1-3,2-3,3);
 
 
 impl<T: Numeric> TMat2<T> {
@@ -388,9 +411,9 @@ mod tests {
 
     #[test]
     fn translate() {
-        let m = Mat4::from_translation(Point3::new(1.0, 2.0, 3.0));
-        let p = Point4::new(1.0, 2.0, 3.0, 1.0);
-        assert_eq!((m * p).xyz(), Point3::new(2.0, 4.0, 6.0));
+        let m = Mat4::from_translation(Point3f::new(1.0, 2.0, 3.0));
+        let p = Point4f::new(1.0, 2.0, 3.0, 1.0);
+        assert_eq!((m * p).xyz(), Point3f::new(2.0, 4.0, 6.0));
     }
 
     #[test]
@@ -399,116 +422,116 @@ mod tests {
         let m = Mat4::from_rotation_x(theta.sin(), theta.cos());
         let gm = glam::Mat4::from_rotation_x(theta);
 
-        let p = Point4::new(0.0, 1.0, 0.0, 1.0);
+        let p = Point4f::new(0.0, 1.0, 0.0, 1.0);
         let gp = glam::Vec4::new(0.0, 1.0, 0.0, 1.0);
 
         let p1 = (m * p).xyz();
         let gp1 = (gm * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3::from(gp1.to_array()));
+        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()));
 
         let theta = 2.3542f32;
         let m = Mat4::from_rotation_y(theta.sin(), theta.cos());
         let gm = glam::Mat4::from_rotation_y(theta);
 
-        let p = Point4::new(0.3, 7.1, 3.4, 1.0);
+        let p = Point4f::new(0.3, 7.1, 3.4, 1.0);
         let gp = glam::Vec4::new(0.3, 7.1, 3.4, 1.0);
 
         let p1 = (m * p).xyz();
         let gp1 = (gm * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3::from(gp1.to_array()));
+        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()));
 
         let theta = 0.761f32;
         let m = Mat4::from_rotation_x(theta.sin(), theta.cos());
         let gm = glam::Mat4::from_rotation_x(theta);
 
-        let p = Point4::new(0.146, 3.0135, 7.0541, 1.0);
+        let p = Point4f::new(0.146, 3.0135, 7.0541, 1.0);
         let gp = glam::Vec4::new(0.146, 3.0135, 7.0541, 1.0);
 
         let p1 = (m * p).xyz();
         let gp1 = (gm * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3::from(gp1.to_array()));
+        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()));
     }
 
     #[test]
     fn rotate() {
         let theta = 1.431f32;
 
-        let m = Mat4::from_rotation(theta.sin(), theta.cos(), UnitVec3::new_normalize(3.0, 1.0, 2.0));
+        let m = Mat4::from_rotation(theta.sin(), theta.cos(), UnitVec3f::new_normalize(3.0, 1.0, 2.0));
         let gm = glam::Mat4::from_axis_angle(glam::Vec3::new(3.0, 1.0, 2.0).normalize(), theta);
 
-        let p = Point4::new(0.413, 4.21, 3.73, 1.0);
+        let p = Point4f::new(0.413, 4.21, 3.73, 1.0);
         let gp = glam::Vec4::new(0.413, 4.21, 3.73, 1.0);
 
         let p1 = (m * p).xyz();
         let gp1 = (gm * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3::from(gp1.to_array()))
+        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()))
     }
 
     #[test]
     fn scale() {
-        let m = Mat4::from_scale(Vec3::new(1.541, 3.312, 0.231));
+        let m = Mat4::from_scale(Vec3f::new(1.541, 3.312, 0.231));
         let gm = glam::Mat4::from_scale(glam::Vec3::new(1.541, 3.312, 0.231));
 
-        let p = Point4::new(1.143, 0.513, 4.041, 1.0);
+        let p = Point4f::new(1.143, 0.513, 4.041, 1.0);
         let gp = glam::Vec4::new(1.143, 0.513, 4.041, 1.0);
 
         let p1 = (m * p).xyz();
         let gp1 = (gm * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3::from(gp1.to_array()))
+        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()))
     }
 
     #[test]
     fn concat() {
         let theta = 0.712f32;
-        let mut m = Mat4::from_rotation(theta.sin(), theta.cos(), UnitVec3::new_normalize(4.0, 2.0, 5.0));
+        let mut m = Mat4::from_rotation(theta.sin(), theta.cos(), UnitVec3f::new_normalize(4.0, 2.0, 5.0));
         let mut gm = glam::Mat4::from_axis_angle(glam::Vec3::new(4.0, 2.0, 5.0).normalize(), theta);
 
-        m = m * Mat4::from_translation(Point3::new(3.02, 2.43, 0.42));
+        m = m * Mat4::from_translation(Point3f::new(3.02, 2.43, 0.42));
         gm = gm.mul_mat4(&glam::Mat4::from_translation(glam::Vec3::new(3.02, 2.43, 0.42)));
 
         let theta = -1.245f32;
-        m = m * Mat4::from_rotation(theta.sin(), theta.cos(), UnitVec3::new_normalize(-2.0, -3.0, 4.0));
+        m = m * Mat4::from_rotation(theta.sin(), theta.cos(), UnitVec3f::new_normalize(-2.0, -3.0, 4.0));
         gm = gm.mul_mat4(&glam::Mat4::from_axis_angle(glam::Vec3::new(-2.0, -3.0, 4.0).normalize(), theta));
 
-        m = m * Mat4::from_scale(Vec3::new(1.43, 0.53, 2.34));
+        m = m * Mat4::from_scale(Vec3f::new(1.43, 0.53, 2.34));
         gm = gm.mul_mat4(&glam::Mat4::from_scale(glam::Vec3::new(1.43, 0.53, 2.34)));
 
-        let p = Point4::new(0.51, 2.12, 4.53, 1.0);
+        let p = Point4f::new(0.51, 2.12, 4.53, 1.0);
         let gp = glam::Vec4::new(0.51, 2.12, 4.53, 1.0);
 
         let p1 = (m * p).xyz();
         let gp1 = (gm * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3::from(gp1.to_array()), epsilon = 2e-6f32);
+        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()), epsilon = 2e-6f32);
     }
 
     #[test]
     fn determinant() {
-        let m = Mat4::from_scale(Vec3::new(2.0, 3.0, 1.5));
+        let m = Mat4::from_scale(Vec3f::new(2.0, 3.0, 1.5));
         assert_abs_diff_eq!(m.determinant(), 9.0);
     }
 
     #[test]
     fn inverse() {
         let theta = -0.834f32;
-        let m = Mat4::from_rotation(theta.sin(), theta.cos(), UnitVec3::new_normalize(2.0, 5.0, 7.0))
-            * Mat4::from_translation(Point3::new(0.9, 0.3, 0.6))
-            * Mat4::from_scale(Vec3::new(0.8, 1.2, 2.3));
+        let m = Mat4::from_rotation(theta.sin(), theta.cos(), UnitVec3f::new_normalize(2.0, 5.0, 7.0))
+            * Mat4::from_translation(Point3f::new(0.9, 0.3, 0.6))
+            * Mat4::from_scale(Vec3f::new(0.8, 1.2, 2.3));
         let gm = glam::Mat4::from_axis_angle(glam::Vec3::new(2.0, 5.0, 7.0).normalize(), theta)
             * glam::Mat4::from_translation(glam::Vec3::new(0.9, 0.3, 0.6))
             * glam::Mat4::from_scale(glam::Vec3::new(0.8, 1.2, 2.3));
         
-        let p = Point4::new(2.23, 0.83, 1.74, 1.0);
+        let p = Point4f::new(2.23, 0.83, 1.74, 1.0);
         let gp = glam::Vec4::new(2.23, 0.83, 1.74, 1.0);
 
         let p1 = (m.inverse() * p).xyz();
         let gp1 = (gm.inverse() * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3::from(gp1.to_array()));
+        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()));
     }
 }

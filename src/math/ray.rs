@@ -4,41 +4,41 @@ use crate::math::*;
 
 
 pub trait RayLike {
-    fn at(&self, t: Scalar) -> Point3;
+    fn at(&self, t: Scalar) -> Point3f;
 }
 
 
 // TODO: Test this
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Ray {
-    pub origin: Point3,
-    pub direction: UnitVec3,
+    pub origin: Point3f,
+    pub direction: UnitVec3f,
 }
 
 impl Default for Ray {
     fn default() -> Self {
-        Self { origin: Point3::new(0.0, 0.0, 0.0), direction: UnitVec3::new(0.0, 0.0, 1.0) }
+        Self { origin: Point3f::new(0.0, 0.0, 0.0), direction: UnitVec3f::new(0.0, 0.0, 1.0) }
     }
 }
 
 impl Ray {
     /// Create a new [`Ray`] from an `origin` and `direction`.
     #[inline]
-    pub const fn new(origin: Point3, direction: UnitVec3) -> Self {
+    pub const fn new(origin: Point3f, direction: UnitVec3f) -> Self {
         Self { origin, direction }
     }
 
     /// Create a new [`Ray`] from an `origin` with a direction pointing along
     /// the positive Z axis.
     #[inline]
-    pub const fn from_origin(origin: Point3) -> Self {
-        Self { origin, direction: UnitVec3::new(0.0, 0.0, 1.0) }
+    pub const fn from_origin(origin: Point3f) -> Self {
+        Self { origin, direction: UnitVec3f::new(0.0, 0.0, 1.0) }
     }
 
     /// Create a new [`Ray`] from a `direction` with an origin at `(0, 0, 0)`.
     #[inline]
-    pub const fn from_direction(direction: UnitVec3) -> Self {
-        Self { origin: Point3::new(0.0, 0.0, 0.0), direction }
+    pub const fn from_direction(direction: UnitVec3f) -> Self {
+        Self { origin: Point3f::new(0.0, 0.0, 0.0), direction }
     }
 
     /// Returns whether or not this [`Ray`] contains an infinite value.
@@ -80,7 +80,7 @@ impl Ray {
 impl RayLike for Ray {
     /// Computes the point along this [`Ray`] at a given `t`.
     #[inline]
-    fn at(&self, t: Scalar) -> Point3 {
+    fn at(&self, t: Scalar) -> Point3f {
         self.origin + self.direction * t
     }
 }
@@ -113,23 +113,23 @@ impl RayDifferential {
 impl RayLike for RayDifferential {
     /// Computes the point along this [`Ray`] at a given `t`.
     #[inline]
-    fn at(&self, t: Scalar) -> Point3 {
+    fn at(&self, t: Scalar) -> Point3f {
         self.ray.at(t)
     }
 }
 
 
 pub struct AuxiliaryRays {
-    pub rx_origin: Point3,
-    pub rx_direction: UnitVec3,
-    pub ry_origin: Point3,
-    pub ry_direction: UnitVec3,
+    pub rx_origin: Point3f,
+    pub rx_direction: UnitVec3f,
+    pub ry_origin: Point3f,
+    pub ry_direction: UnitVec3f,
 }
 
 impl AuxiliaryRays {
     /// Creates a new [`AuxiliaryRays`].
     #[inline]
-    pub fn new(rx_origin: Point3, rx_direction: UnitVec3, ry_origin: Point3, ry_direction: UnitVec3) -> AuxiliaryRays {
+    pub fn new(rx_origin: Point3f, rx_direction: UnitVec3f, ry_origin: Point3f, ry_direction: UnitVec3f) -> AuxiliaryRays {
         AuxiliaryRays { rx_origin, rx_direction, ry_origin, ry_direction }
     }
 }

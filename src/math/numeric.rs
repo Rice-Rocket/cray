@@ -1,6 +1,35 @@
+use std::ops::{Add, Div, Mul, Neg, Sub};
+
 use crate::math_assert;
 /// A trait that provides a blanket implementation for many traits a number
 /// should have.
+
+pub trait NumericField: 
+    Numeric
+    + Clone
+    + Copy
+    + PartialOrd
+    + PartialEq
+    + Add<Self, Output = Self>
+    + Sub<Self, Output = Self>
+    + Mul<Self, Output = Self> 
+    + Div<Self, Output = Self> 
+    + Neg<Output = Self>
+    + Sized {}
+
+impl<T> NumericField for T 
+where T: 
+    Numeric 
+    + Clone
+    + Copy
+    + PartialOrd
+    + PartialEq
+    + Add<T, Output = T> 
+    + Sub<Self, Output = Self> 
+    + Mul<Self, Output = Self> 
+    + Div<Self, Output = Self>
+    + Neg<Output = Self>
+    + Sized {}
 
 pub trait NumericNegative {
     const NEG_ONE: Self;

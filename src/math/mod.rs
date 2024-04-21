@@ -9,14 +9,22 @@ pub mod transform;
 pub mod mat;
 pub mod vect;
 pub mod assert;
+pub mod swizzle;
+pub mod interval;
+pub mod frame;
 
 pub use mat::{TMat2, TMat3, TMat4};
-pub use vect::{TVec2, TVec3, TVec4, TPoint2, TPoint3, TPoint4, TUnitVec2, TUnitVec3, TUnitVec4};
-pub use bounds::{direction::DirectionCone, Bounds2, Bounds3, IBounds2, IBounds3, UBounds2, UBounds3};
-pub use dim::Dimension;
-pub use numeric::{Numeric, NumericNegative, NumericFloat};
-pub use ray::Ray;
+pub use vect::{TVec2, TVec3, TVec4, TPoint2, TPoint3, TPoint4, TUnitVec2, TUnitVec3, TUnitVec4, TNormal2, TNormal3};
+pub use bounds::{direction::DirectionCone, Bounds2f, Bounds3f, Bounds2i, Bounds3i, Bounds2u, Bounds3u, TBounds2, TBounds3};
+
+pub use frame::Frame;
 pub use sphere::OctahedralVec3;
+pub use dim::Dimension;
+pub use interval::{Interval, FloatInterval};
+
+pub use numeric::{Numeric, NumericNegative, NumericFloat, NumericField};
+pub use ray::{Ray, RayDifferential, AuxiliaryRays};
+
 pub use crate::math_assert;
 
 
@@ -286,12 +294,33 @@ pub type ScalarAsBits = u32;
 pub type Mat2 = TMat2<Scalar>;
 pub type Mat3 = TMat3<Scalar>;
 pub type Mat4 = TMat4<Scalar>;
-pub type Point2 = TPoint2<Scalar>;
-pub type Point3 = TPoint3<Scalar>;
-pub type Point4 = TPoint4<Scalar>;
-pub type Vec2 = TVec2<Scalar>;
-pub type Vec3 = TVec3<Scalar>;
-pub type Vec4 = TVec4<Scalar>;
-pub type UnitVec2 = TUnitVec2<Scalar>;
-pub type UnitVec3 = TUnitVec3<Scalar>;
-pub type UnitVec4 = TUnitVec4<Scalar>;
+
+pub type Mat2i = TMat2<Interval>;
+pub type Mat3i = TMat3<Interval>;
+pub type Mat4i = TMat4<Interval>;
+
+pub type Point2f = TPoint2<Scalar>;
+pub type Point3f = TPoint3<Scalar>;
+pub type Point4f = TPoint4<Scalar>;
+pub type Point2fi = TPoint2<Interval>;
+pub type Point3fi = TPoint3<Interval>;
+pub type Point4fi = TPoint4<Interval>;
+
+pub type Vec2f = TVec2<Scalar>;
+pub type Vec3f = TVec3<Scalar>;
+pub type Vec4f = TVec4<Scalar>;
+pub type Vec2fi = TVec2<Interval>;
+pub type Vec3fi = TVec3<Interval>;
+pub type Vec4fi = TVec4<Interval>;
+
+pub type UnitVec2f = TUnitVec2<Scalar>;
+pub type UnitVec3f = TUnitVec3<Scalar>;
+pub type UnitVec4f = TUnitVec4<Scalar>;
+pub type UnitVec2fi = TUnitVec2<Interval>;
+pub type UnitVec3fi = TUnitVec3<Interval>;
+pub type UnitVec4fi = TUnitVec4<Interval>;
+
+pub type Normal2f = TNormal2<Scalar>;
+pub type Normal3f = TNormal3<Scalar>;
+pub type Normal2fi = TNormal2<Interval>;
+pub type Normal3fi = TNormal3<Interval>;

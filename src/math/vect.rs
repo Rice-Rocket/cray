@@ -83,7 +83,7 @@ macro_rules! create_vect {
             }
         }
 
-        impl<T: Clone + Copy + Add<T, Output = T> + Sub<T, Output = T> + Mul<T, Output = T> + Div<T, Output = T>> $name<T> {
+        impl<T: NumericField> $name<T> {
             #[inline]
             pub fn lerp(self, rhs: Self, t: T) -> Self {
                 self + (rhs - self) * t
@@ -118,7 +118,7 @@ macro_rules! create_vect {
             }
         }
 
-        impl<T: Clone + Copy + Numeric + NumericNegative + NumericFloat + PartialOrd + Add<T, Output = T> + Sub<T, Output = T> + Mul<T, Output = T> + Div<T, Output = T>> $name<T> {
+        impl<T: NumericField + NumericFloat + NumericNegative> $name<T> {
             #[inline]
             pub fn length_squared(self) -> T {
                 self.dot(self)
@@ -359,16 +359,20 @@ decl_vect!(TVec4; x,y,z,w);
 decl_vect!(TUnitVec2; x,y);
 decl_vect!(TUnitVec3; x,y,z);
 decl_vect!(TUnitVec4; x,y,z,w);
+decl_vect!(TNormal2; x,y);
+decl_vect!(TNormal3; x,y,z);
 
-create_vect!(TPoint2; x, y; TPoint2:TPoint2, TVec2:TPoint2:x-y, TUnitVec2:TPoint2:x-y);
-create_vect!(TPoint3; x,y,z; TPoint3:TPoint3, TVec3:TPoint3:x-y-z, TUnitVec3:TPoint3:x-y-z);
+create_vect!(TPoint2; x, y; TPoint2:TPoint2, TVec2:TPoint2:x-y, TUnitVec2:TPoint2:x-y, TNormal2:TPoint2:x-y);
+create_vect!(TPoint3; x,y,z; TPoint3:TPoint3, TVec3:TPoint3:x-y-z, TUnitVec3:TPoint3:x-y-z, TNormal3:TPoint3:x-y-z);
 create_vect!(TPoint4; x,y,z,w; TPoint4:TPoint4, TVec4:TPoint4:x-y-z-w, TUnitVec4:TPoint4:x-y-z-w);
-create_vect!(TVec2; x,y; TVec2:TVec2, TPoint2:TPoint2:x-y, TUnitVec2:TVec2:x-y);
-create_vect!(TVec3; x,y,z; TVec3:TVec3, TPoint3:TPoint3:x-y-z, TUnitVec3:TVec3:x-y-z);
+create_vect!(TVec2; x,y; TVec2:TVec2, TPoint2:TPoint2:x-y, TUnitVec2:TVec2:x-y, TNormal2:TVec2:x-y);
+create_vect!(TVec3; x,y,z; TVec3:TVec3, TPoint3:TPoint3:x-y-z, TUnitVec3:TVec3:x-y-z, TNormal3:TVec3:x-y-z);
 create_vect!(TVec4; x,y,z,w; TVec4:TVec4, TPoint4:TPoint4:x-y-z-w, TUnitVec4:TVec4:x-y-z-w);
-create_vect!(TUnitVec2; x,y; TUnitVec2:TUnitVec2, TPoint2:TPoint2:x-y, TVec2:TVec2:x-y);
-create_vect!(TUnitVec3; x,y,z; TUnitVec3:TUnitVec3, TPoint3:TPoint3:x-y-z, TVec3:TVec3:x-y-z);
+create_vect!(TUnitVec2; x,y; TUnitVec2:TUnitVec2, TPoint2:TPoint2:x-y, TVec2:TVec2:x-y, TNormal2:TUnitVec2:x-y);
+create_vect!(TUnitVec3; x,y,z; TUnitVec3:TUnitVec3, TPoint3:TPoint3:x-y-z, TVec3:TVec3:x-y-z, TNormal3:TUnitVec3:x-y-z);
 create_vect!(TUnitVec4; x,y,z,w; TUnitVec4:TUnitVec4, TPoint4:TPoint4:x-y-z-w, TVec4:TVec4:x-y-z-w);
+create_vect!(TNormal2; x,y; TNormal2:TNormal2, TPoint2:TPoint2:x-y, TVec2:TVec2:x-y, TUnitVec2:TUnitVec2:x-y);
+create_vect!(TNormal3; x,y,z; TNormal3:TNormal3, TPoint3:TPoint3:x-y-z, TVec3:TVec3:x-y-z, TUnitVec3:TUnitVec3:x-y-z);
 
 
 macro_rules! impl_index {
@@ -442,6 +446,8 @@ impl_index!(
     TUnitVec2; 2; 0 => 0 => x, 1 => 1 => y;
     TUnitVec3; 3; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z;
     TUnitVec4; 4; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z, 3 => 3 => w;
+    TNormal2; 2; 0 => 0 => x, 1 => 1 => y;
+    TNormal3; 3; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z;
 );
 
 
@@ -462,7 +468,67 @@ macro_rules! impl_cross {
     }
 }
 
-impl_cross!(TVec3, TUnitVec3);
+impl_cross!(TVec3, TUnitVec3, TNormal3);
+
+
+macro_rules! impl_interval {
+    ($($ty:ident => $prim:ident: $($i:ident),*);* $(;)*) => {
+        impl_interval!(@call $($ty => $prim: $($i),*; $($i),*);*);
+    };
+    (@call $($ty:ident => $prim:ident: $($i:ident),*; $a:ident, $($b:ident),*);*) => {
+        $(
+            impl<T: NumericField + NumericFloat + FloatInterval> $ty<T> {
+                pub fn from_errors(v: $ty<$prim>, err: $ty<$prim>) -> Self {
+                    Self::new($(
+                        T::from_value_and_error(v.$i, err.$i),
+                    )*)
+                }
+
+                pub fn error(self) -> $ty<$prim> {
+                    $ty::<$prim>::new($(
+                        self.$i.width() * $prim::HALF,
+                    )*)
+                }
+
+                pub fn is_exact(self) -> bool {
+                    self.$a.width() == $prim::ZERO $(
+                        && self.$b.width() == $prim::ZERO
+                    )*
+                }
+            }
+
+            impl<T: NumericField + FloatInterval> From<$ty<$prim>> for $ty<T> {
+                fn from(value: $ty<$prim>) -> Self {
+                    Self::new($(
+                        T::new_interval(value.$i, value.$i),
+                    )*)
+                }
+            }
+
+            impl<T: NumericField + FloatInterval> From<$ty<T>> for $ty<$prim> {
+                fn from(value: $ty<T>) -> Self {
+                    Self::new($(
+                        value.$i.to_scalar(),
+                    )*)
+                }
+            }
+        )*
+    };
+}
+
+impl_interval!(
+    TPoint2 => Scalar: x,y;
+    TPoint3 => Scalar: x,y,z;
+    TPoint4 => Scalar: x,y,z,w;
+    TVec2 => Scalar: x,y;
+    TVec3 => Scalar: x,y,z;
+    TVec4 => Scalar: x,y,z,w;
+    TUnitVec2 => Scalar: x,y;
+    TUnitVec3 => Scalar: x,y,z;
+    TUnitVec4 => Scalar: x,y,z,w;
+    TNormal2 => Scalar: x,y;
+    TNormal3 => Scalar: x,y,z;
+);
 
 
 macro_rules! impl_debug {
@@ -488,6 +554,8 @@ impl_debug!(
     TUnitVec2: x,y;
     TUnitVec3: x,y,z;
     TUnitVec4: x,y,z,w;
+    TNormal2: x,y;
+    TNormal3: x,y,z;
 );
 
 
@@ -551,13 +619,15 @@ impl_approx!(
     TUnitVec2: x,y;
     TUnitVec3: x,y,z;
     TUnitVec4: x,y,z,w;
+    TNormal2: x,y;
+    TNormal3: x,y,z;
 );
 
 
 macro_rules! impl_new_normalize {
     ($($ty:ident: $($x:ident),*);* $(;)*) => {
         $(
-            impl<T: Clone + Copy + Numeric + NumericNegative + NumericFloat + PartialOrd + Add<T, Output = T> + Sub<T, Output = T> + Mul<T, Output = T> + Div<T, Output = T>> $ty<T> {
+            impl<T: NumericField + NumericNegative + NumericFloat> $ty<T> {
                 #[inline]
                 pub fn new_normalize($($x: T,)*) -> Self {
                     Self {$(
@@ -570,510 +640,17 @@ macro_rules! impl_new_normalize {
 }
 
 
-impl_new_normalize!(TUnitVec2: x,y; TUnitVec3: x,y,z; TUnitVec4: x,y,z,w);
+impl_new_normalize!(TUnitVec2: x,y; TUnitVec3: x,y,z; TUnitVec4: x,y,z,w; TNormal2: x,y; TNormal3: x,y,z);
 
 
-macro_rules! impl_swizzle {
-    ($($ty:ident: $($name:ident -> $out:ident[$($i:expr),+]),* $(,)*);* $(;)*) => {
-        $(
-            impl<T: Clone + Copy> $ty<T> {
-                $(
-                    #[inline]
-                    pub fn $name(self) -> $out<T> {
-                        $out::new($(
-                            self[$i],
-                        )+)
-                    }
-                )*
-            }
-        )*
+impl<T: NumericField + NumericNegative + NumericFloat> TUnitVec3<T> {
+    pub fn local_basis(self) -> (TUnitVec3<T>, TUnitVec3<T>) {
+        let sign = self.z.nsign();
+        let a = T::NEG_ONE / (sign + self.z);
+        let b = self.x * self.y * a;
+        (
+            TUnitVec3::new(T::ONE + sign * math::sqr(self.x) * a, sign * b, -sign * self.x),
+            TUnitVec3::new(b, sign + math::sqr(self.y) * a, -self.y)
+        )
     }
 }
-
-
-impl_swizzle!(
-    TPoint2: 
-        xx -> TPoint2[0, 0],
-        xy -> TPoint2[0, 1],
-        yx -> TPoint2[1, 0],
-        yy -> TPoint2[1, 1],
-        xxx -> TPoint3[0, 0, 0],
-        xxy -> TPoint3[0, 0, 1],
-        xyx -> TPoint3[0, 1, 0],
-        xyy -> TPoint3[0, 1, 1],
-        yxx -> TPoint3[1, 0, 0],
-        yxy -> TPoint3[1, 0, 1],
-        yyx -> TPoint3[1, 1, 0],
-        yyy -> TPoint3[1, 1, 1],
-        xxxx -> TPoint4[0, 0, 0, 0],
-        xxxy -> TPoint4[0, 0, 0, 1],
-        xxyx -> TPoint4[0, 0, 1, 0],
-        xxyy -> TPoint4[0, 0, 1, 1],
-        xyxx -> TPoint4[0, 1, 0, 0],
-        xyxy -> TPoint4[0, 1, 0, 1],
-        xyyx -> TPoint4[0, 1, 1, 0],
-        xyyy -> TPoint4[0, 1, 1, 1],
-        yxxx -> TPoint4[1, 0, 0, 0],
-        yxxy -> TPoint4[1, 0, 0, 1],
-        yxyx -> TPoint4[1, 0, 1, 0],
-        yxyy -> TPoint4[1, 0, 1, 1],
-        yyxx -> TPoint4[1, 1, 0, 0],
-        yyxy -> TPoint4[1, 1, 0, 1],
-        yyyx -> TPoint4[1, 1, 1, 0],
-        yyyy -> TPoint4[1, 1, 1, 1];
-    TPoint3:
-        xx -> TPoint2[0, 0],
-        xy -> TPoint2[0, 1],
-        xz -> TPoint2[0, 2],
-        yx -> TPoint2[1, 0],
-        yy -> TPoint2[1, 1],
-        yz -> TPoint2[1, 2],
-        zx -> TPoint2[2, 0],
-        zy -> TPoint2[2, 1],
-        zz -> TPoint2[2, 2],
-        xxx -> TPoint3[0, 0, 0],
-        xxy -> TPoint3[0, 0, 1],
-        xxz -> TPoint3[0, 0, 2],
-        xyx -> TPoint3[0, 1, 0],
-        xyy -> TPoint3[0, 1, 1],
-        xyz -> TPoint3[0, 1, 2],
-        xzx -> TPoint3[0, 2, 0],
-        xzy -> TPoint3[0, 2, 1],
-        xzz -> TPoint3[0, 2, 2],
-        yxx -> TPoint3[1, 0, 0],
-        yxy -> TPoint3[1, 0, 1],
-        yxz -> TPoint3[1, 0, 2],
-        yyx -> TPoint3[1, 1, 0],
-        yyy -> TPoint3[1, 1, 1],
-        yyz -> TPoint3[1, 1, 2],
-        yzx -> TPoint3[1, 2, 0],
-        yzy -> TPoint3[1, 2, 1],
-        yzz -> TPoint3[1, 2, 2],
-        zxx -> TPoint3[2, 0, 0],
-        zxy -> TPoint3[2, 0, 1],
-        zxz -> TPoint3[2, 0, 2],
-        zyx -> TPoint3[2, 1, 0],
-        zyy -> TPoint3[2, 1, 1],
-        zyz -> TPoint3[2, 1, 2],
-        zzx -> TPoint3[2, 2, 0],
-        zzy -> TPoint3[2, 2, 1],
-        zzz -> TPoint3[2, 2, 2],
-        xxxx -> TPoint4[0, 0, 0, 0],
-        xxxy -> TPoint4[0, 0, 0, 1],
-        xxxz -> TPoint4[0, 0, 0, 2],
-        xxyx -> TPoint4[0, 0, 1, 0],
-        xxyy -> TPoint4[0, 0, 1, 1],
-        xxyz -> TPoint4[0, 0, 1, 2],
-        xxzx -> TPoint4[0, 0, 2, 0],
-        xxzy -> TPoint4[0, 0, 2, 1],
-        xxzz -> TPoint4[0, 0, 2, 2],
-        xyxx -> TPoint4[0, 1, 0, 0],
-        xyxy -> TPoint4[0, 1, 0, 1],
-        xyxz -> TPoint4[0, 1, 0, 2],
-        xyyx -> TPoint4[0, 1, 1, 0],
-        xyyy -> TPoint4[0, 1, 1, 1],
-        xyyz -> TPoint4[0, 1, 1, 2],
-        xyzx -> TPoint4[0, 1, 2, 0],
-        xyzy -> TPoint4[0, 1, 2, 1],
-        xyzz -> TPoint4[0, 1, 2, 2],
-        xzxx -> TPoint4[0, 2, 0, 0],
-        xzxy -> TPoint4[0, 2, 0, 1],
-        xzxz -> TPoint4[0, 2, 0, 2],
-        xzyx -> TPoint4[0, 2, 1, 0],
-        xzyy -> TPoint4[0, 2, 1, 1],
-        xzyz -> TPoint4[0, 2, 1, 2],
-        xzzx -> TPoint4[0, 2, 2, 0],
-        xzzy -> TPoint4[0, 2, 2, 1],
-        xzzz -> TPoint4[0, 2, 2, 2],
-        yxxx -> TPoint4[0, 0, 0, 0],
-        yxxy -> TPoint4[0, 0, 0, 1],
-        yxxz -> TPoint4[0, 0, 0, 2],
-        yxyx -> TPoint4[0, 0, 1, 0],
-        yxyy -> TPoint4[0, 0, 1, 1],
-        yxyz -> TPoint4[0, 0, 1, 2],
-        yxzx -> TPoint4[0, 0, 2, 0],
-        yxzy -> TPoint4[0, 0, 2, 1],
-        yxzz -> TPoint4[0, 0, 2, 2],
-        yyxx -> TPoint4[0, 1, 0, 0],
-        yyxy -> TPoint4[0, 1, 0, 1],
-        yyxz -> TPoint4[0, 1, 0, 2],
-        yyyx -> TPoint4[0, 1, 1, 0],
-        yyyy -> TPoint4[0, 1, 1, 1],
-        yyyz -> TPoint4[0, 1, 1, 2],
-        yyzx -> TPoint4[0, 1, 2, 0],
-        yyzy -> TPoint4[0, 1, 2, 1],
-        yyzz -> TPoint4[0, 1, 2, 2],
-        yzxx -> TPoint4[0, 2, 0, 0],
-        yzxy -> TPoint4[0, 2, 0, 1],
-        yzxz -> TPoint4[0, 2, 0, 2],
-        yzyx -> TPoint4[0, 2, 1, 0],
-        yzyy -> TPoint4[0, 2, 1, 1],
-        yzyz -> TPoint4[0, 2, 1, 2],
-        yzzx -> TPoint4[0, 2, 2, 0],
-        yzzy -> TPoint4[0, 2, 2, 1],
-        yzzz -> TPoint4[0, 2, 2, 2],
-        zxxx -> TPoint4[0, 0, 0, 0],
-        zxxy -> TPoint4[0, 0, 0, 1],
-        zxxz -> TPoint4[0, 0, 0, 2],
-        zxyx -> TPoint4[0, 0, 1, 0],
-        zxyy -> TPoint4[0, 0, 1, 1],
-        zxyz -> TPoint4[0, 0, 1, 2],
-        zxzx -> TPoint4[0, 0, 2, 0],
-        zxzy -> TPoint4[0, 0, 2, 1],
-        zxzz -> TPoint4[0, 0, 2, 2],
-        zyxx -> TPoint4[0, 1, 0, 0],
-        zyxy -> TPoint4[0, 1, 0, 1],
-        zyxz -> TPoint4[0, 1, 0, 2],
-        zyyx -> TPoint4[0, 1, 1, 0],
-        zyyy -> TPoint4[0, 1, 1, 1],
-        zyyz -> TPoint4[0, 1, 1, 2],
-        zyzx -> TPoint4[0, 1, 2, 0],
-        zyzy -> TPoint4[0, 1, 2, 1],
-        zyzz -> TPoint4[0, 1, 2, 2],
-        zzxx -> TPoint4[0, 2, 0, 0],
-        zzxy -> TPoint4[0, 2, 0, 1],
-        zzxz -> TPoint4[0, 2, 0, 2],
-        zzyx -> TPoint4[0, 2, 1, 0],
-        zzyy -> TPoint4[0, 2, 1, 1],
-        zzyz -> TPoint4[0, 2, 1, 2],
-        zzzx -> TPoint4[0, 2, 2, 0],
-        zzzy -> TPoint4[0, 2, 2, 1],
-        zzzz -> TPoint4[0, 2, 2, 2];
-    TPoint4:
-        xx -> TPoint2[0, 0],
-        xy -> TPoint2[0, 1],
-        xz -> TPoint2[0, 2],
-        xw -> TPoint2[0, 3],
-        yx -> TPoint2[1, 0],
-        yy -> TPoint2[1, 1],
-        yz -> TPoint2[1, 2],
-        yw -> TPoint2[1, 3],
-        zx -> TPoint2[2, 0],
-        zy -> TPoint2[2, 1],
-        zz -> TPoint2[2, 2],
-        zw -> TPoint2[2, 3],
-        wx -> TPoint2[3, 0],
-        wy -> TPoint2[3, 1],
-        wz -> TPoint2[3, 2],
-        ww -> TPoint2[3, 3],
-        xxx -> TPoint3[0, 0, 0],
-        xxy -> TPoint3[0, 0, 1],
-        xxz -> TPoint3[0, 0, 2],
-        xxw -> TPoint3[0, 0, 3],
-        xyx -> TPoint3[0, 1, 0],
-        xyy -> TPoint3[0, 1, 1],
-        xyz -> TPoint3[0, 1, 2],
-        xyw -> TPoint3[0, 1, 3],
-        xzx -> TPoint3[0, 2, 0],
-        xzy -> TPoint3[0, 2, 1],
-        xzz -> TPoint3[0, 2, 2],
-        xzw -> TPoint3[0, 2, 3],
-        xwx -> TPoint3[0, 3, 0],
-        xwy -> TPoint3[0, 3, 1],
-        xwz -> TPoint3[0, 3, 2],
-        xww -> TPoint3[0, 3, 3],
-        yxx -> TPoint3[1, 0, 0],
-        yxy -> TPoint3[1, 0, 1],
-        yxz -> TPoint3[1, 0, 2],
-        yxw -> TPoint3[1, 0, 3],
-        yyx -> TPoint3[1, 1, 0],
-        yyy -> TPoint3[1, 1, 1],
-        yyz -> TPoint3[1, 1, 2],
-        yyw -> TPoint3[1, 1, 3],
-        yzx -> TPoint3[1, 2, 0],
-        yzy -> TPoint3[1, 2, 1],
-        yzz -> TPoint3[1, 2, 2],
-        yzw -> TPoint3[1, 2, 3],
-        ywx -> TPoint3[1, 3, 0],
-        ywy -> TPoint3[1, 3, 1],
-        ywz -> TPoint3[1, 3, 2],
-        yww -> TPoint3[1, 3, 3],
-        zxx -> TPoint3[2, 0, 0],
-        zxy -> TPoint3[2, 0, 1],
-        zxz -> TPoint3[2, 0, 2],
-        zxw -> TPoint3[2, 0, 3],
-        zyx -> TPoint3[2, 1, 0],
-        zyy -> TPoint3[2, 1, 1],
-        zyz -> TPoint3[2, 1, 2],
-        zyw -> TPoint3[2, 1, 3],
-        zzx -> TPoint3[2, 2, 0],
-        zzy -> TPoint3[2, 2, 1],
-        zzz -> TPoint3[2, 2, 2],
-        zzw -> TPoint3[2, 2, 3],
-        zwx -> TPoint3[2, 3, 0],
-        zwy -> TPoint3[2, 3, 1],
-        zwz -> TPoint3[2, 3, 2],
-        zww -> TPoint3[2, 3, 3],
-        wxx -> TPoint3[3, 0, 0],
-        wxy -> TPoint3[3, 0, 1],
-        wxz -> TPoint3[3, 0, 2],
-        wxw -> TPoint3[3, 0, 3],
-        wyx -> TPoint3[3, 1, 0],
-        wyy -> TPoint3[3, 1, 1],
-        wyz -> TPoint3[3, 1, 2],
-        wyw -> TPoint3[3, 1, 3],
-        wzx -> TPoint3[3, 2, 0],
-        wzy -> TPoint3[3, 2, 1],
-        wzz -> TPoint3[3, 2, 2],
-        wzw -> TPoint3[3, 2, 3],
-        wwx -> TPoint3[3, 3, 0],
-        wwy -> TPoint3[3, 3, 1],
-        wwz -> TPoint3[3, 3, 2],
-        www -> TPoint3[3, 3, 3],
-        xxxx -> TPoint4[0, 0, 0, 0],
-        xxxy -> TPoint4[0, 0, 0, 1],
-        xxxz -> TPoint4[0, 0, 0, 2],
-        xxxw -> TPoint4[0, 0, 0, 3],
-        xxyx -> TPoint4[0, 0, 1, 0],
-        xxyy -> TPoint4[0, 0, 1, 1],
-        xxyz -> TPoint4[0, 0, 1, 2],
-        xxyw -> TPoint4[0, 0, 1, 3],
-        xxzx -> TPoint4[0, 0, 2, 0],
-        xxzy -> TPoint4[0, 0, 2, 1],
-        xxzz -> TPoint4[0, 0, 2, 2],
-        xxzw -> TPoint4[0, 0, 2, 3],
-        xxwx -> TPoint4[0, 0, 3, 0],
-        xxwy -> TPoint4[0, 0, 3, 1],
-        xxwz -> TPoint4[0, 0, 3, 2],
-        xxww -> TPoint4[0, 0, 3, 3],
-        xyxx -> TPoint4[0, 1, 0, 0],
-        xyxy -> TPoint4[0, 1, 0, 1],
-        xyxz -> TPoint4[0, 1, 0, 2],
-        xyxw -> TPoint4[0, 1, 0, 3],
-        xyyx -> TPoint4[0, 1, 1, 0],
-        xyyy -> TPoint4[0, 1, 1, 1],
-        xyyz -> TPoint4[0, 1, 1, 2],
-        xyyw -> TPoint4[0, 1, 1, 3],
-        xyzx -> TPoint4[0, 1, 2, 0],
-        xyzy -> TPoint4[0, 1, 2, 1],
-        xyzz -> TPoint4[0, 1, 2, 2],
-        xyzw -> TPoint4[0, 1, 2, 3],
-        xywx -> TPoint4[0, 1, 3, 0],
-        xywy -> TPoint4[0, 1, 3, 1],
-        xywz -> TPoint4[0, 1, 3, 2],
-        xyww -> TPoint4[0, 1, 3, 3],
-        xzxx -> TPoint4[0, 2, 0, 0],
-        xzxy -> TPoint4[0, 2, 0, 1],
-        xzxz -> TPoint4[0, 2, 0, 2],
-        xzxw -> TPoint4[0, 2, 0, 3],
-        xzyx -> TPoint4[0, 2, 1, 0],
-        xzyy -> TPoint4[0, 2, 1, 1],
-        xzyz -> TPoint4[0, 2, 1, 2],
-        xzyw -> TPoint4[0, 2, 1, 3],
-        xzzx -> TPoint4[0, 2, 2, 0],
-        xzzy -> TPoint4[0, 2, 2, 1],
-        xzzz -> TPoint4[0, 2, 2, 2],
-        xzzw -> TPoint4[0, 2, 2, 3],
-        xzwx -> TPoint4[0, 2, 3, 0],
-        xzwy -> TPoint4[0, 2, 3, 1],
-        xzwz -> TPoint4[0, 2, 3, 2],
-        xzww -> TPoint4[0, 2, 3, 3],
-        xwxx -> TPoint4[0, 3, 0, 0],
-        xwxy -> TPoint4[0, 3, 0, 1],
-        xwxz -> TPoint4[0, 3, 0, 2],
-        xwxw -> TPoint4[0, 3, 0, 3],
-        xwyx -> TPoint4[0, 3, 1, 0],
-        xwyy -> TPoint4[0, 3, 1, 1],
-        xwyz -> TPoint4[0, 3, 1, 2],
-        xwyw -> TPoint4[0, 3, 1, 3],
-        xwzx -> TPoint4[0, 3, 2, 0],
-        xwzy -> TPoint4[0, 3, 2, 1],
-        xwzz -> TPoint4[0, 3, 2, 2],
-        xwzw -> TPoint4[0, 3, 2, 3],
-        xwwx -> TPoint4[0, 3, 3, 0],
-        xwwy -> TPoint4[0, 3, 3, 1],
-        xwwz -> TPoint4[0, 3, 3, 2],
-        xwww -> TPoint4[0, 3, 3, 3],
-        yxxx -> TPoint4[1, 0, 0, 0],
-        yxxy -> TPoint4[1, 0, 0, 1],
-        yxxz -> TPoint4[1, 0, 0, 2],
-        yxxw -> TPoint4[1, 0, 0, 3],
-        yxyx -> TPoint4[1, 0, 1, 0],
-        yxyy -> TPoint4[1, 0, 1, 1],
-        yxyz -> TPoint4[1, 0, 1, 2],
-        yxyw -> TPoint4[1, 0, 1, 3],
-        yxzx -> TPoint4[1, 0, 2, 0],
-        yxzy -> TPoint4[1, 0, 2, 1],
-        yxzz -> TPoint4[1, 0, 2, 2],
-        yxzw -> TPoint4[1, 0, 2, 3],
-        yxwx -> TPoint4[1, 0, 3, 0],
-        yxwy -> TPoint4[1, 0, 3, 1],
-        yxwz -> TPoint4[1, 0, 3, 2],
-        yxww -> TPoint4[1, 0, 3, 3],
-        yyxx -> TPoint4[1, 1, 0, 0],
-        yyxy -> TPoint4[1, 1, 0, 1],
-        yyxz -> TPoint4[1, 1, 0, 2],
-        yyxw -> TPoint4[1, 1, 0, 3],
-        yyyx -> TPoint4[1, 1, 1, 0],
-        yyyy -> TPoint4[1, 1, 1, 1],
-        yyyz -> TPoint4[1, 1, 1, 2],
-        yyyw -> TPoint4[1, 1, 1, 3],
-        yyzx -> TPoint4[1, 1, 2, 0],
-        yyzy -> TPoint4[1, 1, 2, 1],
-        yyzz -> TPoint4[1, 1, 2, 2],
-        yyzw -> TPoint4[1, 1, 2, 3],
-        yywx -> TPoint4[1, 1, 3, 0],
-        yywy -> TPoint4[1, 1, 3, 1],
-        yywz -> TPoint4[1, 1, 3, 2],
-        yyww -> TPoint4[1, 1, 3, 3],
-        yzxx -> TPoint4[1, 2, 0, 0],
-        yzxy -> TPoint4[1, 2, 0, 1],
-        yzxz -> TPoint4[1, 2, 0, 2],
-        yzxw -> TPoint4[1, 2, 0, 3],
-        yzyx -> TPoint4[1, 2, 1, 0],
-        yzyy -> TPoint4[1, 2, 1, 1],
-        yzyz -> TPoint4[1, 2, 1, 2],
-        yzyw -> TPoint4[1, 2, 1, 3],
-        yzzx -> TPoint4[1, 2, 2, 0],
-        yzzy -> TPoint4[1, 2, 2, 1],
-        yzzz -> TPoint4[1, 2, 2, 2],
-        yzzw -> TPoint4[1, 2, 2, 3],
-        yzwx -> TPoint4[1, 2, 3, 0],
-        yzwy -> TPoint4[1, 2, 3, 1],
-        yzwz -> TPoint4[1, 2, 3, 2],
-        yzww -> TPoint4[1, 2, 3, 3],
-        ywxx -> TPoint4[1, 3, 0, 0],
-        ywxy -> TPoint4[1, 3, 0, 1],
-        ywxz -> TPoint4[1, 3, 0, 2],
-        ywxw -> TPoint4[1, 3, 0, 3],
-        ywyx -> TPoint4[1, 3, 1, 0],
-        ywyy -> TPoint4[1, 3, 1, 1],
-        ywyz -> TPoint4[1, 3, 1, 2],
-        ywyw -> TPoint4[1, 3, 1, 3],
-        ywzx -> TPoint4[1, 3, 2, 0],
-        ywzy -> TPoint4[1, 3, 2, 1],
-        ywzz -> TPoint4[1, 3, 2, 2],
-        ywzw -> TPoint4[1, 3, 2, 3],
-        ywwx -> TPoint4[1, 3, 3, 0],
-        ywwy -> TPoint4[1, 3, 3, 1],
-        ywwz -> TPoint4[1, 3, 3, 2],
-        ywww -> TPoint4[1, 3, 3, 3],
-        zxxx -> TPoint4[2, 0, 0, 0],
-        zxxy -> TPoint4[2, 0, 0, 1],
-        zxxz -> TPoint4[2, 0, 0, 2],
-        zxxw -> TPoint4[2, 0, 0, 3],
-        zxyx -> TPoint4[2, 0, 1, 0],
-        zxyy -> TPoint4[2, 0, 1, 1],
-        zxyz -> TPoint4[2, 0, 1, 2],
-        zxyw -> TPoint4[2, 0, 1, 3],
-        zxzx -> TPoint4[2, 0, 2, 0],
-        zxzy -> TPoint4[2, 0, 2, 1],
-        zxzz -> TPoint4[2, 0, 2, 2],
-        zxzw -> TPoint4[2, 0, 2, 3],
-        zxwx -> TPoint4[2, 0, 3, 0],
-        zxwy -> TPoint4[2, 0, 3, 1],
-        zxwz -> TPoint4[2, 0, 3, 2],
-        zxww -> TPoint4[2, 0, 3, 3],
-        zyxx -> TPoint4[2, 1, 0, 0],
-        zyxy -> TPoint4[2, 1, 0, 1],
-        zyxz -> TPoint4[2, 1, 0, 2],
-        zyxw -> TPoint4[2, 1, 0, 3],
-        zyyx -> TPoint4[2, 1, 1, 0],
-        zyyy -> TPoint4[2, 1, 1, 1],
-        zyyz -> TPoint4[2, 1, 1, 2],
-        zyyw -> TPoint4[2, 1, 1, 3],
-        zyzx -> TPoint4[2, 1, 2, 0],
-        zyzy -> TPoint4[2, 1, 2, 1],
-        zyzz -> TPoint4[2, 1, 2, 2],
-        zyzw -> TPoint4[2, 1, 2, 3],
-        zywx -> TPoint4[2, 1, 3, 0],
-        zywy -> TPoint4[2, 1, 3, 1],
-        zywz -> TPoint4[2, 1, 3, 2],
-        zyww -> TPoint4[2, 1, 3, 3],
-        zzxx -> TPoint4[2, 2, 0, 0],
-        zzxy -> TPoint4[2, 2, 0, 1],
-        zzxz -> TPoint4[2, 2, 0, 2],
-        zzxw -> TPoint4[2, 2, 0, 3],
-        zzyx -> TPoint4[2, 2, 1, 0],
-        zzyy -> TPoint4[2, 2, 1, 1],
-        zzyz -> TPoint4[2, 2, 1, 2],
-        zzyw -> TPoint4[2, 2, 1, 3],
-        zzzx -> TPoint4[2, 2, 2, 0],
-        zzzy -> TPoint4[2, 2, 2, 1],
-        zzzz -> TPoint4[2, 2, 2, 2],
-        zzzw -> TPoint4[2, 2, 2, 3],
-        zzwx -> TPoint4[2, 2, 3, 0],
-        zzwy -> TPoint4[2, 2, 3, 1],
-        zzwz -> TPoint4[2, 2, 3, 2],
-        zzww -> TPoint4[2, 2, 3, 3],
-        zwxx -> TPoint4[2, 3, 0, 0],
-        zwxy -> TPoint4[2, 3, 0, 1],
-        zwxz -> TPoint4[2, 3, 0, 2],
-        zwxw -> TPoint4[2, 3, 0, 3],
-        zwyx -> TPoint4[2, 3, 1, 0],
-        zwyy -> TPoint4[2, 3, 1, 1],
-        zwyz -> TPoint4[2, 3, 1, 2],
-        zwyw -> TPoint4[2, 3, 1, 3],
-        zwzx -> TPoint4[2, 3, 2, 0],
-        zwzy -> TPoint4[2, 3, 2, 1],
-        zwzz -> TPoint4[2, 3, 2, 2],
-        zwzw -> TPoint4[2, 3, 2, 3],
-        zwwx -> TPoint4[2, 3, 3, 0],
-        zwwy -> TPoint4[2, 3, 3, 1],
-        zwwz -> TPoint4[2, 3, 3, 2],
-        zwww -> TPoint4[2, 3, 3, 3],
-        wxxx -> TPoint4[3, 0, 0, 0],
-        wxxy -> TPoint4[3, 0, 0, 1],
-        wxxz -> TPoint4[3, 0, 0, 2],
-        wxxw -> TPoint4[3, 0, 0, 3],
-        wxyx -> TPoint4[3, 0, 1, 0],
-        wxyy -> TPoint4[3, 0, 1, 1],
-        wxyz -> TPoint4[3, 0, 1, 2],
-        wxyw -> TPoint4[3, 0, 1, 3],
-        wxzx -> TPoint4[3, 0, 2, 0],
-        wxzy -> TPoint4[3, 0, 2, 1],
-        wxzz -> TPoint4[3, 0, 2, 2],
-        wxzw -> TPoint4[3, 0, 2, 3],
-        wxwx -> TPoint4[3, 0, 3, 0],
-        wxwy -> TPoint4[3, 0, 3, 1],
-        wxwz -> TPoint4[3, 0, 3, 2],
-        wxww -> TPoint4[3, 0, 3, 3],
-        wyxx -> TPoint4[3, 1, 0, 0],
-        wyxy -> TPoint4[3, 1, 0, 1],
-        wyxz -> TPoint4[3, 1, 0, 2],
-        wyxw -> TPoint4[3, 1, 0, 3],
-        wyyx -> TPoint4[3, 1, 1, 0],
-        wyyy -> TPoint4[3, 1, 1, 1],
-        wyyz -> TPoint4[3, 1, 1, 2],
-        wyyw -> TPoint4[3, 1, 1, 3],
-        wyzx -> TPoint4[3, 1, 2, 0],
-        wyzy -> TPoint4[3, 1, 2, 1],
-        wyzz -> TPoint4[3, 1, 2, 2],
-        wyzw -> TPoint4[3, 1, 2, 3],
-        wywx -> TPoint4[3, 1, 3, 0],
-        wywy -> TPoint4[3, 1, 3, 1],
-        wywz -> TPoint4[3, 1, 3, 2],
-        wyww -> TPoint4[3, 1, 3, 3],
-        wzxx -> TPoint4[3, 2, 0, 0],
-        wzxy -> TPoint4[3, 2, 0, 1],
-        wzxz -> TPoint4[3, 2, 0, 2],
-        wzxw -> TPoint4[3, 2, 0, 3],
-        wzyx -> TPoint4[3, 2, 1, 0],
-        wzyy -> TPoint4[3, 2, 1, 1],
-        wzyz -> TPoint4[3, 2, 1, 2],
-        wzyw -> TPoint4[3, 2, 1, 3],
-        wzzx -> TPoint4[3, 2, 2, 0],
-        wzzy -> TPoint4[3, 2, 2, 1],
-        wzzz -> TPoint4[3, 2, 2, 2],
-        wzzw -> TPoint4[3, 2, 2, 3],
-        wzwx -> TPoint4[3, 2, 3, 0],
-        wzwy -> TPoint4[3, 2, 3, 1],
-        wzwz -> TPoint4[3, 2, 3, 2],
-        wzww -> TPoint4[3, 2, 3, 3],
-        wwxx -> TPoint4[3, 3, 0, 0],
-        wwxy -> TPoint4[3, 3, 0, 1],
-        wwxz -> TPoint4[3, 3, 0, 2],
-        wwxw -> TPoint4[3, 3, 0, 3],
-        wwyx -> TPoint4[3, 3, 1, 0],
-        wwyy -> TPoint4[3, 3, 1, 1],
-        wwyz -> TPoint4[3, 3, 1, 2],
-        wwyw -> TPoint4[3, 3, 1, 3],
-        wwzx -> TPoint4[3, 3, 2, 0],
-        wwzy -> TPoint4[3, 3, 2, 1],
-        wwzz -> TPoint4[3, 3, 2, 2],
-        wwzw -> TPoint4[3, 3, 2, 3],
-        wwwx -> TPoint4[3, 3, 3, 0],
-        wwwy -> TPoint4[3, 3, 3, 1],
-        wwwz -> TPoint4[3, 3, 3, 2],
-        wwww -> TPoint4[3, 3, 3, 3],
-);

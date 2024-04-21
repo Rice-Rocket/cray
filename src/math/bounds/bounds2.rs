@@ -152,7 +152,7 @@ where
 
 impl<T> TBounds2<T> 
 where 
-    T: Numeric + NumericNegative + NumericFloat + PartialOrd + Clone + Copy + Add<T, Output = T> + Mul<T, Output = T> + Sub<T, Output = T> + Div<T, Output = T> 
+    T: NumericField + NumericNegative + NumericFloat
 {
     /// Computes the distance from point `p` to the edge of the bounding box.
     ///

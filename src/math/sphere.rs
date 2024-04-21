@@ -6,7 +6,7 @@ use crate::math::*;
 /// `(a, b, c)` that correspond to the spherical triangle's vertices.
 // TODO: Test this
 #[inline]
-pub fn spherical_triangle_area(a: UnitVec3, b: UnitVec3, c: UnitVec3) -> Scalar {
+pub fn spherical_triangle_area(a: UnitVec3f, b: UnitVec3f, c: UnitVec3f) -> Scalar {
     (2.0 * (b.cross(c).dot(a)).atan2(1.0 + a.dot(b) + a.dot(c) + b.dot(c))).abs()
 }
 
@@ -18,8 +18,8 @@ pub fn spherical_triangle_area(a: UnitVec3, b: UnitVec3, c: UnitVec3) -> Scalar 
 /// Uses the `sin` and `cos` of theta.
 // TODO: Test this
 #[inline]
-pub fn spherical_direction(sin_theta: Scalar, cos_theta: Scalar, phi: Scalar) -> UnitVec3 {
-    UnitVec3::new(
+pub fn spherical_direction(sin_theta: Scalar, cos_theta: Scalar, phi: Scalar) -> UnitVec3f {
+    UnitVec3f::new(
         sin_theta.clamp(-1.0, 1.0) * phi.cos(),
         sin_theta.clamp(-1.0, 1.0) * phi.sin(),
         cos_theta.clamp(-1.0, 1.0),
@@ -32,7 +32,7 @@ pub fn spherical_direction(sin_theta: Scalar, cos_theta: Scalar, phi: Scalar) ->
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn spherical_theta(v: UnitVec3) -> Scalar {
+pub fn spherical_theta(v: UnitVec3f) -> Scalar {
     math::safe::acos(v.z)
 }
 
@@ -42,7 +42,7 @@ pub fn spherical_theta(v: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 // TODO: Test this
-pub fn spherical_phi(v: UnitVec3) -> Scalar {
+pub fn spherical_phi(v: UnitVec3f) -> Scalar {
     let p = v.y.atan2(v.x);
     if p < 0.0 {
         p + math::TAU
@@ -57,7 +57,7 @@ pub fn spherical_phi(v: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn cos_theta(w: UnitVec3) -> Scalar {
+pub fn cos_theta(w: UnitVec3f) -> Scalar {
     w.z
 }
 
@@ -68,7 +68,7 @@ pub fn cos_theta(w: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn cos_2_theta(w: UnitVec3) -> Scalar {
+pub fn cos_2_theta(w: UnitVec3f) -> Scalar {
     w.z * w.z
 }
 
@@ -78,7 +78,7 @@ pub fn cos_2_theta(w: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn sin_theta(w: UnitVec3) -> Scalar {
+pub fn sin_theta(w: UnitVec3f) -> Scalar {
     sin_2_theta(w).sqrt()
 }
 
@@ -88,7 +88,7 @@ pub fn sin_theta(w: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn sin_2_theta(w: UnitVec3) -> Scalar {
+pub fn sin_2_theta(w: UnitVec3f) -> Scalar {
     (1.0 - cos_2_theta(w)).max(0.0)
 }
 
@@ -98,7 +98,7 @@ pub fn sin_2_theta(w: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn tan_theta(w: UnitVec3) -> Scalar {
+pub fn tan_theta(w: UnitVec3f) -> Scalar {
     sin_theta(w) / cos_theta(w)
 }
 
@@ -109,7 +109,7 @@ pub fn tan_theta(w: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn tan_2_theta(w: UnitVec3) -> Scalar {
+pub fn tan_2_theta(w: UnitVec3f) -> Scalar {
     sin_2_theta(w) / cos_2_theta(w)
 }
 
@@ -119,7 +119,7 @@ pub fn tan_2_theta(w: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn cos_phi(w: UnitVec3) -> Scalar {
+pub fn cos_phi(w: UnitVec3f) -> Scalar {
     let sin_theta = sin_theta(w);
     if sin_theta == 0.0 {
         1.0
@@ -135,7 +135,7 @@ pub fn cos_phi(w: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn cos_2_phi(w: UnitVec3) -> Scalar {
+pub fn cos_2_phi(w: UnitVec3f) -> Scalar {
     math::sqr(cos_phi(w))
 }
 
@@ -145,7 +145,7 @@ pub fn cos_2_phi(w: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn sin_phi(w: UnitVec3) -> Scalar {
+pub fn sin_phi(w: UnitVec3f) -> Scalar {
     let sin_theta = sin_theta(w);
     if sin_theta == 0.0 {
         0.0
@@ -161,7 +161,7 @@ pub fn sin_phi(w: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn sin_2_phi(w: UnitVec3) -> Scalar {
+pub fn sin_2_phi(w: UnitVec3f) -> Scalar {
     math::sqr(sin_phi(w))
 }
 
@@ -171,7 +171,7 @@ pub fn sin_2_phi(w: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn tan_phi(w: UnitVec3) -> Scalar {
+pub fn tan_phi(w: UnitVec3f) -> Scalar {
     sin_phi(w) / cos_phi(w)
 }
 
@@ -182,7 +182,7 @@ pub fn tan_phi(w: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn tan_2_phi(w: UnitVec3) -> Scalar {
+pub fn tan_2_phi(w: UnitVec3f) -> Scalar {
     sin_2_phi(w) / cos_2_phi(w)
 }
 
@@ -192,7 +192,7 @@ pub fn tan_2_phi(w: UnitVec3) -> Scalar {
 /// the apparent `yaw` of the direction.
 // TODO: Test this
 #[inline]
-pub fn cos_d_phi(wa: UnitVec3, wb: UnitVec3) -> Scalar {
+pub fn cos_d_phi(wa: UnitVec3f, wb: UnitVec3f) -> Scalar {
     let waxy = math::sqr(wa.x) + math::sqr(wa.y);
     let wbxy = math::sqr(wb.x) + math::sqr(wb.y);
 
@@ -205,7 +205,7 @@ pub fn cos_d_phi(wa: UnitVec3, wb: UnitVec3) -> Scalar {
 
 
 // TODO: Test this
-pub fn equal_area_square_to_sphere(p: Vec2) -> Vec3 {
+pub fn equal_area_square_to_sphere(p: Vec2f) -> Vec3f {
     let u = 2.0 * p.x - 1.0;
     let v = 2.0 * p.y - 1.0;
     let up = u.abs();
@@ -221,7 +221,7 @@ pub fn equal_area_square_to_sphere(p: Vec2) -> Vec3 {
     let cos_phi = phi.cos() * u.signum();
     let sin_phi = phi.sin() * v.signum();
 
-    Vec3::new(cos_phi * r * math::safe::sqrt(2.0 - r * r), sin_phi * r * math::safe::sqrt(2.0 - r * r), z)
+    Vec3f::new(cos_phi * r * math::safe::sqrt(2.0 - r * r), sin_phi * r * math::safe::sqrt(2.0 - r * r), z)
 }
 
 
@@ -233,7 +233,7 @@ pub struct OctahedralVec3 {
 
 impl OctahedralVec3 {
     /// Builds a new [`OctahedralVec3`] from a UnitVec3.
-    pub fn new(d: UnitVec3) -> Self {
+    pub fn new(d: UnitVec3f) -> Self {
         let v = d / (d.x.abs() + d.y.abs() + d.z.abs());
         if v.z >= 0.0 {
             Self { x: Self::encode(v.x), y: Self::encode(v.y) }
@@ -243,8 +243,8 @@ impl OctahedralVec3 {
     }
 
     /// Converts this [`OctahedralVec3`] back into a UnitVec3.
-    pub fn to_vec3(self) -> UnitVec3 {
-        let mut v = Vec3::new(-1.0 + 2.0 * (self.x as f32 / 65535.0), -1.0 + 2.0 * (self.y as f32 / 65535.0), 0.0);
+    pub fn to_vec3(self) -> UnitVec3f {
+        let mut v = Vec3f::new(-1.0 + 2.0 * (self.x as f32 / 65535.0), -1.0 + 2.0 * (self.y as f32 / 65535.0), 0.0);
         v.z = 1.0 - (v.x.abs() + v.y.abs());
 
         if v.z < 0.0 {
@@ -253,7 +253,7 @@ impl OctahedralVec3 {
             v.y = (1.0 - xo.abs()) * v.y.signum();
         }
 
-        UnitVec3::from(v)
+        UnitVec3f::from(v)
     }
 
     fn encode(f: Scalar) -> u16 {
