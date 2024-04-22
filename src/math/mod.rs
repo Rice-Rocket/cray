@@ -14,7 +14,7 @@ pub mod interval;
 pub mod frame;
 
 pub use mat::{TMat2, TMat3, TMat4};
-pub use vect::{TVec2, TVec3, TVec4, TPoint2, TPoint3, TPoint4, TUnitVec2, TUnitVec3, TUnitVec4, TNormal2, TNormal3};
+pub use vect::{TVec2, TVec3, TVec4, TPoint2, TPoint3, TPoint4, TNormal2, TNormal3};
 pub use bounds::{direction::DirectionCone, Bounds2f, Bounds3f, Bounds2i, Bounds3i, Bounds2u, Bounds3u, TBounds2, TBounds3};
 
 pub use frame::Frame;
@@ -312,13 +312,6 @@ pub type Vec4f = TVec4<Scalar>;
 pub type Vec2fi = TVec2<Interval>;
 pub type Vec3fi = TVec3<Interval>;
 pub type Vec4fi = TVec4<Interval>;
-
-pub type UnitVec2f = TUnitVec2<Scalar>;
-pub type UnitVec3f = TUnitVec3<Scalar>;
-pub type UnitVec4f = TUnitVec4<Scalar>;
-pub type UnitVec2fi = TUnitVec2<Interval>;
-pub type UnitVec3fi = TUnitVec3<Interval>;
-pub type UnitVec4fi = TUnitVec4<Interval>;
 
 pub type Normal2f = TNormal2<Scalar>;
 pub type Normal3f = TNormal3<Scalar>;

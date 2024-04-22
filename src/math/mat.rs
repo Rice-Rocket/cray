@@ -106,9 +106,9 @@ macro_rules! impl_mul_vect {
     }
 }
 
-impl_mul_vect!(TMat2 -> TVec2:0,1; TPoint2:0,1; TUnitVec2:0,1);
-impl_mul_vect!(TMat3 -> TVec3:0,1,2; TPoint3:0,1,2; TUnitVec3:0,1,2);
-impl_mul_vect!(TMat4 -> TVec4:0,1,2,3; TPoint4:0,1,2,3; TUnitVec4:0,1,2,3);
+impl_mul_vect!(TMat2 -> TVec2:0,1; TPoint2:0,1; TNormal2:0,1);
+impl_mul_vect!(TMat3 -> TVec3:0,1,2; TPoint3:0,1,2; TNormal3:0,1,2);
+impl_mul_vect!(TMat4 -> TVec4:0,1,2,3; TPoint4:0,1,2,3);
 
 
 macro_rules! impl_interval {
@@ -370,7 +370,7 @@ where
         )
     }
 
-    pub fn from_rotation(sin_theta: T, cos_theta: T, axis: TUnitVec3<T>) -> Self {
+    pub fn from_rotation(sin_theta: T, cos_theta: T, axis: TVec3<T>) -> Self {
         Self::new(
             axis.x * axis.x + (T::ONE - axis.x * axis.x) * cos_theta,
             axis.x * axis.y * (T::ONE - cos_theta) - axis.z * sin_theta,
@@ -459,7 +459,7 @@ mod tests {
     fn rotate() {
         let theta = 1.431f32;
 
-        let m = Mat4::from_rotation(theta.sin(), theta.cos(), UnitVec3f::new_normalize(3.0, 1.0, 2.0));
+        let m = Mat4::from_rotation(theta.sin(), theta.cos(), Vec3f::new(3.0, 1.0, 2.0).normalize());
         let gm = glam::Mat4::from_axis_angle(glam::Vec3::new(3.0, 1.0, 2.0).normalize(), theta);
 
         let p = Point4f::new(0.413, 4.21, 3.73, 1.0);
@@ -488,14 +488,14 @@ mod tests {
     #[test]
     fn concat() {
         let theta = 0.712f32;
-        let mut m = Mat4::from_rotation(theta.sin(), theta.cos(), UnitVec3f::new_normalize(4.0, 2.0, 5.0));
+        let mut m = Mat4::from_rotation(theta.sin(), theta.cos(), Vec3f::new(4.0, 2.0, 5.0).normalize());
         let mut gm = glam::Mat4::from_axis_angle(glam::Vec3::new(4.0, 2.0, 5.0).normalize(), theta);
 
         m = m * Mat4::from_translation(Point3f::new(3.02, 2.43, 0.42));
         gm = gm.mul_mat4(&glam::Mat4::from_translation(glam::Vec3::new(3.02, 2.43, 0.42)));
 
         let theta = -1.245f32;
-        m = m * Mat4::from_rotation(theta.sin(), theta.cos(), UnitVec3f::new_normalize(-2.0, -3.0, 4.0));
+        m = m * Mat4::from_rotation(theta.sin(), theta.cos(), Vec3f::new(-2.0, -3.0, 4.0).normalize());
         gm = gm.mul_mat4(&glam::Mat4::from_axis_angle(glam::Vec3::new(-2.0, -3.0, 4.0).normalize(), theta));
 
         m = m * Mat4::from_scale(Vec3f::new(1.43, 0.53, 2.34));
@@ -519,7 +519,7 @@ mod tests {
     #[test]
     fn inverse() {
         let theta = -0.834f32;
-        let m = Mat4::from_rotation(theta.sin(), theta.cos(), UnitVec3f::new_normalize(2.0, 5.0, 7.0))
+        let m = Mat4::from_rotation(theta.sin(), theta.cos(), Vec3f::new(2.0, 5.0, 7.0).normalize())
             * Mat4::from_translation(Point3f::new(0.9, 0.3, 0.6))
             * Mat4::from_scale(Vec3f::new(0.8, 1.2, 2.3));
         let gm = glam::Mat4::from_axis_angle(glam::Vec3::new(2.0, 5.0, 7.0).normalize(), theta)

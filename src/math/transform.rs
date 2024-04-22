@@ -65,13 +65,18 @@ impl Transform {
     }
 
     #[inline]
-    pub fn from_rotation(sin_theta: Scalar, cos_theta: Scalar, axis: UnitVec3f) -> Transform {
+    pub fn from_rotation(sin_theta: Scalar, cos_theta: Scalar, axis: Vec3f) -> Transform {
+        math_assert!(axis.is_normalized());
+
         let m = Mat4::from_rotation(sin_theta, cos_theta, axis);
         Transform { m, m_inv: m.transpose() }
     }
 
     #[inline]
-    pub fn from_rotation_delta(from: UnitVec3f, to: UnitVec3f) -> Transform {
+    pub fn from_rotation_delta(from: Vec3f, to: Vec3f) -> Transform {
+        math_assert!(from.is_normalized());
+        math_assert!(to.is_normalized());
+
         let refl = if from.x.abs() < 0.72 && to.x.abs() < 0.72 {
             Point3f::new(1.0, 0.0, 0.0)
         } else if from.y.abs() < 0.72 && to.y.abs() < 0.72 {
@@ -99,9 +104,11 @@ impl Transform {
     }
 
     #[inline]
-    pub fn looking_at(pos: Point3f, target: Point3f, up: UnitVec3f) -> Transform {
-        let dir = UnitVec3f::from((target - pos).normalize());
-        let right = UnitVec3f::from(up.cross(dir).normalize());
+    pub fn looking_at(pos: Point3f, target: Point3f, up: Vec3f) -> Transform {
+        math_assert!(up.is_normalized());
+
+        let dir = (target - pos).normalize().into();
+        let right = up.cross(dir).normalize();
         let new_up = dir.cross(right);
 
         let m_inv = Mat4::new(
@@ -187,19 +194,6 @@ impl Mul<Vec3f> for Transform {
     }
 }
 
-impl Mul<UnitVec3f> for Transform {
-    type Output = Vec3f;
-
-    #[inline]
-    fn mul(self, rhs: UnitVec3f) -> Self::Output {
-        Vec3f::new(
-            self.m[(0, 0)] * rhs.x + self.m[(0, 1)] * rhs.y + self.m[(0, 2)] * rhs.z,
-            self.m[(1, 0)] * rhs.x + self.m[(1, 1)] * rhs.y + self.m[(1, 2)] * rhs.z,
-            self.m[(2, 0)] * rhs.x + self.m[(2, 1)] * rhs.y + self.m[(2, 2)] * rhs.z,
-        )
-    }
-}
-
 impl Mul<Point3f> for Transform {
     type Output = Point3f;
 
@@ -242,7 +236,7 @@ impl Mul<Normal3f> for Transform {
     #[inline]
     fn mul(self, rhs: Normal3f) -> Self::Output {
         let m = self.m_inv;
-        Normal3f::new_normalize(
+        Normal3f::new(
             m[(0, 0)] * rhs.x + m[(1, 0)] * rhs.y + m[(2, 0)] * rhs.z,
             m[(0, 1)] * rhs.x + m[(1, 1)] * rhs.y + m[(2, 1)] * rhs.z,
             m[(0, 2)] * rhs.x + m[(1, 2)] * rhs.y + m[(2, 2)] * rhs.z,
@@ -276,7 +270,7 @@ impl Mul<Ray> for Transform {
             o = o + TVec3::from(d * dt);
         }
 
-        Ray::new(o.into(), d.into())
+        Ray::new(o.into(), d)
     }
 }
 
@@ -293,9 +287,9 @@ impl Mul<RayDifferential> for Transform {
             let ry_direction = self * aux.ry_direction;
             Some(AuxiliaryRays::new(
                 rx_origin,
-                rx_direction.into(),
+                rx_direction,
                 ry_origin,
-                ry_direction.into(),
+                ry_direction,
             ))
         } else {
             None

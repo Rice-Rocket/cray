@@ -356,23 +356,17 @@ decl_vect!(TPoint4; x,y,z,w);
 decl_vect!(TVec2; x,y);
 decl_vect!(TVec3; x,y,z);
 decl_vect!(TVec4; x,y,z,w);
-decl_vect!(TUnitVec2; x,y);
-decl_vect!(TUnitVec3; x,y,z);
-decl_vect!(TUnitVec4; x,y,z,w);
 decl_vect!(TNormal2; x,y);
 decl_vect!(TNormal3; x,y,z);
 
-create_vect!(TPoint2; x, y; TPoint2:TPoint2, TVec2:TPoint2:x-y, TUnitVec2:TPoint2:x-y, TNormal2:TPoint2:x-y);
-create_vect!(TPoint3; x,y,z; TPoint3:TPoint3, TVec3:TPoint3:x-y-z, TUnitVec3:TPoint3:x-y-z, TNormal3:TPoint3:x-y-z);
-create_vect!(TPoint4; x,y,z,w; TPoint4:TPoint4, TVec4:TPoint4:x-y-z-w, TUnitVec4:TPoint4:x-y-z-w);
-create_vect!(TVec2; x,y; TVec2:TVec2, TPoint2:TPoint2:x-y, TUnitVec2:TVec2:x-y, TNormal2:TVec2:x-y);
-create_vect!(TVec3; x,y,z; TVec3:TVec3, TPoint3:TPoint3:x-y-z, TUnitVec3:TVec3:x-y-z, TNormal3:TVec3:x-y-z);
-create_vect!(TVec4; x,y,z,w; TVec4:TVec4, TPoint4:TPoint4:x-y-z-w, TUnitVec4:TVec4:x-y-z-w);
-create_vect!(TUnitVec2; x,y; TUnitVec2:TUnitVec2, TPoint2:TPoint2:x-y, TVec2:TVec2:x-y, TNormal2:TUnitVec2:x-y);
-create_vect!(TUnitVec3; x,y,z; TUnitVec3:TUnitVec3, TPoint3:TPoint3:x-y-z, TVec3:TVec3:x-y-z, TNormal3:TUnitVec3:x-y-z);
-create_vect!(TUnitVec4; x,y,z,w; TUnitVec4:TUnitVec4, TPoint4:TPoint4:x-y-z-w, TVec4:TVec4:x-y-z-w);
-create_vect!(TNormal2; x,y; TNormal2:TNormal2, TPoint2:TPoint2:x-y, TVec2:TVec2:x-y, TUnitVec2:TUnitVec2:x-y);
-create_vect!(TNormal3; x,y,z; TNormal3:TNormal3, TPoint3:TPoint3:x-y-z, TVec3:TVec3:x-y-z, TUnitVec3:TUnitVec3:x-y-z);
+create_vect!(TPoint2; x, y; TPoint2:TPoint2, TVec2:TPoint2:x-y, TNormal2:TPoint2:x-y);
+create_vect!(TPoint3; x,y,z; TPoint3:TPoint3, TVec3:TPoint3:x-y-z, TNormal3:TPoint3:x-y-z);
+create_vect!(TPoint4; x,y,z,w; TPoint4:TPoint4, TVec4:TPoint4:x-y-z-w);
+create_vect!(TVec2; x,y; TVec2:TVec2, TPoint2:TPoint2:x-y, TNormal2:TVec2:x-y);
+create_vect!(TVec3; x,y,z; TVec3:TVec3, TPoint3:TPoint3:x-y-z, TNormal3:TVec3:x-y-z);
+create_vect!(TVec4; x,y,z,w; TVec4:TVec4, TPoint4:TPoint4:x-y-z-w);
+create_vect!(TNormal2; x,y; TNormal2:TNormal2, TPoint2:TPoint2:x-y, TVec2:TVec2:x-y);
+create_vect!(TNormal3; x,y,z; TNormal3:TNormal3, TPoint3:TPoint3:x-y-z, TVec3:TVec3:x-y-z);
 
 
 macro_rules! impl_index {
@@ -443,9 +437,6 @@ impl_index!(
     TVec2; 2; 0 => 0 => x, 1 => 1 => y;
     TVec3; 3; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z;
     TVec4; 4; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z, 3 => 3 => w;
-    TUnitVec2; 2; 0 => 0 => x, 1 => 1 => y;
-    TUnitVec3; 3; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z;
-    TUnitVec4; 4; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z, 3 => 3 => w;
     TNormal2; 2; 0 => 0 => x, 1 => 1 => y;
     TNormal3; 3; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z;
 );
@@ -468,7 +459,7 @@ macro_rules! impl_cross {
     }
 }
 
-impl_cross!(TVec3, TUnitVec3, TNormal3);
+impl_cross!(TVec3, TNormal3);
 
 
 macro_rules! impl_interval {
@@ -523,9 +514,6 @@ impl_interval!(
     TVec2 => Scalar: x,y;
     TVec3 => Scalar: x,y,z;
     TVec4 => Scalar: x,y,z,w;
-    TUnitVec2 => Scalar: x,y;
-    TUnitVec3 => Scalar: x,y,z;
-    TUnitVec4 => Scalar: x,y,z,w;
     TNormal2 => Scalar: x,y;
     TNormal3 => Scalar: x,y,z;
 );
@@ -551,9 +539,6 @@ impl_debug!(
     TVec2: x,y;
     TVec3: x,y,z;
     TVec4: x,y,z,w;
-    TUnitVec2: x,y;
-    TUnitVec3: x,y,z;
-    TUnitVec4: x,y,z,w;
     TNormal2: x,y;
     TNormal3: x,y,z;
 );
@@ -616,41 +601,21 @@ impl_approx!(
     TVec2: x,y;
     TVec3: x,y,z;
     TVec4: x,y,z,w;
-    TUnitVec2: x,y;
-    TUnitVec3: x,y,z;
-    TUnitVec4: x,y,z,w;
     TNormal2: x,y;
     TNormal3: x,y,z;
 );
 
 
-macro_rules! impl_new_normalize {
-    ($($ty:ident: $($x:ident),*);* $(;)*) => {
-        $(
-            impl<T: NumericField + NumericNegative + NumericFloat> $ty<T> {
-                #[inline]
-                pub fn new_normalize($($x: T,)*) -> Self {
-                    Self {$(
-                        $x,
-                    )*}.normalize()
-                }
-            }
-        )*
-    }
-}
+impl<T: NumericField + NumericNegative + NumericFloat> TVec3<T> {
+    pub fn local_basis(self) -> (TVec3<T>, TVec3<T>) {
+        math_assert!(self.is_normalized());
 
-
-impl_new_normalize!(TUnitVec2: x,y; TUnitVec3: x,y,z; TUnitVec4: x,y,z,w; TNormal2: x,y; TNormal3: x,y,z);
-
-
-impl<T: NumericField + NumericNegative + NumericFloat> TUnitVec3<T> {
-    pub fn local_basis(self) -> (TUnitVec3<T>, TUnitVec3<T>) {
         let sign = self.z.nsign();
         let a = T::NEG_ONE / (sign + self.z);
         let b = self.x * self.y * a;
         (
-            TUnitVec3::new(T::ONE + sign * math::sqr(self.x) * a, sign * b, -sign * self.x),
-            TUnitVec3::new(b, sign + math::sqr(self.y) * a, -self.y)
+            TVec3::new(T::ONE + sign * math::sqr(self.x) * a, sign * b, -sign * self.x),
+            TVec3::new(b, sign + math::sqr(self.y) * a, -self.y)
         )
     }
 }

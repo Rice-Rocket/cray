@@ -12,19 +12,20 @@ pub trait RayLike {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Ray {
     pub origin: Point3f,
-    pub direction: UnitVec3f,
+    pub direction: Vec3f,
 }
 
 impl Default for Ray {
     fn default() -> Self {
-        Self { origin: Point3f::new(0.0, 0.0, 0.0), direction: UnitVec3f::new(0.0, 0.0, 1.0) }
+        Self { origin: Point3f::new(0.0, 0.0, 0.0), direction: Vec3f::new(0.0, 0.0, 1.0) }
     }
 }
 
 impl Ray {
     /// Create a new [`Ray`] from an `origin` and `direction`.
     #[inline]
-    pub const fn new(origin: Point3f, direction: UnitVec3f) -> Self {
+    pub fn new(origin: Point3f, direction: Vec3f) -> Self {
+        math_assert!(direction.is_normalized());
         Self { origin, direction }
     }
 
@@ -32,12 +33,13 @@ impl Ray {
     /// the positive Z axis.
     #[inline]
     pub const fn from_origin(origin: Point3f) -> Self {
-        Self { origin, direction: UnitVec3f::new(0.0, 0.0, 1.0) }
+        Self { origin, direction: Vec3f::new(0.0, 0.0, 1.0) }
     }
 
     /// Create a new [`Ray`] from a `direction` with an origin at `(0, 0, 0)`.
     #[inline]
-    pub const fn from_direction(direction: UnitVec3f) -> Self {
+    pub fn from_direction(direction: Vec3f) -> Self {
+        math_assert!(direction.is_normalized());
         Self { origin: Point3f::new(0.0, 0.0, 0.0), direction }
     }
 
@@ -121,15 +123,17 @@ impl RayLike for RayDifferential {
 
 pub struct AuxiliaryRays {
     pub rx_origin: Point3f,
-    pub rx_direction: UnitVec3f,
+    pub rx_direction: Vec3f,
     pub ry_origin: Point3f,
-    pub ry_direction: UnitVec3f,
+    pub ry_direction: Vec3f,
 }
 
 impl AuxiliaryRays {
     /// Creates a new [`AuxiliaryRays`].
     #[inline]
-    pub fn new(rx_origin: Point3f, rx_direction: UnitVec3f, ry_origin: Point3f, ry_direction: UnitVec3f) -> AuxiliaryRays {
+    pub fn new(rx_origin: Point3f, rx_direction: Vec3f, ry_origin: Point3f, ry_direction: Vec3f) -> AuxiliaryRays {
+        math_assert!(rx_direction.is_normalized());
+        math_assert!(ry_direction.is_normalized());
         AuxiliaryRays { rx_origin, rx_direction, ry_origin, ry_direction }
     }
 }
