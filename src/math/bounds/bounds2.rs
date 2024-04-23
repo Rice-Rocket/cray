@@ -5,11 +5,10 @@ use std::ops::{Add, BitAnd, BitAndAssign, BitOr, BitOrAssign, Div, Index, Mul, S
 use crate::math::*;
 
 /// A 2-dimensional axis-aligned bounding box of type `T`
-// TODO: Test this
-#[derive(Clone, Copy)]
-pub struct TBounds2<T> {
-    pub min: TVec2<T>,
-    pub max: TVec2<T>,
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct TBounds2<T: Clone + Copy> {
+    pub min: TPoint2<T>,
+    pub max: TPoint2<T>,
 }
 
 impl<T> TBounds2<T>
@@ -19,25 +18,25 @@ where
     /// Creates a new [`TBounds2`] with no points.
     #[inline]
     pub const fn new() -> Self {
-        Self { min: TVec2::new(T::MAX, T::MAX), max: TVec2::new(T::MIN, T::MIN) }
+        Self { min: TPoint2::new(T::MAX, T::MAX), max: TPoint2::new(T::MIN, T::MIN) }
     }
 
     /// Creates a new [`TBounds2`] containing a single `point`.
     #[inline]
-    pub const fn from_point(point: TVec2<T>) -> Self {
+    pub const fn from_point(point: TPoint2<T>) -> Self {
         Self { min: point, max: point }
     }
 
     /// Creates a new [`TBounds2`] containing the given `points`.
     #[inline]
-    pub fn from_points(points: Vec<TVec2<T>>) -> Self {
+    pub fn from_points(points: Vec<TPoint2<T>>) -> Self {
         points.iter().fold(TBounds2::new(), |bounds, p| bounds | *p)
     }
 
     /// Returns the position of the given `corner`.
     #[inline]
-    pub fn corner(self, corner: u8) -> TVec2<T> {
-        TVec2::new(self[corner & 1].x, self[if corner & 2 != 0 { 1 } else { 0 }].y)
+    pub fn corner(self, corner: u8) -> TPoint2<T> {
+        TPoint2::new(self[corner & 1].x, self[if corner & 2 != 0 { 1 } else { 0 }].y)
     }
 
     /// Returns the diagonal vector of the bounding box.
@@ -45,14 +44,14 @@ where
     /// In other words, the vector that points from `self.min` to `self.max`.
     #[inline]
     #[doc(alias = "dimensions")]
-    pub fn diagonal(self) -> TVec2<T> {
+    pub fn diagonal(self) -> TPoint2<T> {
         self.max - self.min
     }
 
     /// Returns the dimensions of the bounding box.
     #[inline(always)]
     #[doc(alias = "diagonal")]
-    pub fn dimensions(self) -> TVec2<T> {
+    pub fn dimensions(self) -> TPoint2<T> {
         self.diagonal()
     }
 
@@ -79,8 +78,8 @@ where
     /// This essentially allows you to select an arbitrary point inside the
     /// bounding box.
     #[inline]
-    pub fn lerp(self, t: TVec2<T>) -> TVec2<T> {
-        TVec2::new(math::lerp(self.min.x, self.max.x, t.x), math::lerp(self.min.y, self.max.y, t.y))
+    pub fn lerp(self, t: TPoint2<T>) -> TPoint2<T> {
+        TPoint2::new(math::lerp(self.min.x, self.max.x, t.x), math::lerp(self.min.y, self.max.y, t.y))
     }
 
     /// Computes the position of a point `p` relative to the corners of the box.
@@ -88,7 +87,7 @@ where
     /// That is, if `p = self.min`, the offset is `(0, 0, 0)`. If `p =
     /// self.max`, the offset is `(1, 1, 1)` and so on for values in between.
     #[inline]
-    pub fn offset(self, p: TVec2<T>) -> TVec2<T> {
+    pub fn offset(self, p: TPoint2<T>) -> TPoint2<T> {
         let mut o = p - self.min;
         if self.max.x > self.min.x {
             o.x = o.x / (self.max.x - self.min.x)
@@ -114,13 +113,13 @@ where
 
     /// Computes whether or not the given point `p` is inside the bounding box.
     #[inline]
-    pub fn inside(self, p: TVec2<T>) -> bool {
+    pub fn inside(self, p: TPoint2<T>) -> bool {
         p.x >= self.min.x && p.x <= self.max.x && p.y >= self.min.y && p.y <= self.max.y
     }
 
     /// Same as `inside`, but excludes points on the upper boundary.
     #[inline]
-    pub fn inside_exclusive(self, p: TVec2<T>) -> bool {
+    pub fn inside_exclusive(self, p: TPoint2<T>) -> bool {
         p.x >= self.min.x && p.x < self.max.x && p.y >= self.min.y && p.y < self.max.y
     }
 
@@ -135,7 +134,7 @@ where
     ///
     /// If `p` is inside the bounding box, the returned distance is zero.
     #[inline]
-    pub fn distance_sqr(self, p: TVec2<T>) -> T {
+    pub fn distance_sqr(self, p: TPoint2<T>) -> T {
         let dx = T::ZERO.nmax(self.min.x - p.x).nmax(p.x - self.max.x);
         let dy = T::ZERO.nmax(self.min.y - p.y).nmax(p.y - self.max.y);
         dx * dx + dy * dy
@@ -145,7 +144,7 @@ where
     /// dimensions.
     #[inline]
     pub fn expand(self, delta: T) -> Self {
-        Self { min: self.min - TVec2::new(delta, delta), max: self.max + TVec2::new(delta, delta) }
+        Self { min: self.min - TPoint2::new(delta, delta), max: self.max + TPoint2::new(delta, delta) }
     }
 }
 
@@ -158,13 +157,13 @@ where
     ///
     /// If `p` is inside the bounding box, the returned distance is zero.
     #[inline]
-    pub fn distance(self, p: TVec2<T>) -> T {
+    pub fn distance(self, p: TPoint2<T>) -> T {
         self.distance_sqr(p).nsqrt()
     }
 
     /// Computes the bounding sphere that encompasses this bounding box.
     #[inline]
-    pub fn bounding_sphere(self) -> (TVec2<T>, T) {
+    pub fn bounding_sphere(self) -> (TPoint2<T>, T) {
         let center = (self.min + self.max) / T::TWO;
         let radius = if self.inside(center) { (center - self.max).length() } else { T::ZERO };
         (center, radius)
@@ -179,30 +178,30 @@ impl<T: Numeric + Clone + Copy> TBounds2<T> {
     #[inline]
     pub fn union_box(self, rhs: Self) -> Self {
         Self {
-            min: TVec2::new(self.min.x.nmin(rhs.min.x), self.min.y.nmin(rhs.min.y)),
-            max: TVec2::new(self.max.x.nmax(rhs.max.x), self.max.y.nmax(rhs.max.y)),
+            min: TPoint2::new(self.min.x.nmin(rhs.min.x), self.min.y.nmin(rhs.min.y)),
+            max: TPoint2::new(self.max.x.nmax(rhs.max.x), self.max.y.nmax(rhs.max.y)),
         }
     }
 
     fn union_box_assign(&mut self, rhs: Self) {
-        self.min = TVec2::new(self.min.x.nmin(rhs.min.x), self.min.y.nmin(rhs.min.y));
-        self.max = TVec2::new(self.max.x.nmax(rhs.max.x), self.max.y.nmax(rhs.max.y));
+        self.min = TPoint2::new(self.min.x.nmin(rhs.min.x), self.min.y.nmin(rhs.min.y));
+        self.max = TPoint2::new(self.max.x.nmax(rhs.max.x), self.max.y.nmax(rhs.max.y));
     }
 
     /// Takes the union of a vector with this bounding box, extending the `min`
     /// and `max` of the bounding box as needed.
     #[doc(alias = "|, |=")]
     #[inline]
-    pub fn union_vect(self, rhs: TVec2<T>) -> Self {
+    pub fn union_vect(self, rhs: TPoint2<T>) -> Self {
         Self {
-            min: TVec2::new(self.min.x.nmin(rhs.x), self.min.y.nmin(rhs.y)),
-            max: TVec2::new(self.max.x.nmax(rhs.x), self.max.y.nmax(rhs.y)),
+            min: TPoint2::new(self.min.x.nmin(rhs.x), self.min.y.nmin(rhs.y)),
+            max: TPoint2::new(self.max.x.nmax(rhs.x), self.max.y.nmax(rhs.y)),
         }
     }
 
-    fn union_vect_assign(&mut self, rhs: TVec2<T>) {
-        self.min = TVec2::new(self.min.x.nmin(rhs.x), self.min.y.nmin(rhs.y));
-        self.max = TVec2::new(self.max.x.nmax(rhs.x), self.max.y.nmax(rhs.y));
+    fn union_vect_assign(&mut self, rhs: TPoint2<T>) {
+        self.min = TPoint2::new(self.min.x.nmin(rhs.x), self.min.y.nmin(rhs.y));
+        self.max = TPoint2::new(self.max.x.nmax(rhs.x), self.max.y.nmax(rhs.y));
     }
 
     /// Takes the intersection of two bounding boxes
@@ -210,20 +209,20 @@ impl<T: Numeric + Clone + Copy> TBounds2<T> {
     #[inline]
     pub fn intersect(self, rhs: Self) -> Self {
         Self {
-            min: TVec2::new(self.min.x.nmax(rhs.min.x), self.min.y.nmax(rhs.min.y)),
-            max: TVec2::new(self.max.x.nmin(rhs.max.x), self.max.y.nmin(rhs.max.y)),
+            min: TPoint2::new(self.min.x.nmax(rhs.min.x), self.min.y.nmax(rhs.min.y)),
+            max: TPoint2::new(self.max.x.nmin(rhs.max.x), self.max.y.nmin(rhs.max.y)),
         }
     }
 
     fn intersect_assign(&mut self, rhs: Self) {
-        self.min = TVec2::new(self.min.x.nmax(rhs.min.x), self.min.y.nmax(rhs.min.y));
-        self.max = TVec2::new(self.max.x.nmin(rhs.max.x), self.max.y.nmin(rhs.max.y));
+        self.min = TPoint2::new(self.min.x.nmax(rhs.min.x), self.min.y.nmax(rhs.min.y));
+        self.max = TPoint2::new(self.max.x.nmin(rhs.max.x), self.max.y.nmin(rhs.max.y));
     }
 }
 
 
-impl<T> Index<u8> for TBounds2<T> {
-    type Output = TVec2<T>;
+impl<T: Clone + Copy> Index<u8> for TBounds2<T> {
+    type Output = TPoint2<T>;
 
     /// Indexes into the extremes of the bounding box.
     ///
@@ -251,13 +250,13 @@ impl<T: Numeric + Clone + Copy> BitOr<TBounds2<T>> for TBounds2<T> {
     }
 }
 
-impl<T: Numeric + Clone + Copy> BitOr<TVec2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitOr<TPoint2<T>> for TBounds2<T> {
     type Output = TBounds2<T>;
 
     /// Takes the union of a vector with this bounding box, extending the `min`
     /// and `max` of the bounding box as needed.
     #[inline]
-    fn bitor(self, rhs: TVec2<T>) -> Self::Output {
+    fn bitor(self, rhs: TPoint2<T>) -> Self::Output {
         self.union_vect(rhs)
     }
 }
@@ -282,11 +281,11 @@ impl<T: Numeric + Clone + Copy> BitOrAssign<TBounds2<T>> for TBounds2<T> {
     }
 }
 
-impl<T: Numeric + Clone + Copy> BitOrAssign<TVec2<T>> for TBounds2<T> {
+impl<T: Numeric + Clone + Copy> BitOrAssign<TPoint2<T>> for TBounds2<T> {
     /// Takes the union of a vector with this bounding box, extending the `min`
     /// and `max` of the bounding box as needed.
     #[inline]
-    fn bitor_assign(&mut self, rhs: TVec2<T>) {
+    fn bitor_assign(&mut self, rhs: TPoint2<T>) {
         self.union_vect_assign(rhs);
     }
 }

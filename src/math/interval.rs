@@ -3,44 +3,11 @@ use std::ops::{Index, IndexMut, Neg};
 
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 
-use crate::math::*;
+use crate::math::{*, math::{next_float_up, next_float_down}};
 
 
 // Code adapted from https://github.com/jalberse/shimmer/blob/main/src/interval.rs
 
-
-pub fn next_float_up(mut v: Scalar) -> Scalar {
-    if v.is_infinite() && v > 0.0 {
-        return v;
-    }
-    if v == -0.0 {
-        v = 0.0;
-    }
-
-    let mut ui: ScalarAsBits = math::float_to_bits(v);
-    if v >= 0.0 {
-        ui += 1;
-    } else {
-        ui -= 1;
-    }
-    math::bits_to_float(ui)
-}
-
-pub fn next_float_down(mut v: Scalar) -> Scalar {
-    if v.is_infinite() && v < 0.0 {
-        return v;
-    }
-    if v == 0.0 {
-        v = -0.0;
-    }
-    let mut ui: ScalarAsBits = math::float_to_bits(v);
-    if v > 0.0 {
-        ui -= 1;
-    } else {
-        ui += 1;
-    }
-    math::bits_to_float(ui)
-}
 
 pub fn add_round_up(a: Scalar, b: Scalar) -> Scalar {
     next_float_up(a + b)

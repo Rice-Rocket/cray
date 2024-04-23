@@ -8,16 +8,17 @@ pub trait RayLike {
 }
 
 
-// TODO: Test this
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Ray {
     pub origin: Point3f,
     pub direction: Vec3f,
+    pub time: Scalar,
+    // pub medium: Option<Medium>,
 }
 
 impl Default for Ray {
     fn default() -> Self {
-        Self { origin: Point3f::new(0.0, 0.0, 0.0), direction: Vec3f::new(0.0, 0.0, 1.0) }
+        Self { origin: Point3f::new(0.0, 0.0, 0.0), direction: Vec3f::new(0.0, 0.0, 1.0), time: 0.0 }
     }
 }
 
@@ -26,21 +27,28 @@ impl Ray {
     #[inline]
     pub fn new(origin: Point3f, direction: Vec3f) -> Self {
         math_assert!(direction.is_normalized());
-        Self { origin, direction }
+        Self { origin, direction, time: 0.0 }
+    }
+
+    /// Create a new [`Ray`] from an `origin`, `direction` and `time`.
+    #[inline]
+    pub fn new_with_time(origin: Point3f, direction: Vec3f, time: Scalar) -> Self {
+        math_assert!(direction.is_normalized());
+        Self { origin, direction, time }
     }
 
     /// Create a new [`Ray`] from an `origin` with a direction pointing along
     /// the positive Z axis.
     #[inline]
     pub const fn from_origin(origin: Point3f) -> Self {
-        Self { origin, direction: Vec3f::new(0.0, 0.0, 1.0) }
+        Self { origin, direction: Vec3f::new(0.0, 0.0, 1.0), time: 0.0 }
     }
 
     /// Create a new [`Ray`] from a `direction` with an origin at `(0, 0, 0)`.
     #[inline]
     pub fn from_direction(direction: Vec3f) -> Self {
         math_assert!(direction.is_normalized());
-        Self { origin: Point3f::new(0.0, 0.0, 0.0), direction }
+        Self { origin: Point3f::new(0.0, 0.0, 0.0), direction, time: 0.0 }
     }
 
     /// Returns whether or not this [`Ray`] contains an infinite value.
@@ -75,6 +83,38 @@ impl Ray {
             && self.direction.x.is_finite()
             && self.direction.y.is_finite()
             && self.direction.z.is_finite()
+    }
+
+    pub fn offset_ray_origin(pi: Point3fi, n: Normal3f, w: Vec3f) -> Point3f {
+        let d = Point3f::from(n).abs().dot(pi.error());
+        let mut offset = Vec3f::from(n) * d;
+
+        if w.dot(n.into()) < 0.0 {
+            offset = -offset;
+        }
+        let po = Point3f::from(pi) + offset;
+        po.zip(offset.into()).map(|(p, o)| 
+            if o > 0.0 { math::next_float_up(p) } else if o < 0.0 { math::next_float_down(p) } else { p })
+    }
+
+    pub fn spawn_ray(pi: Point3fi, n: Normal3f, time: Scalar, d: Vec3f) -> Ray {
+        Ray::new_with_time(Ray::offset_ray_origin(pi, n, d), d, time)
+    }
+
+    pub fn spawn_ray_to(p_from: Point3fi, n: Normal3f, time: Scalar, p_to: Point3f) -> Ray {
+        let d = p_to - Point3f::from(p_from);
+        Self::spawn_ray(p_from, n, time, d.into())
+    }
+
+    pub fn spawn_ray_to_both_offset(p_from: Point3fi, n_from: Normal3f, time: Scalar, p_to: Point3fi, n_to: Normal3f) -> Ray {
+        let pf = Self::offset_ray_origin(p_from, n_from, (Point3f::from(p_to) - Point3f::from(p_from)).into());
+        let pt = Self::offset_ray_origin(p_to, n_to, (pf - Point3f::from(p_to)).into());
+
+        Ray {
+            origin: pf,
+            direction: (pt - pf).into(),
+            time,
+        }
     }
 }
 

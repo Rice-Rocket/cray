@@ -40,6 +40,13 @@ macro_rules! create_vect {
                     $v: f(self.$v),
                 )*}
             }
+
+            #[inline]
+            pub fn zip<U>(self, rhs: $name<U>) -> $name<(T, U)> {
+                $name::<(T, U)> {$(
+                    $v: (self.$v, rhs.$v),
+                )*}
+            }
         }
 
         impl<T: Clone + Copy + Numeric + PartialOrd> $name<T> {
@@ -250,6 +257,15 @@ macro_rules! create_vect {
             #[inline]
             pub fn angle(self, rhs: Self) -> T {
                 (self.dot(rhs) / (self.length_squared() * rhs.length_squared()).nsqrt()).nacos()
+            }
+
+            #[inline]
+            pub fn face(self, rhs: Self) -> Self {
+                if self.dot(rhs).nsign() < T::ZERO {
+                    -self
+                } else {
+                    self
+                }
             }
         }
 

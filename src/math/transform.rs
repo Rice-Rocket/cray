@@ -1,11 +1,10 @@
-// Pbrt 3.9 Transformations
+// Pbrt 3.9 Transformations + 3.10 Applying Transformations
 
 use std::ops::Mul;
 
 use crate::math::*;
 
 
-// TODO: Test this
 #[derive(Clone, Copy)]
 pub struct Transform {
     pub m: Mat4,
@@ -316,5 +315,50 @@ impl PartialEq for Transform {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         self.m == other.m
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use approx::assert_abs_diff_eq;
+
+    use super::*;
+
+    #[test]
+    fn scale_normal() {
+        let p = Normal3f::new(1.0, 2.0, 3.0);
+        let scale = Transform::from_scale(Vec3f::new(2.0, 3.0, 4.0));
+        let scaled = scale * p;
+        assert_eq!(Normal3f::new(0.5, 0.6666667, 0.75), scaled);
+        let back_again = scale.inverse() * scaled;
+        assert_eq!(p, back_again);
+
+        let p = Normal3f::new(1.0, 2.0, 3.0);
+        let scale = Transform::from_scale(Vec3f::new(2.0, 2.0, 2.0));
+        let scaled = scale * p;
+        assert_eq!(Normal3f::new(0.5, 1.0, 1.5), scaled);
+        let back_again = scale.inverse() * scaled;
+        assert_eq!(p, back_again);
+    }
+
+    #[test]
+    fn bb_transform() {
+        let b = Bounds3f::from_points(vec![Point3f::ZERO, Point3f::ONE]);
+        let m = Transform::from_translation(Point3f::ONE);
+        assert_eq!(Bounds3f::from_points(vec![Point3f::ONE, Point3f::ONE * 2.0]), m * b);
+    }
+
+    #[test]
+    fn rotate_from_to() {
+        let from = Vec3f::new(2.0, 4.0, 1.0).normalize();
+        let to = Vec3f::new(3.0, 1.0, 4.0).normalize();
+        let r = Transform::from_rotation_delta(from, to);
+        assert_abs_diff_eq!(to, r * from, epsilon = 2e-6);
+
+        let from = Vec3f::new(-1.0, -5.0, 3.0).normalize();
+        let to = Vec3f::new(3.0, 1.0, -2.0).normalize();
+        let r = Transform::from_rotation_delta(from, to);
+        assert_abs_diff_eq!(to, r * from, epsilon = 2e-6);
     }
 }

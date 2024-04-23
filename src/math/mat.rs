@@ -8,6 +8,7 @@ macro_rules! create_mat {
         
         impl<T> $name<T> {
             #[inline]
+            #[allow(clippy::too_many_arguments)]
             pub const fn new($($($m: T,)*)*) -> Self {
                 Self([$([$($m,)*],)*])
             }

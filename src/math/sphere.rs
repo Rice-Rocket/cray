@@ -4,7 +4,6 @@ use crate::math::*;
 
 /// Computes the area of a triangle given by three vectors on the unit sphere
 /// `(a, b, c)` that correspond to the spherical triangle's vertices.
-// TODO: Test this
 #[inline]
 pub fn spherical_triangle_area(a: Vec3f, b: Vec3f, c: Vec3f) -> Scalar {
     math_assert!(a.is_normalized());
@@ -20,7 +19,6 @@ pub fn spherical_triangle_area(a: Vec3f, b: Vec3f, c: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 ///
 /// Uses the `sin` and `cos` of theta.
-// TODO: Test this
 #[inline]
 pub fn spherical_direction(sin_theta: Scalar, cos_theta: Scalar, phi: Scalar) -> Vec3f {
     Vec3f::new(
@@ -34,7 +32,6 @@ pub fn spherical_direction(sin_theta: Scalar, cos_theta: Scalar, phi: Scalar) ->
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn spherical_theta(v: Vec3f) -> Scalar {
     math_assert!(v.is_normalized());
@@ -46,7 +43,6 @@ pub fn spherical_theta(v: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-// TODO: Test this
 pub fn spherical_phi(v: Vec3f) -> Scalar {
     math_assert!(v.is_normalized());
 
@@ -62,7 +58,6 @@ pub fn spherical_phi(v: Vec3f) -> Scalar {
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn cos_theta(w: Vec3f) -> Scalar {
     math_assert!(w.is_normalized());
@@ -74,7 +69,6 @@ pub fn cos_theta(w: Vec3f) -> Scalar {
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn cos_2_theta(w: Vec3f) -> Scalar {
     math_assert!(w.is_normalized());
@@ -85,7 +79,6 @@ pub fn cos_2_theta(w: Vec3f) -> Scalar {
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn sin_theta(w: Vec3f) -> Scalar {
     math_assert!(w.is_normalized());
@@ -96,7 +89,6 @@ pub fn sin_theta(w: Vec3f) -> Scalar {
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn sin_2_theta(w: Vec3f) -> Scalar {
     math_assert!(w.is_normalized());
@@ -107,7 +99,6 @@ pub fn sin_2_theta(w: Vec3f) -> Scalar {
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn tan_theta(w: Vec3f) -> Scalar {
     math_assert!(w.is_normalized());
@@ -119,7 +110,6 @@ pub fn tan_theta(w: Vec3f) -> Scalar {
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn tan_2_theta(w: Vec3f) -> Scalar {
     math_assert!(w.is_normalized());
@@ -130,7 +120,6 @@ pub fn tan_2_theta(w: Vec3f) -> Scalar {
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn cos_phi(w: Vec3f) -> Scalar {
     math_assert!(w.is_normalized());
@@ -147,7 +136,6 @@ pub fn cos_phi(w: Vec3f) -> Scalar {
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn cos_2_phi(w: Vec3f) -> Scalar {
     math_assert!(w.is_normalized());
@@ -158,7 +146,6 @@ pub fn cos_2_phi(w: Vec3f) -> Scalar {
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn sin_phi(w: Vec3f) -> Scalar {
     math_assert!(w.is_normalized());
@@ -175,7 +162,6 @@ pub fn sin_phi(w: Vec3f) -> Scalar {
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn sin_2_phi(w: Vec3f) -> Scalar {
     math_assert!(w.is_normalized());
@@ -186,7 +172,6 @@ pub fn sin_2_phi(w: Vec3f) -> Scalar {
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn tan_phi(w: Vec3f) -> Scalar {
     math_assert!(w.is_normalized());
@@ -198,7 +183,6 @@ pub fn tan_phi(w: Vec3f) -> Scalar {
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn tan_2_phi(w: Vec3f) -> Scalar {
     math_assert!(w.is_normalized());
@@ -209,7 +193,6 @@ pub fn tan_2_phi(w: Vec3f) -> Scalar {
 ///
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
-// TODO: Test this
 #[inline]
 pub fn cos_d_phi(wa: Vec3f, wb: Vec3f) -> Scalar {
     math_assert!(wa.is_normalized());
@@ -226,7 +209,6 @@ pub fn cos_d_phi(wa: Vec3f, wb: Vec3f) -> Scalar {
 }
 
 
-// TODO: Test this
 pub fn equal_area_square_to_sphere(p: Vec2f) -> Vec3f {
     let u = 2.0 * p.x - 1.0;
     let v = 2.0 * p.y - 1.0;
@@ -247,7 +229,6 @@ pub fn equal_area_square_to_sphere(p: Vec2f) -> Vec3f {
 }
 
 
-// TODO: Test this
 pub struct OctahedralVec3 {
     x: u16,
     y: u16,

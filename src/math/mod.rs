@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+pub mod interaction;
 pub mod bounds;
 pub mod dim;
 pub mod numeric;
@@ -67,7 +68,6 @@ pub mod math {
 
     /// Computes the smoothstep function at a given input `t` with bounds `a`
     /// and `b`.
-    // TODO: Test this
     #[inline]
     pub fn smoothstep(a: Scalar, b: Scalar, t: Scalar) -> Scalar {
         if a == b {
@@ -104,7 +104,6 @@ pub mod math {
     }
 
     /// Get the bits of a floating point number.
-    // TODO: Test this
     #[inline]
     pub fn float_to_bits(f: Scalar) -> ScalarAsBits {
         let rui: ScalarAsBits;
@@ -116,7 +115,6 @@ pub mod math {
     }
 
     /// Convert the bit representation of a float back into the value.
-    // TODO: Test this
     #[inline]
     pub fn bits_to_float(ui: ScalarAsBits) -> Scalar {
         let rf: Scalar;
@@ -127,37 +125,52 @@ pub mod math {
         rf
     }
 
+    pub fn next_float_up(mut v: Scalar) -> Scalar {
+        if v.is_infinite() && v > 0.0 {
+            return v;
+        }
+        if v == -0.0 {
+            v = 0.0;
+        }
+
+        let mut ui: ScalarAsBits = float_to_bits(v);
+        if v >= 0.0 {
+            ui += 1;
+        } else {
+            ui -= 1;
+        }
+        bits_to_float(ui)
+    }
+
+    pub fn next_float_down(mut v: Scalar) -> Scalar {
+        if v.is_infinite() && v < 0.0 {
+            return v;
+        }
+        if v == 0.0 {
+            v = -0.0;
+        }
+        let mut ui: ScalarAsBits = float_to_bits(v);
+        if v > 0.0 {
+            ui -= 1;
+        } else {
+            ui += 1;
+        }
+        bits_to_float(ui)
+    }
+
     /// Returns the exponent of the bit representation of the float. (+127)
-    // TODO: Test this
     #[inline]
     pub fn exponent(v: Scalar) -> ScalarAsBits {
         float_to_bits(v) >> 23
     }
 
     /// Returns the mantissa of the bit representation of the float.
-    // TODO: Test this
     #[inline]
     pub fn significand(v: Scalar) -> ScalarAsBits {
         float_to_bits(v) & ((1 << 23) - 1)
     }
 
-    /// Evaluates the polynomial given its coefficients.
-    // TODO: Test this
-    pub fn evaluate_polynomial(t: Scalar, c: Scalar, c_remaining: Option<&[Scalar]>) -> Scalar {
-        if let Some(remain) = c_remaining {
-            let eval = if remain.len() > 1 {
-                evaluate_polynomial(t, remain[0], Some(&remain[1..]))
-            } else {
-                evaluate_polynomial(t, remain[0], None)
-            };
-            t * eval + c
-        } else {
-            c
-        }
-    }
-
     /// Computes the integer component of `log2(x)`.
-    // TODO: Test this
     #[inline]
     pub fn log2int(v: Scalar) -> i32 {
         if v < 1.0 {
@@ -172,42 +185,16 @@ pub mod math {
         log2int(v) / 2
     }
 
-    /// A fast e^x approximation using floating point bit magic.
-    // TODO: Test this
-    pub fn fast_exp(x: Scalar) -> Scalar {
-        #[allow(clippy::approx_constant)]
-        let xp = x * 1.442695041;
-
-        let fxp = xp.floor();
-        let f = xp - fxp;
-        let i = fxp as ScalarAsBits;
-
-        let pow_2_f = evaluate_polynomial(f, 1.0, Some(&[0.695556856, 0.226173572, 0.0781455737]));
-
-        let exponent = exponent(pow_2_f) + i;
-        if exponent < 1 {
-            return 0.0;
-        };
-        if exponent > 254 {
-            return Scalar::INFINITY;
-        };
-
-        let mut bits = float_to_bits(pow_2_f);
-        bits &= 0b10000000011111111111111111111111;
-        bits |= (exponent + 127) << 23;
-        bits_to_float(bits)
-    }
-
-    const A1: Scalar = 0.254829592;
-    const A2: Scalar = -0.284496736;
-    const A3: Scalar = 1.421413741;
-    const A4: Scalar = -1.453152027;
-    const A5: Scalar = 1.061405429;
-    const P: Scalar = 0.3275911;
     /// Computes the Gauss error function
-    // TODO: Test this
     #[inline]
     pub fn erf(mut x: Scalar) -> Scalar {
+        const A1: Scalar = 0.254829592;
+        const A2: Scalar = -0.284496736;
+        const A3: Scalar = 1.421413741;
+        const A4: Scalar = -1.453152027;
+        const A5: Scalar = 1.061405429;
+        const P: Scalar = 0.3275911;
+
         let sign = x.signum();
         x = x.abs();
 
@@ -220,16 +207,14 @@ pub mod math {
     /// Computes the guassian distribution at the input `x`.
     ///
     /// Defaults for `mu` and `sigma` should be 0 and 1 respectively.
-    // TODO: Test this
     #[inline]
     pub fn gaussian(x: Scalar, mu: Scalar, sigma: Scalar) -> Scalar {
-        1.0 / (2.0 * PI * sigma * sigma).sqrt() * fast_exp(-sqr(x - mu) / (2.0 * sigma * sigma))
+        1.0 / (2.0 * PI * sigma * sigma).sqrt() * (-sqr(x - mu) / (2.0 * sigma * sigma).exp())
     }
 
     /// Computes the integral of the gaussian distribution at the input `x`.
     ///
     /// Defaults for `mu` and `sigma` should be 0 and 1 respectively.
-    // TODO: Test this
     #[inline]
     pub fn gaussian_integral(x0: Scalar, x1: Scalar, mu: Scalar, sigma: Scalar) -> Scalar {
         let sigma_root_2 = sigma * SQRT_2;
@@ -238,7 +223,6 @@ pub mod math {
 
     /// Computes the logistic distribution at the input `x` and a scale factor
     /// `s`.
-    // TODO: Test this
     #[inline]
     pub fn logistic(mut x: Scalar, s: Scalar) -> Scalar {
         x = x.abs();
@@ -247,14 +231,12 @@ pub mod math {
 
     /// Computes the cumulative distribution function (CDF) of the logistic
     /// distribution at the input `x` and a scale factor `s`.
-    // TODO: Test this
     #[inline]
     pub fn logistic_cdf(x: Scalar, s: Scalar) -> Scalar {
         1.0 / (1.0 + (-x / s).exp())
     }
 
     /// The logistic function limited to the interval `[a, b]` and renormalized.
-    // TODO: Test this
     #[inline]
     pub fn trimmed_logistic(x: Scalar, s: Scalar, a: Scalar, b: Scalar) -> Scalar {
         logistic(x, s) / (logistic_cdf(b, s) - logistic_cdf(a, s))
@@ -317,3 +299,16 @@ pub type Normal2f = TNormal2<Scalar>;
 pub type Normal3f = TNormal3<Scalar>;
 pub type Normal2fi = TNormal2<Interval>;
 pub type Normal3fi = TNormal3<Interval>;
+
+
+#[cfg(test)]
+mod tests {
+    use super::math::*;
+
+    #[test]
+    fn test_erf() {
+        assert!((erf(0.0)).abs() < f32::EPSILON);
+        assert!((erf(-0.5) + 0.5205).abs() < f32::EPSILON);
+        assert!((erf(0.5) - 0.5205).abs() < f32::EPSILON);
+    }
+}

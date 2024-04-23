@@ -2,7 +2,6 @@
 
 use crate::math::*;
 
-// TODO: Test this
 #[derive(Clone, Copy)]
 pub struct DirectionCone {
     pub w: Vec3f,
