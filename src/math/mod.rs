@@ -9,7 +9,6 @@ pub mod sphere;
 pub mod transform;
 pub mod mat;
 pub mod vect;
-pub mod assert;
 pub mod swizzle;
 pub mod interval;
 pub mod frame;
@@ -26,11 +25,8 @@ pub use interval::{Interval, FloatInterval};
 pub use numeric::{Numeric, NumericNegative, NumericFloat, NumericField};
 pub use ray::{Ray, RayDifferential, AuxiliaryRays};
 
-pub use crate::math_assert;
-
 
 #[allow(clippy::module_inception)]
-#[allow(clippy::excessive_precision)]
 pub mod math {
     // Pbrt B.2 Mathematical Infrastructure
 
@@ -242,10 +238,24 @@ pub mod math {
         logistic(x, s) / (logistic_cdf(b, s) - logistic_cdf(a, s))
     }
 
-
     #[inline]
     pub fn sin_cos(x: Scalar) -> (Scalar, Scalar) {
         Scalar::sin_cos(x)
+    }
+
+    #[inline]
+    pub fn find_interval(size: usize, pred: impl Fn(usize) -> bool) -> usize {
+        let mut first = 1;
+        let mut last = size as i32 - 2;
+        while last > 0 {
+            let half = last >> 1;
+            let middle = first + half;
+            let pred_result = pred(middle.try_into().unwrap());
+            first = if pred_result { middle + 1 } else { first };
+            last = if pred_result { last - (half + 1) } else { half };
+        }
+
+        i32::clamp(first - 1, 0, size as i32 - 2) as usize
     }
 
 

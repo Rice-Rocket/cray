@@ -65,7 +65,7 @@ impl Transform {
 
     #[inline]
     pub fn from_rotation(sin_theta: Scalar, cos_theta: Scalar, axis: Vec3f) -> Transform {
-        math_assert!(axis.is_normalized());
+        debug_assert!(axis.is_normalized());
 
         let m = Mat4::from_rotation(sin_theta, cos_theta, axis);
         Transform { m, m_inv: m.transpose() }
@@ -73,8 +73,8 @@ impl Transform {
 
     #[inline]
     pub fn from_rotation_delta(from: Vec3f, to: Vec3f) -> Transform {
-        math_assert!(from.is_normalized());
-        math_assert!(to.is_normalized());
+        debug_assert!(from.is_normalized());
+        debug_assert!(to.is_normalized());
 
         let refl = if from.x.abs() < 0.72 && to.x.abs() < 0.72 {
             Point3f::new(1.0, 0.0, 0.0)
@@ -104,7 +104,7 @@ impl Transform {
 
     #[inline]
     pub fn looking_at(pos: Point3f, target: Point3f, up: Vec3f) -> Transform {
-        math_assert!(up.is_normalized());
+        debug_assert!(up.is_normalized());
 
         let dir = (target - pos).normalize().into();
         let right = up.cross(dir).normalize();

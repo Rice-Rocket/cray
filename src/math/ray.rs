@@ -26,14 +26,14 @@ impl Ray {
     /// Create a new [`Ray`] from an `origin` and `direction`.
     #[inline]
     pub fn new(origin: Point3f, direction: Vec3f) -> Self {
-        math_assert!(direction.is_normalized());
+        debug_assert!(direction.is_normalized());
         Self { origin, direction, time: 0.0 }
     }
 
     /// Create a new [`Ray`] from an `origin`, `direction` and `time`.
     #[inline]
     pub fn new_with_time(origin: Point3f, direction: Vec3f, time: Scalar) -> Self {
-        math_assert!(direction.is_normalized());
+        debug_assert!(direction.is_normalized());
         Self { origin, direction, time }
     }
 
@@ -47,7 +47,7 @@ impl Ray {
     /// Create a new [`Ray`] from a `direction` with an origin at `(0, 0, 0)`.
     #[inline]
     pub fn from_direction(direction: Vec3f) -> Self {
-        math_assert!(direction.is_normalized());
+        debug_assert!(direction.is_normalized());
         Self { origin: Point3f::new(0.0, 0.0, 0.0), direction, time: 0.0 }
     }
 
@@ -172,8 +172,8 @@ impl AuxiliaryRays {
     /// Creates a new [`AuxiliaryRays`].
     #[inline]
     pub fn new(rx_origin: Point3f, rx_direction: Vec3f, ry_origin: Point3f, ry_direction: Vec3f) -> AuxiliaryRays {
-        math_assert!(rx_direction.is_normalized());
-        math_assert!(ry_direction.is_normalized());
+        debug_assert!(rx_direction.is_normalized());
+        debug_assert!(ry_direction.is_normalized());
         AuxiliaryRays { rx_origin, rx_direction, ry_origin, ry_direction }
     }
 }

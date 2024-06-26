@@ -85,7 +85,7 @@ macro_rules! create_vect {
 
             #[inline]
             pub fn clamp(self, min: Self, max: Self) -> Self {
-                $(math_assert!(min.$v < max.$v);)*
+                $(debug_assert!(min.$v < max.$v);)*
                 self.max(min).min(max)
             }
         }
@@ -158,15 +158,15 @@ macro_rules! create_vect {
 
             #[inline]
             pub fn is_nan(self) -> bool {
-                self.$x.nnan() $(
-                    || self.$y.nnan()
+                self.$x.has_nan() $(
+                    || self.$y.has_nan()
                 )*
             }
 
             #[inline]
             pub fn is_finite(self) -> bool {
-                self.$x.nfinite() $(
-                    && self.$y.nfinite()
+                self.$x.has_finite() $(
+                    && self.$y.has_finite()
                 )*
             }
 
@@ -299,7 +299,7 @@ macro_rules! create_vect {
         impl<T: Clone + Copy + Div<T, Output = T> + Numeric + PartialEq> Div<T> for $name<T> {
             type Output = $name<T>;
             fn div(self, rhs: T) -> Self::Output {
-                math_assert!(rhs != T::ZERO);
+                debug_assert!(rhs != T::ZERO);
                 $name {$(
                     $v: self.$v / rhs,
                 )*}
@@ -337,7 +337,7 @@ macro_rules! create_vect {
             impl<T: Div<T, Output = T> + Numeric + PartialEq> Div<$alias<T>> for $name<T> {
                 type Output = $out<T>;
                 fn div(self, rhs: $alias<T>) -> Self::Output {
-                    $(math_assert!(rhs.$z != T::ZERO);)*
+                    $(debug_assert!(rhs.$z != T::ZERO);)*
                     $out {$(
                         $z: self.$z / rhs.$z,
                     )*}
@@ -624,7 +624,7 @@ impl_approx!(
 
 impl<T: NumericField + NumericNegative + NumericFloat> TVec3<T> {
     pub fn local_basis(self) -> (TVec3<T>, TVec3<T>) {
-        math_assert!(self.is_normalized());
+        debug_assert!(self.is_normalized());
 
         let sign = self.z.nsign();
         let a = T::NEG_ONE / (sign + self.z);

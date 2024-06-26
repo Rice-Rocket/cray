@@ -158,7 +158,7 @@ impl SurfaceInteraction {
         orientation_is_authoritative: bool,
     ) {
         self.shading.n = ns;
-        math_assert!(self.shading.n != Normal3f::ZERO);
+        debug_assert!(self.shading.n != Normal3f::ZERO);
         if orientation_is_authoritative {
             self.interaction.n = self.interaction.n.face(self.shading.n);
         } else {

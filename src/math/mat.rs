@@ -161,7 +161,7 @@ where
     pub fn inverse(self) -> Self {
         let inv_det = {
             let det = self.determinant();
-            math_assert!(det != T::ZERO);
+            debug_assert!(det != T::ZERO);
             det.ninv()
         };
         Self::new(
@@ -208,7 +208,7 @@ where
         let tmp1 = self.rowc::<2>().cross(self.rowc::<0>());
         let tmp2 = self.rowc::<0>().cross(self.rowc::<1>());
         let det = self.rowc::<2>().dot(tmp2);
-        math_assert!(det != T::ZERO);
+        debug_assert!(det != T::ZERO);
         let inv_det = TVec3::splat(det.ninv());
         Self([tmp0.mul(inv_det).into(), tmp1.mul(inv_det).into(), tmp2.mul(inv_det).into()]).transpose()
     }
@@ -323,7 +323,7 @@ where
         let dot0 = self.rowc::<0>().mul(col0);
         let dot1 = dot0.x + dot0.y + dot0.z + dot0.w;
 
-        math_assert!(dot1 != T::ZERO);
+        debug_assert!(dot1 != T::ZERO);
 
         let rcp_det = dot1.ninv();
         inverse.mul(rcp_det)
@@ -402,11 +402,26 @@ where
     }
 }
 
+pub fn mul_mat_vec<const N: usize, V, VResult, M>(m: &M, v: &V) -> VResult
+where
+    V: Index<usize, Output = Scalar>,
+    VResult: IndexMut<usize, Output = Scalar> + Default,
+    M: Index<(usize, usize), Output = Scalar>
+{
+    let mut out: VResult = Default::default();
+    for i in 0..N {
+        for j in 0..N {
+            out[i] += m[(i, j)] * v[j];
+        }
+    }
+    out
+}
 
 #[cfg(test)]
 mod tests {
     use approx::assert_abs_diff_eq;
     use glam::Vec4Swizzles;
+    use mat::mul_mat_vec;
 
     use crate::math::*;
 
@@ -534,5 +549,13 @@ mod tests {
         let gp1 = (gm.inverse() * gp).xyz();
 
         assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()));
+    }
+
+    #[test]
+    fn test_mul_mat_vec() {
+        let m = Mat3::new(0.531, -0.61, 0.631, 0.613, 0.657, 0.81, 0.134, 0.246, 0.136);
+        let v = Vec3f::new(2.15, 0.53, 3.87);
+
+        assert_abs_diff_eq!(mul_mat_vec::<3, Vec3f, Vec3f, Mat3>(&m, &v), m * v);
     }
 }

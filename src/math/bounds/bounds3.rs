@@ -167,6 +167,15 @@ where
     }
 }
 
+impl<T> Default for TBounds3<T>
+where
+    T: Numeric + PartialOrd + Clone + Copy + Add<T, Output = T> + Mul<T, Output = T> + Sub<T, Output = T> + Div<T, Output = T>
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T> TBounds3<T>
 where
     T: NumericField + NumericNegative + NumericFloat

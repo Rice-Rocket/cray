@@ -2,6 +2,7 @@
 use std::ops::{Index, IndexMut, Neg};
 
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
+use numeric::HasNan;
 
 use crate::math::{*, math::{next_float_up, next_float_down}};
 
@@ -196,6 +197,18 @@ impl NumericNegative for Interval {
     }
 }
 
+impl HasNan for Interval {
+    const NAN: Self = Interval { low: Scalar::NAN, high: Scalar::NAN };
+
+    fn has_nan(&self) -> bool {
+        self.low.is_nan() || self.high.is_nan()
+    }
+
+    fn has_finite(&self) -> bool {
+        self.low.is_finite() && self.high.is_finite()
+    }
+}
+
 impl NumericFloat for Interval {
     const EPSILON: Self = Interval::from_val(Scalar::EPSILON);
     const BIG_EPSILON: Self = Interval::from_val(2e-4f32);
@@ -210,14 +223,6 @@ impl NumericFloat for Interval {
 
     fn ninv(self) -> Self {
         1.0 / self
-    }
-
-    fn nnan(self) -> bool {
-        self.low.is_nan() || self.high.is_nan()
-    }
-
-    fn nfinite(self) -> bool {
-        self.low.is_finite() && self.high.is_finite()
     }
 
     fn nround(self) -> Self {

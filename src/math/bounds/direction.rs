@@ -12,12 +12,12 @@ impl DirectionCone {
     /// Creates a new [`DirectionCone`] from the given direction `w` and the
     /// cosine of half the central angle of a cone.
     pub fn new(w: Vec3f, cos_theta: Scalar) -> Self {
-        math_assert!(w.is_normalized());
+        debug_assert!(w.is_normalized());
         Self { w, cos_theta }
     }
 
     pub fn from_direction(w: Vec3f) -> Self {
-        math_assert!(w.is_normalized());
+        debug_assert!(w.is_normalized());
         Self { w, cos_theta: 1.0 }
     }
 
@@ -71,7 +71,7 @@ impl DirectionCone {
     }
 
     pub fn inside(&self, w: Vec3f) -> bool {
-        math_assert!(w.is_normalized());
+        debug_assert!(w.is_normalized());
 
         !self.is_empty() && self.w.dot(w) >= self.cos_theta
     }

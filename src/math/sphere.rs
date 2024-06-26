@@ -6,9 +6,9 @@ use crate::math::*;
 /// `(a, b, c)` that correspond to the spherical triangle's vertices.
 #[inline]
 pub fn spherical_triangle_area(a: Vec3f, b: Vec3f, c: Vec3f) -> Scalar {
-    math_assert!(a.is_normalized());
-    math_assert!(b.is_normalized());
-    math_assert!(c.is_normalized());
+    debug_assert!(a.is_normalized());
+    debug_assert!(b.is_normalized());
+    debug_assert!(c.is_normalized());
 
     (2.0 * (b.cross(c).dot(a)).atan2(1.0 + a.dot(b) + a.dot(c) + b.dot(c))).abs()
 }
@@ -34,7 +34,7 @@ pub fn spherical_direction(sin_theta: Scalar, cos_theta: Scalar, phi: Scalar) ->
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn spherical_theta(v: Vec3f) -> Scalar {
-    math_assert!(v.is_normalized());
+    debug_assert!(v.is_normalized());
     math::safe::acos(v.z)
 }
 
@@ -44,7 +44,7 @@ pub fn spherical_theta(v: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn spherical_phi(v: Vec3f) -> Scalar {
-    math_assert!(v.is_normalized());
+    debug_assert!(v.is_normalized());
 
     let p = v.y.atan2(v.x);
     if p < 0.0 {
@@ -60,7 +60,7 @@ pub fn spherical_phi(v: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn cos_theta(w: Vec3f) -> Scalar {
-    math_assert!(w.is_normalized());
+    debug_assert!(w.is_normalized());
     w.z
 }
 
@@ -71,7 +71,7 @@ pub fn cos_theta(w: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn cos_2_theta(w: Vec3f) -> Scalar {
-    math_assert!(w.is_normalized());
+    debug_assert!(w.is_normalized());
     w.z * w.z
 }
 
@@ -81,7 +81,7 @@ pub fn cos_2_theta(w: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn sin_theta(w: Vec3f) -> Scalar {
-    math_assert!(w.is_normalized());
+    debug_assert!(w.is_normalized());
     sin_2_theta(w).sqrt()
 }
 
@@ -91,7 +91,7 @@ pub fn sin_theta(w: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn sin_2_theta(w: Vec3f) -> Scalar {
-    math_assert!(w.is_normalized());
+    debug_assert!(w.is_normalized());
     (1.0 - cos_2_theta(w)).max(0.0)
 }
 
@@ -101,7 +101,7 @@ pub fn sin_2_theta(w: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn tan_theta(w: Vec3f) -> Scalar {
-    math_assert!(w.is_normalized());
+    debug_assert!(w.is_normalized());
     sin_theta(w) / cos_theta(w)
 }
 
@@ -112,7 +112,7 @@ pub fn tan_theta(w: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn tan_2_theta(w: Vec3f) -> Scalar {
-    math_assert!(w.is_normalized());
+    debug_assert!(w.is_normalized());
     sin_2_theta(w) / cos_2_theta(w)
 }
 
@@ -122,7 +122,7 @@ pub fn tan_2_theta(w: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn cos_phi(w: Vec3f) -> Scalar {
-    math_assert!(w.is_normalized());
+    debug_assert!(w.is_normalized());
     let sin_theta = sin_theta(w);
     if sin_theta == 0.0 {
         1.0
@@ -138,7 +138,7 @@ pub fn cos_phi(w: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn cos_2_phi(w: Vec3f) -> Scalar {
-    math_assert!(w.is_normalized());
+    debug_assert!(w.is_normalized());
     math::sqr(cos_phi(w))
 }
 
@@ -148,7 +148,7 @@ pub fn cos_2_phi(w: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn sin_phi(w: Vec3f) -> Scalar {
-    math_assert!(w.is_normalized());
+    debug_assert!(w.is_normalized());
     let sin_theta = sin_theta(w);
     if sin_theta == 0.0 {
         0.0
@@ -164,7 +164,7 @@ pub fn sin_phi(w: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn sin_2_phi(w: Vec3f) -> Scalar {
-    math_assert!(w.is_normalized());
+    debug_assert!(w.is_normalized());
     math::sqr(sin_phi(w))
 }
 
@@ -174,7 +174,7 @@ pub fn sin_2_phi(w: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn tan_phi(w: Vec3f) -> Scalar {
-    math_assert!(w.is_normalized());
+    debug_assert!(w.is_normalized());
     sin_phi(w) / cos_phi(w)
 }
 
@@ -185,7 +185,7 @@ pub fn tan_phi(w: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn tan_2_phi(w: Vec3f) -> Scalar {
-    math_assert!(w.is_normalized());
+    debug_assert!(w.is_normalized());
     sin_2_phi(w) / cos_2_phi(w)
 }
 
@@ -195,8 +195,8 @@ pub fn tan_2_phi(w: Vec3f) -> Scalar {
 /// the apparent `yaw` of the direction.
 #[inline]
 pub fn cos_d_phi(wa: Vec3f, wb: Vec3f) -> Scalar {
-    math_assert!(wa.is_normalized());
-    math_assert!(wb.is_normalized());
+    debug_assert!(wa.is_normalized());
+    debug_assert!(wb.is_normalized());
 
     let waxy = math::sqr(wa.x) + math::sqr(wa.y);
     let wbxy = math::sqr(wb.x) + math::sqr(wb.y);
@@ -237,7 +237,7 @@ pub struct OctahedralVec3 {
 impl OctahedralVec3 {
     /// Builds a new [`OctahedralVec3`] from a normalized Vec3.
     pub fn new(d: Vec3f) -> Self {
-        math_assert!(d.is_normalized());
+        debug_assert!(d.is_normalized());
 
         let v = d / (d.x.abs() + d.y.abs() + d.z.abs());
         if v.z >= 0.0 {
