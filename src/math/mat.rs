@@ -123,9 +123,9 @@ macro_rules! impl_interval {
     }
 }
 
-impl_interval!(TMat2 -> Scalar: 0,0-0,1-1,0-1,1);
-impl_interval!(TMat3 -> Scalar: 0,0-0,1-0,2-1,0-1,1-1,2-2,0-2,1-2,2);
-impl_interval!(TMat4 -> Scalar: 0,0-0,1-0,2-0,3-1,0-1,1-1,2-1,3-2,0-2,1-2,2-2,3-3,0-3,1-3,2-3,3);
+impl_interval!(TMat2 -> Float: 0,0-0,1-1,0-1,1);
+impl_interval!(TMat3 -> Float: 0,0-0,1-0,2-1,0-1,1-1,2-2,0-2,1-2,2);
+impl_interval!(TMat4 -> Float: 0,0-0,1-0,2-0,3-1,0-1,1-1,2-1,3-2,0-2,1-2,2-2,3-3,0-3,1-3,2-3,3);
 
 macro_rules! impl_default {
     ($($ty:ident),*) => {
@@ -441,9 +441,9 @@ where
 
 pub fn mul_mat_vec<const N: usize, V, VResult, M>(m: &M, v: &V) -> VResult
 where
-    V: Index<usize, Output = Scalar>,
-    VResult: IndexMut<usize, Output = Scalar> + Default,
-    M: Index<(usize, usize), Output = Scalar>
+    V: Index<usize, Output = Float>,
+    VResult: IndexMut<usize, Output = Float> + Default,
+    M: Index<(usize, usize), Output = Float>
 {
     let mut out: VResult = Default::default();
     for i in 0..N {

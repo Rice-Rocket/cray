@@ -5,14 +5,14 @@ use crate::math::*;
 #[derive(Debug, Clone)]
 pub struct Interaction {
     pub pi: Point3fi,
-    pub time: Scalar,
+    pub time: Float,
     pub wo: Vec3f,
     pub n: Normal3f,
     pub uv: Point2f,
 }
 
 impl Interaction {
-    pub fn new(pi: Point3fi, n: Normal3f, uv: Point2f, wo: Vec3f, time: Scalar) -> Self {
+    pub fn new(pi: Point3fi, n: Normal3f, uv: Point2f, wo: Vec3f, time: Float) -> Self {
         Self { pi, time, wo, n, uv }
     }
 
@@ -67,10 +67,10 @@ pub struct SurfaceInteraction {
     pub area_light: Option<()>,
     pub dpdx: Vec3f,
     pub dpdy: Vec3f,
-    pub dudx: Scalar,
-    pub dvdx: Scalar,
-    pub dudy: Scalar,
-    pub dvdy: Scalar,
+    pub dudx: Float,
+    pub dvdx: Float,
+    pub dudy: Float,
+    pub dvdy: Float,
 }
 
 impl SurfaceInteraction {
@@ -83,7 +83,7 @@ impl SurfaceInteraction {
         dpdv: Vec3f,
         dndu: Normal3f,
         dndv: Normal3f,
-        time: Scalar,
+        time: Float,
         flip_normal: bool,
     ) -> SurfaceInteraction {
         let norm_sign = if flip_normal { -1.0 } else { 1.0 };
@@ -124,7 +124,7 @@ impl SurfaceInteraction {
         dpdv: Vec3f,
         dndu: Normal3f,
         dndv: Normal3f,
-        time: Scalar,
+        time: Float,
         flip_normal: bool,
         face_index: i32,
     ) -> SurfaceInteraction {

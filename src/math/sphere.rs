@@ -5,7 +5,7 @@ use crate::math::*;
 /// Computes the area of a triangle given by three vectors on the unit sphere
 /// `(a, b, c)` that correspond to the spherical triangle's vertices.
 #[inline]
-pub fn spherical_triangle_area(a: Vec3f, b: Vec3f, c: Vec3f) -> Scalar {
+pub fn spherical_triangle_area(a: Vec3f, b: Vec3f, c: Vec3f) -> Float {
     debug_assert!(a.is_normalized());
     debug_assert!(b.is_normalized());
     debug_assert!(c.is_normalized());
@@ -20,7 +20,7 @@ pub fn spherical_triangle_area(a: Vec3f, b: Vec3f, c: Vec3f) -> Scalar {
 ///
 /// Uses the `sin` and `cos` of theta.
 #[inline]
-pub fn spherical_direction(sin_theta: Scalar, cos_theta: Scalar, phi: Scalar) -> Vec3f {
+pub fn spherical_direction(sin_theta: Float, cos_theta: Float, phi: Float) -> Vec3f {
     Vec3f::new(
         sin_theta.clamp(-1.0, 1.0) * phi.cos(),
         sin_theta.clamp(-1.0, 1.0) * phi.sin(),
@@ -33,7 +33,7 @@ pub fn spherical_direction(sin_theta: Scalar, cos_theta: Scalar, phi: Scalar) ->
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn spherical_theta(v: Vec3f) -> Scalar {
+pub fn spherical_theta(v: Vec3f) -> Float {
     debug_assert!(v.is_normalized());
     safe::acos(v.z)
 }
@@ -43,7 +43,7 @@ pub fn spherical_theta(v: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn spherical_phi(v: Vec3f) -> Scalar {
+pub fn spherical_phi(v: Vec3f) -> Float {
     debug_assert!(v.is_normalized());
 
     let p = v.y.atan2(v.x);
@@ -59,7 +59,7 @@ pub fn spherical_phi(v: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn cos_theta(w: Vec3f) -> Scalar {
+pub fn cos_theta(w: Vec3f) -> Float {
     debug_assert!(w.is_normalized());
     w.z
 }
@@ -70,7 +70,7 @@ pub fn cos_theta(w: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn cos_2_theta(w: Vec3f) -> Scalar {
+pub fn cos_2_theta(w: Vec3f) -> Float {
     debug_assert!(w.is_normalized());
     w.z * w.z
 }
@@ -80,7 +80,7 @@ pub fn cos_2_theta(w: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn sin_theta(w: Vec3f) -> Scalar {
+pub fn sin_theta(w: Vec3f) -> Float {
     debug_assert!(w.is_normalized());
     sin_2_theta(w).sqrt()
 }
@@ -90,7 +90,7 @@ pub fn sin_theta(w: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn sin_2_theta(w: Vec3f) -> Scalar {
+pub fn sin_2_theta(w: Vec3f) -> Float {
     debug_assert!(w.is_normalized());
     (1.0 - cos_2_theta(w)).max(0.0)
 }
@@ -100,7 +100,7 @@ pub fn sin_2_theta(w: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn tan_theta(w: Vec3f) -> Scalar {
+pub fn tan_theta(w: Vec3f) -> Float {
     debug_assert!(w.is_normalized());
     sin_theta(w) / cos_theta(w)
 }
@@ -111,7 +111,7 @@ pub fn tan_theta(w: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn tan_2_theta(w: Vec3f) -> Scalar {
+pub fn tan_2_theta(w: Vec3f) -> Float {
     debug_assert!(w.is_normalized());
     sin_2_theta(w) / cos_2_theta(w)
 }
@@ -121,7 +121,7 @@ pub fn tan_2_theta(w: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn cos_phi(w: Vec3f) -> Scalar {
+pub fn cos_phi(w: Vec3f) -> Float {
     debug_assert!(w.is_normalized());
     let sin_theta = sin_theta(w);
     if sin_theta == 0.0 {
@@ -137,7 +137,7 @@ pub fn cos_phi(w: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn cos_2_phi(w: Vec3f) -> Scalar {
+pub fn cos_2_phi(w: Vec3f) -> Float {
     debug_assert!(w.is_normalized());
     sqr(cos_phi(w))
 }
@@ -147,7 +147,7 @@ pub fn cos_2_phi(w: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn sin_phi(w: Vec3f) -> Scalar {
+pub fn sin_phi(w: Vec3f) -> Float {
     debug_assert!(w.is_normalized());
     let sin_theta = sin_theta(w);
     if sin_theta == 0.0 {
@@ -163,7 +163,7 @@ pub fn sin_phi(w: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn sin_2_phi(w: Vec3f) -> Scalar {
+pub fn sin_2_phi(w: Vec3f) -> Float {
     debug_assert!(w.is_normalized());
     sqr(sin_phi(w))
 }
@@ -173,7 +173,7 @@ pub fn sin_2_phi(w: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn tan_phi(w: Vec3f) -> Scalar {
+pub fn tan_phi(w: Vec3f) -> Float {
     debug_assert!(w.is_normalized());
     sin_phi(w) / cos_phi(w)
 }
@@ -184,7 +184,7 @@ pub fn tan_phi(w: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn tan_2_phi(w: Vec3f) -> Scalar {
+pub fn tan_2_phi(w: Vec3f) -> Float {
     debug_assert!(w.is_normalized());
     sin_2_phi(w) / cos_2_phi(w)
 }
@@ -194,7 +194,7 @@ pub fn tan_2_phi(w: Vec3f) -> Scalar {
 /// Note that `theta` is the apparent `pitch` of the direction while `phi` is
 /// the apparent `yaw` of the direction.
 #[inline]
-pub fn cos_d_phi(wa: Vec3f, wb: Vec3f) -> Scalar {
+pub fn cos_d_phi(wa: Vec3f, wb: Vec3f) -> Float {
     debug_assert!(wa.is_normalized());
     debug_assert!(wb.is_normalized());
 
@@ -261,7 +261,7 @@ impl OctahedralVec3 {
         v
     }
 
-    fn encode(f: Scalar) -> u16 {
+    fn encode(f: Float) -> u16 {
         (((f + 1.0) / 2.0).clamp(0.0, 1.0) * 65535.0).round() as u16
     }
 }

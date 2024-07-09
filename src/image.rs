@@ -4,7 +4,7 @@ use arrayvec::ArrayVec;
 use half::f16;
 use tracing::warn;
 
-use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{ColorEncoding, ColorEncodingLike as _, ColorEncodingPtr}}, modulo, tile::Tile, vec2d::Vec2D, windowed_sinc, Bounds2f, Bounds2i, Mat4, Point2f, Point2i, Scalar};
+use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{ColorEncoding, ColorEncodingLike as _, ColorEncodingPtr}}, modulo, tile::Tile, vec2d::Vec2D, windowed_sinc, Bounds2f, Bounds2i, Mat4, Point2f, Point2i, Float};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PixelFormat {
@@ -40,7 +40,7 @@ impl Display for PixelFormat {
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
 pub struct ResampleWeight {
     first_pixel: i32,
-    weight: [Scalar; 4]
+    weight: [Float; 4]
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -146,13 +146,13 @@ impl Display for WrapMode {
 
 #[derive(Default)]
 pub struct ImageMetadata {
-    pub render_time_seconds: Option<Scalar>,
+    pub render_time_seconds: Option<Float>,
     pub camera_from_world: Option<Mat4>,
     pub ndc_from_world: Option<Mat4>,
     pub pixel_bounds: Option<Bounds2i>,
     pub full_resolution: Option<Point2i>,
     pub samples_per_pixel: Option<i32>,
-    pub mse: Option<Scalar>,
+    pub mse: Option<Float>,
     pub color_space: Option<Arc<RgbColorSpace>>,
     pub strings: HashMap<String, String>,
     pub string_vecs: HashMap<String, Vec<String>>,
@@ -190,25 +190,25 @@ impl ImageChannelDesc {
 
 #[derive(Default)]
 pub struct ImageChannelValues {
-    pub values: ArrayVec<Scalar, 4>,
+    pub values: ArrayVec<Float, 4>,
 }
 
 impl ImageChannelValues {
-    pub fn new(size: usize, v: Scalar) -> Self {
+    pub fn new(size: usize, v: Float) -> Self {
         Self { values: vec![v; size].into_iter().collect() }
     }
 
-    pub fn max_value(&self) -> Scalar {
+    pub fn max_value(&self) -> Float {
         *self.values.iter().max_by(|a, b| a.partial_cmp(b).expect("unexpected NaN")).expect("tried to find max value of empty vector")
     }
 
-    pub fn average(&self) -> Scalar {
-        self.values.iter().sum::<Scalar>() / self.values.len() as Scalar
+    pub fn average(&self) -> Float {
+        self.values.iter().sum::<Float>() / self.values.len() as Float
     }
 }
 
 impl Index<usize> for ImageChannelValues {
-    type Output = Scalar;
+    type Output = Float;
 
     fn index(&self, index: usize) -> &Self::Output {
         &self.values[index]
@@ -221,14 +221,14 @@ impl IndexMut<usize> for ImageChannelValues {
     }
 }
 
-impl From<ImageChannelValues> for Scalar {
+impl From<ImageChannelValues> for Float {
     fn from(value: ImageChannelValues) -> Self {
         debug_assert!(value.values.len() == 1);
         value[0]
     }
 }
 
-impl From<ImageChannelValues> for [Scalar; 3] {
+impl From<ImageChannelValues> for [Float; 3] {
     fn from(value: ImageChannelValues) -> Self {
         debug_assert!(value.values.len() == 3);
         [value[0], value[1], value[2]]
@@ -581,7 +581,7 @@ impl Image {
 
                     let mut out_offset = self.n_channels() * (x + y * nx_out) as usize;
                     for _c in 0..self.n_channels() {
-                        out_buf[out_offset] = Scalar::max(0.0, rsw.weight[0] * x_buf[x_buf_offset]
+                        out_buf[out_offset] = Float::max(0.0, rsw.weight[0] * x_buf[x_buf_offset]
                             + rsw.weight[1] * x_buf[x_buf_offset + step]
                             + rsw.weight[2] * x_buf[x_buf_offset + 2 * step]
                             + rsw.weight[3] * x_buf[x_buf_offset + 3 * step]);
@@ -604,10 +604,10 @@ impl Image {
         let filter_radius = 2.0;
         let tau = 2.0;
         for (i, w) in wt.iter_mut().enumerate().take(new_res) {
-            let center = (i as Scalar + 0.5) * old_res as Scalar / new_res as Scalar;
+            let center = (i as Float + 0.5) * old_res as Float / new_res as Float;
             w.first_pixel = ((center - filter_radius + 0.5).floor() as i32).max(0);
             for j in 0..4 {
-                let pos = w.first_pixel as Scalar + 0.5;
+                let pos = w.first_pixel as Float + 0.5;
                 w.weight[j] = windowed_sinc(pos - center, filter_radius, tau);
             }
 
@@ -638,7 +638,7 @@ impl Image {
 
         assert!(image.data.format().is_32bit());
 
-        let n_levels = 1 + ((i32::max(image.resolution.x, image.resolution.y) as Scalar).log2() as i32);
+        let n_levels = 1 + ((i32::max(image.resolution.x, image.resolution.y) as Float).log2() as i32);
         let mut pyramid = Vec::with_capacity(n_levels as usize);
 
         for i in 0..(n_levels - 1) {
@@ -736,11 +736,11 @@ impl Image {
         (self.n_channels() as i32 * (p.y * self.resolution.x + p.x)) as usize
     }
 
-    pub fn get_channel(&self, p: Point2i, c: usize) -> Scalar {
+    pub fn get_channel(&self, p: Point2i, c: usize) -> Float {
         self.get_channel_wrapped(p, c, WrapMode::Clamp.into())
     }
 
-    pub fn get_channel_wrapped(&self, p: Point2i, c: usize, wrap_mode: WrapMode2D) -> Scalar {
+    pub fn get_channel_wrapped(&self, p: Point2i, c: usize, wrap_mode: WrapMode2D) -> Float {
         if let Some(p) = wrap_mode.remap(p, self.resolution) {
             match &self.data {
                 ImageData::Uint256(ref data) => {
@@ -830,14 +830,14 @@ impl Image {
         cv
     }
 
-    pub fn lookup_nearest_channel(&self, p: Point2f, c: usize) -> Scalar {
+    pub fn lookup_nearest_channel(&self, p: Point2f, c: usize) -> Float {
         self.lookup_nearest_channel_wrapped(p, c, WrapMode::Clamp.into())
     }
 
-    pub fn lookup_nearest_channel_wrapped(&self, p: Point2f, c: usize, wrap_mode: WrapMode2D) -> Scalar {
+    pub fn lookup_nearest_channel_wrapped(&self, p: Point2f, c: usize, wrap_mode: WrapMode2D) -> Float {
         let pi = Point2i::new(
-            (p.x * self.resolution.x as Scalar) as i32,
-            (p.y * self.resolution.y as Scalar) as i32,
+            (p.x * self.resolution.x as Float) as i32,
+            (p.y * self.resolution.y as Float) as i32,
         );
 
         self.get_channel_wrapped(pi, c, wrap_mode)
@@ -862,19 +862,19 @@ impl Image {
         cv
     }
 
-    pub fn bilinear_channel(&self, p: Point2f, c: usize) -> Scalar {
+    pub fn bilinear_channel(&self, p: Point2f, c: usize) -> Float {
         self.bilinear_channel_wrapped(p, c, WrapMode::Clamp.into())
     }
 
-    pub fn bilinear_channel_wrapped(&self, p: Point2f, c: usize, wrap_mode: WrapMode2D) -> Scalar {
-        let x = p.x * self.resolution.x as Scalar - 0.5;
-        let y = p.y * self.resolution.y as Scalar - 0.5;
+    pub fn bilinear_channel_wrapped(&self, p: Point2f, c: usize, wrap_mode: WrapMode2D) -> Float {
+        let x = p.x * self.resolution.x as Float - 0.5;
+        let y = p.y * self.resolution.y as Float - 0.5;
         let xi = x.floor() as i32;
         let yi = y.floor() as i32;
-        let dx = x - xi as Scalar;
-        let dy = y - yi as Scalar;
+        let dx = x - xi as Float;
+        let dy = y - yi as Float;
 
-        let v: [Scalar; 4] = [
+        let v: [Float; 4] = [
             self.get_channel_wrapped(Point2i::new(xi, yi), c, wrap_mode),
             self.get_channel_wrapped(Point2i::new(xi + 1, yi), c, wrap_mode),
             self.get_channel_wrapped(Point2i::new(xi, yi + 1), c, wrap_mode),
@@ -887,7 +887,7 @@ impl Image {
             + dx * dy * v[3]
     }
 
-    pub fn set_channel(&mut self, p: Point2i, c: usize, value: Scalar) {
+    pub fn set_channel(&mut self, p: Point2i, c: usize, value: Float) {
         let value = if value.is_nan() { warn!("tried to store NaN value in image, using 0.0 instead"); 0.0 } else { value };
 
         let index = self.pixel_offset(p) + c;
@@ -923,7 +923,7 @@ impl Image {
         }
     }
 
-    pub fn set_channels_slice(&mut self, p: Point2i, values: &[Scalar]) {
+    pub fn set_channels_slice(&mut self, p: Point2i, values: &[Float]) {
         assert!(values.len() == self.n_channels());
         let index = self.pixel_offset(p);
 
@@ -975,18 +975,18 @@ impl Image {
         ImageChannelDesc { offset }
     }
 
-    pub fn get_default_sampling_distribution(&self) -> Vec2D<Scalar> {
+    pub fn get_default_sampling_distribution(&self) -> Vec2D<Float> {
         self.get_sampling_distribution(|_p| 1.0, &Bounds2f::from_point(Point2f::ONE))
     }
 
-    pub fn get_sampling_distribution<F: Fn(Point2f) -> Scalar>(&self, dx_da: F, domain: &Bounds2f) -> Vec2D<Scalar> {
+    pub fn get_sampling_distribution<F: Fn(Point2f) -> Float>(&self, dx_da: F, domain: &Bounds2f) -> Vec2D<Float> {
         let mut dist = Vec2D::from_bounds(Bounds2i::new(Point2i::ZERO, self.resolution));
 
         for y in 0..self.resolution.y {
             for x in 0..self.resolution.x {
                 let value = self.get_channels(Point2i::new(x, y)).average();
-                let p = domain.lerp(Point2f::new((x as Scalar + 0.5) / self.resolution.x as Scalar,
-                    (y as Scalar + 0.5) / self.resolution.y as Scalar));
+                let p = domain.lerp(Point2f::new((x as Float + 0.5) / self.resolution.x as Float,
+                    (y as Float + 0.5) / self.resolution.y as Float));
                 dist.set(Point2i::new(x, y), value * dx_da(p))
             }
         }
@@ -1049,7 +1049,7 @@ impl Image {
                                     im_data[(2 * (y * info.width + x)) as usize..(2 * (y * info.width + x) + 2) as usize]
                                         .try_into().unwrap()
                                 );
-                                let v: Scalar = v.into();
+                                let v: Float = v.into();
                                 let v = encoding.0.to_float_linear(v);
                                 image.set_channel(Point2i::new(x as i32, y as i32), 0, v);
                             }
@@ -1089,10 +1089,10 @@ impl Image {
                             let mut idx = 0;
                             for y in 0..info.height {
                                 for x in 0..info.width {
-                                    let r: Scalar = (((im_data[idx] as i32) << 8) + (im_data[idx + 1] as i32)) as Scalar / 65535.0;
-                                    let g: Scalar = (((im_data[idx + 2] as i32) << 8) + (im_data[idx + 3] as i32)) as Scalar / 65535.0;
-                                    let b: Scalar = (((im_data[idx + 4] as i32) << 8) + (im_data[idx + 5] as i32)) as Scalar / 65535.0;
-                                    let a: Scalar = (((im_data[idx + 6] as i32) << 8) + (im_data[idx + 7] as i32)) as Scalar / 65535.0;
+                                    let r: Float = (((im_data[idx] as i32) << 8) + (im_data[idx + 1] as i32)) as Float / 65535.0;
+                                    let g: Float = (((im_data[idx + 2] as i32) << 8) + (im_data[idx + 3] as i32)) as Float / 65535.0;
+                                    let b: Float = (((im_data[idx + 4] as i32) << 8) + (im_data[idx + 5] as i32)) as Float / 65535.0;
+                                    let a: Float = (((im_data[idx + 6] as i32) << 8) + (im_data[idx + 7] as i32)) as Float / 65535.0;
                                     let rgba = [r, g, b, a];
                                     for (i, c) in rgba.into_iter().enumerate() {
                                         let cv = encoding.0.to_float_linear(c);
@@ -1115,9 +1115,9 @@ impl Image {
                             let mut idx = 0;
                             for y in 0..info.height {
                                 for x in 0..info.width {
-                                    let r: Scalar = (((im_data[idx] as i32) << 8) + (im_data[idx + 1] as i32)) as Scalar / 65535.0;
-                                    let g: Scalar = (((im_data[idx + 2] as i32) << 8) + (im_data[idx + 3] as i32)) as Scalar / 65535.0;
-                                    let b: Scalar = (((im_data[idx + 4] as i32) << 8) + (im_data[idx + 5] as i32)) as Scalar / 65535.0;
+                                    let r: Float = (((im_data[idx] as i32) << 8) + (im_data[idx + 1] as i32)) as Float / 65535.0;
+                                    let g: Float = (((im_data[idx + 2] as i32) << 8) + (im_data[idx + 3] as i32)) as Float / 65535.0;
+                                    let b: Float = (((im_data[idx + 4] as i32) << 8) + (im_data[idx + 5] as i32)) as Float / 65535.0;
                                     let rgb = [r, g, b];
                                     for (i, c) in rgb.into_iter().enumerate() {
                                         let cv = encoding.0.to_float_linear(c);

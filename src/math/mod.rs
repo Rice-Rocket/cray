@@ -36,21 +36,21 @@ use std::ops::{Add, Div, Index, IndexMut, Mul, Sub};
 pub use super::sphere::*;
 
 /// π
-pub const PI: Scalar = 3.14159265358979323846;
+pub const PI: Float = 3.14159265358979323846;
 /// 2π
-pub const TAU: Scalar = 6.28318530717958647693;
+pub const TAU: Float = 6.28318530717958647693;
 /// 1/π
-pub const FRAC_1_PI: Scalar = 0.31830988618379067154;
+pub const FRAC_1_PI: Float = 0.31830988618379067154;
 /// 1/2π
-pub const FRAC_1_TAU: Scalar = 0.15915494309189533577;
+pub const FRAC_1_TAU: Float = 0.15915494309189533577;
 /// 1/4π
-pub const FRAC_1_4PI: Scalar = 0.07957747154594766788;
+pub const FRAC_1_4PI: Float = 0.07957747154594766788;
 /// π/2
-pub const FRAC_PI_2: Scalar = 1.57079632679489661923;
+pub const FRAC_PI_2: Float = 1.57079632679489661923;
 /// π/4
-pub const FRAC_PI_4: Scalar = 0.78539816339744830961;
+pub const FRAC_PI_4: Float = 0.78539816339744830961;
 /// √2
-pub const SQRT_2: Scalar = 1.41421356237309504880;
+pub const SQRT_2: Float = 1.41421356237309504880;
 
 /// Computse the linear interpolation between `a` and `b` at input `t`.
 pub fn lerp<T: std::ops::Add<T, Output = T> + std::ops::Sub<T, Output = T> + std::ops::Mul<T, Output = T> + Copy>(
@@ -61,10 +61,10 @@ pub fn lerp<T: std::ops::Add<T, Output = T> + std::ops::Sub<T, Output = T> + std
     a + (b - a) * t
 }
 
-pub fn lerp_float<T>(a: T, b: T, t: Scalar) -> T
+pub fn lerp_float<T>(a: T, b: T, t: Float) -> T
 where
     T: Add<T, Output = T>,
-    T: Mul<Scalar, Output = T>,
+    T: Mul<Float, Output = T>,
 {
     a * (1.0 - t) + b * t
 }
@@ -72,7 +72,7 @@ where
 /// Computes the smoothstep function at a given input `t` with bounds `a`
 /// and `b`.
 #[inline]
-pub fn smoothstep(a: Scalar, b: Scalar, t: Scalar) -> Scalar {
+pub fn smoothstep(a: Float, b: Float, t: Float) -> Float {
     if a == b {
         return if t < a { 0.0 } else { 1.0 };
     };
@@ -82,12 +82,12 @@ pub fn smoothstep(a: Scalar, b: Scalar, t: Scalar) -> Scalar {
 
 /// Converts the given degrees `deg` to radians.
 #[inline]
-pub fn to_radians(deg: Scalar) -> Scalar {
+pub fn to_radians(deg: Float) -> Float {
     (PI / 180.0) * deg
 }
 /// Converts the given radians `rad` to degrees.
 #[inline]
-pub fn to_degrees(rad: Scalar) -> Scalar {
+pub fn to_degrees(rad: Float) -> Float {
     (180.0 / PI) * rad
 }
 
@@ -99,7 +99,7 @@ pub fn sqr<T: Numeric + Clone + Copy + Mul<T, Output = T>>(x: T) -> T {
 
 /// Computes the `sinc(x)` (`sin(x)/x`) function defined at 0.
 #[inline]
-pub fn sinc(x: Scalar) -> Scalar {
+pub fn sinc(x: Float) -> Float {
     if 1.0 - x * x == 1.0 {
         return 1.0;
     }
@@ -108,10 +108,10 @@ pub fn sinc(x: Scalar) -> Scalar {
 
 /// Get the bits of a floating point number.
 #[inline]
-pub fn float_to_bits(f: Scalar) -> ScalarAsBits {
-    let rui: ScalarAsBits;
+pub fn float_to_bits(f: Float) -> FloatAsBits {
+    let rui: FloatAsBits;
     unsafe {
-        let ui: ScalarAsBits = std::mem::transmute_copy(&f);
+        let ui: FloatAsBits = std::mem::transmute_copy(&f);
         rui = ui;
     }
     rui
@@ -119,16 +119,16 @@ pub fn float_to_bits(f: Scalar) -> ScalarAsBits {
 
 /// Convert the bit representation of a float back into the value.
 #[inline]
-pub fn bits_to_float(ui: ScalarAsBits) -> Scalar {
-    let rf: Scalar;
+pub fn bits_to_float(ui: FloatAsBits) -> Float {
+    let rf: Float;
     unsafe {
-        let f: Scalar = std::mem::transmute_copy(&ui);
+        let f: Float = std::mem::transmute_copy(&ui);
         rf = f;
     }
     rf
 }
 
-pub fn next_float_up(mut v: Scalar) -> Scalar {
+pub fn next_float_up(mut v: Float) -> Float {
     if v.is_infinite() && v > 0.0 {
         return v;
     }
@@ -136,7 +136,7 @@ pub fn next_float_up(mut v: Scalar) -> Scalar {
         v = 0.0;
     }
 
-    let mut ui: ScalarAsBits = float_to_bits(v);
+    let mut ui: FloatAsBits = float_to_bits(v);
     if v >= 0.0 {
         ui += 1;
     } else {
@@ -145,14 +145,14 @@ pub fn next_float_up(mut v: Scalar) -> Scalar {
     bits_to_float(ui)
 }
 
-pub fn next_float_down(mut v: Scalar) -> Scalar {
+pub fn next_float_down(mut v: Float) -> Float {
     if v.is_infinite() && v < 0.0 {
         return v;
     }
     if v == 0.0 {
         v = -0.0;
     }
-    let mut ui: ScalarAsBits = float_to_bits(v);
+    let mut ui: FloatAsBits = float_to_bits(v);
     if v > 0.0 {
         ui -= 1;
     } else {
@@ -163,19 +163,19 @@ pub fn next_float_down(mut v: Scalar) -> Scalar {
 
 /// Returns the exponent of the bit representation of the float. (+127)
 #[inline]
-pub fn exponent(v: Scalar) -> ScalarAsBits {
+pub fn exponent(v: Float) -> FloatAsBits {
     float_to_bits(v) >> 23
 }
 
 /// Returns the mantissa of the bit representation of the float.
 #[inline]
-pub fn significand(v: Scalar) -> ScalarAsBits {
+pub fn significand(v: Float) -> FloatAsBits {
     float_to_bits(v) & ((1 << 23) - 1)
 }
 
 /// Computes the integer component of `log2(x)`.
 #[inline]
-pub fn log2int(v: Scalar) -> i32 {
+pub fn log2int(v: Float) -> i32 {
     if v < 1.0 {
         return -log2int(1.0 / v);
     };
@@ -184,19 +184,19 @@ pub fn log2int(v: Scalar) -> i32 {
 
 /// Computes the integer component of `log4(x)`.
 #[inline]
-pub fn log4int(v: Scalar) -> i32 {
+pub fn log4int(v: Float) -> i32 {
     log2int(v) / 2
 }
 
 /// Computes the Gauss error function
 #[inline]
-pub fn erf(mut x: Scalar) -> Scalar {
-    const A1: Scalar = 0.254829592;
-    const A2: Scalar = -0.284496736;
-    const A3: Scalar = 1.421413741;
-    const A4: Scalar = -1.453152027;
-    const A5: Scalar = 1.061405429;
-    const P: Scalar = 0.3275911;
+pub fn erf(mut x: Float) -> Float {
+    const A1: Float = 0.254829592;
+    const A2: Float = -0.284496736;
+    const A3: Float = 1.421413741;
+    const A4: Float = -1.453152027;
+    const A5: Float = 1.061405429;
+    const P: Float = 0.3275911;
 
     let sign = x.signum();
     x = x.abs();
@@ -211,7 +211,7 @@ pub fn erf(mut x: Scalar) -> Scalar {
 ///
 /// Defaults for `mu` and `sigma` should be 0 and 1 respectively.
 #[inline]
-pub fn gaussian(x: Scalar, mu: Scalar, sigma: Scalar) -> Scalar {
+pub fn gaussian(x: Float, mu: Float, sigma: Float) -> Float {
     1.0 / (2.0 * PI * sigma * sigma).sqrt() * (-sqr(x - mu) / (2.0 * sigma * sigma).exp())
 }
 
@@ -219,7 +219,7 @@ pub fn gaussian(x: Scalar, mu: Scalar, sigma: Scalar) -> Scalar {
 ///
 /// Defaults for `mu` and `sigma` should be 0 and 1 respectively.
 #[inline]
-pub fn gaussian_integral(x0: Scalar, x1: Scalar, mu: Scalar, sigma: Scalar) -> Scalar {
+pub fn gaussian_integral(x0: Float, x1: Float, mu: Float, sigma: Float) -> Float {
     let sigma_root_2 = sigma * SQRT_2;
     0.5 * (erf((mu - x0) / sigma_root_2) - erf((mu - x1) / sigma_root_2))
 }
@@ -227,7 +227,7 @@ pub fn gaussian_integral(x0: Scalar, x1: Scalar, mu: Scalar, sigma: Scalar) -> S
 /// Computes the logistic distribution at the input `x` and a scale factor
 /// `s`.
 #[inline]
-pub fn logistic(mut x: Scalar, s: Scalar) -> Scalar {
+pub fn logistic(mut x: Float, s: Float) -> Float {
     x = x.abs();
     (-x / s).exp() / (s * sqr(1.0 + (-x / s).exp()))
 }
@@ -235,19 +235,19 @@ pub fn logistic(mut x: Scalar, s: Scalar) -> Scalar {
 /// Computes the cumulative distribution function (CDF) of the logistic
 /// distribution at the input `x` and a scale factor `s`.
 #[inline]
-pub fn logistic_cdf(x: Scalar, s: Scalar) -> Scalar {
+pub fn logistic_cdf(x: Float, s: Float) -> Float {
     1.0 / (1.0 + (-x / s).exp())
 }
 
 /// The logistic function limited to the interval `[a, b]` and renormalized.
 #[inline]
-pub fn trimmed_logistic(x: Scalar, s: Scalar, a: Scalar, b: Scalar) -> Scalar {
+pub fn trimmed_logistic(x: Float, s: Float, a: Float, b: Float) -> Float {
     logistic(x, s) / (logistic_cdf(b, s) - logistic_cdf(a, s))
 }
 
 #[inline]
-pub fn sin_cos(x: Scalar) -> (Scalar, Scalar) {
-    Scalar::sin_cos(x)
+pub fn sin_cos(x: Float) -> (Float, Float) {
+    Float::sin_cos(x)
 }
 
 #[inline]
@@ -266,8 +266,8 @@ pub fn find_interval(size: usize, pred: impl Fn(usize) -> bool) -> usize {
 }
 
 pub fn linear_least_squares_3<const ROWS: usize>(
-    a: &[[Scalar; 3]; ROWS],
-    b: &[[Scalar; 3]; ROWS],
+    a: &[[Float; 3]; ROWS],
+    b: &[[Float; 3]; ROWS],
 ) -> Option<Mat3> {
     let (at_a, at_b) = linear_least_squares_helper::<3, ROWS, Mat3>(a, b);
     let at_ai = at_a.try_inverse()?;
@@ -275,11 +275,11 @@ pub fn linear_least_squares_3<const ROWS: usize>(
 }
 
 pub fn linear_least_squares_helper<const N: usize, const ROWS: usize, M>(
-    a: &[[Scalar; N]; ROWS],
-    b: &[[Scalar; N]; ROWS],
+    a: &[[Float; N]; ROWS],
+    b: &[[Float; N]; ROWS],
 ) -> (M, M)
 where 
-    M: Default + IndexMut<(usize, usize)> + Index<(usize, usize), Output = Scalar>
+    M: Default + IndexMut<(usize, usize)> + Index<(usize, usize), Output = Float>
 {
     let mut a_t_a = M::default();
     let mut a_t_b = M::default();
@@ -311,7 +311,7 @@ where
     }
 }
 
-pub fn windowed_sinc(x: Scalar, radius: Scalar, tau: Scalar) -> Scalar {
+pub fn windowed_sinc(x: Float, radius: Float, tau: Float) -> Float {
     if x.abs() > radius {
         return 0.0;
     }
@@ -321,7 +321,7 @@ pub fn windowed_sinc(x: Scalar, radius: Scalar, tau: Scalar) -> Scalar {
 
 
 pub mod safe {
-    use crate::{math::{Numeric, Scalar}, NumericFloat};
+    use crate::{math::{Numeric, Float}, NumericFloat};
 
     #[inline]
     pub fn sqrt<T: Numeric + NumericFloat>(x: T) -> T {
@@ -329,31 +329,31 @@ pub mod safe {
     }
 
     #[inline]
-    pub fn asin(x: Scalar) -> Scalar {
+    pub fn asin(x: Float) -> Float {
         x.clamp(-1.0, 1.0).asin()
     }
 
     #[inline]
-    pub fn acos(x: Scalar) -> Scalar {
+    pub fn acos(x: Float) -> Float {
         x.clamp(-1.0, 1.0).acos()
     }
 }
 
 
-pub type Scalar = f32;
-pub type ScalarAsBits = u32;
+pub type Float = f32;
+pub type FloatAsBits = u32;
 
-pub type Mat2 = TMat2<Scalar>;
-pub type Mat3 = TMat3<Scalar>;
-pub type Mat4 = TMat4<Scalar>;
+pub type Mat2 = TMat2<Float>;
+pub type Mat3 = TMat3<Float>;
+pub type Mat4 = TMat4<Float>;
 
 pub type Mat2i = TMat2<Interval>;
 pub type Mat3i = TMat3<Interval>;
 pub type Mat4i = TMat4<Interval>;
 
-pub type Point2f = TPoint2<Scalar>;
-pub type Point3f = TPoint3<Scalar>;
-pub type Point4f = TPoint4<Scalar>;
+pub type Point2f = TPoint2<Float>;
+pub type Point3f = TPoint3<Float>;
+pub type Point4f = TPoint4<Float>;
 pub type Point2fi = TPoint2<Interval>;
 pub type Point3fi = TPoint3<Interval>;
 pub type Point4fi = TPoint4<Interval>;
@@ -365,9 +365,9 @@ pub type Point2u = TPoint2<u32>;
 pub type Point3u = TPoint3<u32>;
 pub type Point4u = TPoint4<u32>;
 
-pub type Vec2f = TVec2<Scalar>;
-pub type Vec3f = TVec3<Scalar>;
-pub type Vec4f = TVec4<Scalar>;
+pub type Vec2f = TVec2<Float>;
+pub type Vec3f = TVec3<Float>;
+pub type Vec4f = TVec4<Float>;
 pub type Vec2fi = TVec2<Interval>;
 pub type Vec3fi = TVec3<Interval>;
 pub type Vec4fi = TVec4<Interval>;
@@ -379,8 +379,8 @@ pub type Vec2u = TVec2<u32>;
 pub type Vec3u = TVec3<u32>;
 pub type Vec4u = TVec4<u32>;
 
-pub type Normal2f = TNormal2<Scalar>;
-pub type Normal3f = TNormal3<Scalar>;
+pub type Normal2f = TNormal2<Float>;
+pub type Normal3f = TNormal3<Float>;
 pub type Normal2fi = TNormal2<Interval>;
 pub type Normal3fi = TNormal3<Interval>;
 

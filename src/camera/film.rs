@@ -4,7 +4,7 @@ use once_cell::sync::Lazy;
 use rgb2spec::{LAMBDA_MAX, LAMBDA_MIN};
 use tracing::{error, warn};
 
-use crate::{color::{cie::Cie, colorspace::{NamedColorSpace, RgbColorSpace}, named_spectrum::NamedSpectrum, rgb_xyz::{white_balance, Rgb, Xyz}, sampled::SampledSpectrum, spectrum::{inner_product, DenselySampledSpectrum, PiecewiseLinearSpectrum, Spectrum, SpectrumLike}, wavelengths::SampledWavelengths}, image::{Image, ImageMetadata, PixelFormat}, interaction::SurfaceInteraction, linear_least_squares_3, numeric::HasNan, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, vec2d::Vec2D, Bounds2f, Bounds2i, Mat3, Normal3f, Point2f, Point2i, Point3f, Scalar, Vec2f, Vec3f};
+use crate::{color::{cie::Cie, colorspace::{NamedColorSpace, RgbColorSpace}, named_spectrum::NamedSpectrum, rgb_xyz::{white_balance, Rgb, Xyz}, sampled::SampledSpectrum, spectrum::{inner_product, DenselySampledSpectrum, PiecewiseLinearSpectrum, Spectrum, SpectrumLike}, wavelengths::SampledWavelengths}, image::{Image, ImageMetadata, PixelFormat}, interaction::SurfaceInteraction, linear_least_squares_3, numeric::HasNan, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, vec2d::Vec2D, Bounds2f, Bounds2i, Mat3, Normal3f, Point2f, Point2i, Point3f, Float, Vec2f, Vec3f};
 
 use super::{filter::{Filter, FilterLike as _}, CameraTransform};
 
@@ -15,7 +15,7 @@ pub trait FilmLike {
         l: &SampledSpectrum,
         lambda: &SampledWavelengths,
         visible_surface: &Option<VisibleSurface>,
-        weight: Scalar,
+        weight: Float,
     );
 
     fn add_splat(&mut self, p: Point2f, l: &SampledSpectrum, lambda: &SampledWavelengths);
@@ -26,19 +26,19 @@ pub trait FilmLike {
 
     fn sample_bounds(&self) -> Bounds2f;
 
-    fn diagonal(&self) -> Scalar;
+    fn diagonal(&self) -> Float;
 
     fn uses_visible_surface(&self) -> bool;
 
-    fn sample_wavelengths(&self, u: Scalar) -> SampledWavelengths;
+    fn sample_wavelengths(&self, u: Float) -> SampledWavelengths;
 
-    fn get_image(&self, metadata: &mut ImageMetadata, splat_scale: Scalar) -> Image;
+    fn get_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> Image;
 
-    fn write_image(&self, metadata: &mut ImageMetadata, splat_scale: Scalar) -> std::io::Result<()>;
+    fn write_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> std::io::Result<()>;
 
     fn to_output_rgb(&self, l: &SampledSpectrum, lambda: &SampledWavelengths) -> Rgb;
 
-    fn get_pixel_rgb(&self, p: Point2i, splat_scale: Scalar) -> Rgb;
+    fn get_pixel_rgb(&self, p: Point2i, splat_scale: Float) -> Rgb;
 
     fn get_filter(&self) -> &Filter;
 
@@ -56,7 +56,7 @@ impl Film {
     pub fn create(
         name: &str,
         parameters: &mut ParameterDictionary,
-        exposure_time: Scalar,
+        exposure_time: Float,
         _camera_transform: &CameraTransform,
         filter: Filter,
         loc: &FileLoc,
@@ -83,7 +83,7 @@ impl FilmLike for Film {
             l: &SampledSpectrum,
             lambda: &SampledWavelengths,
             visible_surface: &Option<VisibleSurface>,
-            weight: Scalar,
+            weight: Float,
     ) {
         match self {
             Film::RgbFilm(f) => f.add_sample(p_film, l, lambda, visible_surface, weight),
@@ -114,7 +114,7 @@ impl FilmLike for Film {
         }
     }
 
-    fn diagonal(&self) -> Scalar {
+    fn diagonal(&self) -> Float {
         match self {
             Film::RgbFilm(f) => f.diagonal(),
         }
@@ -126,19 +126,19 @@ impl FilmLike for Film {
         }
     }
 
-    fn sample_wavelengths(&self, u: Scalar) -> SampledWavelengths {
+    fn sample_wavelengths(&self, u: Float) -> SampledWavelengths {
         match self {
             Film::RgbFilm(f) => f.sample_wavelengths(u),
         }
     }
 
-    fn get_image(&self, metadata: &mut ImageMetadata, splat_scale: Scalar) -> Image {
+    fn get_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> Image {
         match self {
             Film::RgbFilm(f) => f.get_image(metadata, splat_scale),
         }
     }
 
-    fn write_image(&self, metadata: &mut ImageMetadata, splat_scale: Scalar) -> std::io::Result<()> {
+    fn write_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> std::io::Result<()> {
         match self {
             Film::RgbFilm(f) => f.write_image(metadata, splat_scale),
         }
@@ -150,7 +150,7 @@ impl FilmLike for Film {
         }
     }
 
-    fn get_pixel_rgb(&self, p: Point2i, splat_scale: Scalar) -> Rgb {
+    fn get_pixel_rgb(&self, p: Point2i, splat_scale: Float) -> Rgb {
         match self {
             Film::RgbFilm(f) => f.get_pixel_rgb(p, splat_scale),
         }
@@ -179,7 +179,7 @@ pub struct FilmBaseParameters {
     pub full_resolution: Point2i,
     pub pixel_bounds: Bounds2i,
     pub filter: Filter,
-    pub diagonal: Scalar,
+    pub diagonal: Float,
     pub sensor: PixelSensor,
     pub filename: String,
 }
@@ -291,12 +291,12 @@ impl FilmBaseParameters {
             }
             Bounds2i::new(
                 Point2i::new(
-                    Scalar::ceil(full_resolution.x as Scalar * crop.min.x) as i32,
-                    Scalar::ceil(full_resolution.y as Scalar * crop.min.y) as i32,
+                    Float::ceil(full_resolution.x as Float * crop.min.x) as i32,
+                    Float::ceil(full_resolution.y as Float * crop.min.y) as i32,
                 ),
                 Point2i::new(
-                    Scalar::ceil(full_resolution.x as Scalar * crop.max.x) as i32,
-                    Scalar::ceil(full_resolution.y as Scalar * crop.max.y) as i32,
+                    Float::ceil(full_resolution.x as Float * crop.max.x) as i32,
+                    Float::ceil(full_resolution.y as Float * crop.max.y) as i32,
                 ),
             )
         } else if !cr.is_empty() {
@@ -316,23 +316,23 @@ impl FilmBaseParameters {
 
                 let crop = Bounds2f::new(
                     Point2f::new(
-                        Scalar::clamp(Scalar::min(cr[0], cr[1]), 0.0, 1.0),
-                        Scalar::clamp(Scalar::max(cr[0], cr[1]), 0.0, 1.0),
+                        Float::clamp(Float::min(cr[0], cr[1]), 0.0, 1.0),
+                        Float::clamp(Float::max(cr[0], cr[1]), 0.0, 1.0),
                     ),
                     Point2f::new(
-                        Scalar::clamp(Scalar::min(cr[2], cr[3]), 0.0, 1.0),
-                        Scalar::clamp(Scalar::max(cr[2], cr[3]), 0.0, 1.0),
+                        Float::clamp(Float::min(cr[2], cr[3]), 0.0, 1.0),
+                        Float::clamp(Float::max(cr[2], cr[3]), 0.0, 1.0),
                     ),
                 );
 
                 Bounds2i::new(
                     Point2i::new(
-                        Scalar::ceil(full_resolution.x as Scalar * crop.min.x) as i32,
-                        Scalar::ceil(full_resolution.y as Scalar * crop.min.y) as i32,
+                        Float::ceil(full_resolution.x as Float * crop.min.x) as i32,
+                        Float::ceil(full_resolution.y as Float * crop.min.y) as i32,
                     ),
                     Point2i::new(
-                        Scalar::ceil(full_resolution.x as Scalar * crop.max.x) as i32,
-                        Scalar::ceil(full_resolution.y as Scalar * crop.max.y) as i32,
+                        Float::ceil(full_resolution.x as Float * crop.max.x) as i32,
+                        Float::ceil(full_resolution.y as Float * crop.max.y) as i32,
                     ),
                 )
             } else {
@@ -370,7 +370,7 @@ pub struct FilmBase {
     pub full_resolution: Point2i,
     pub pixel_bounds: Bounds2i,
     pub filter: Filter,
-    pub diagonal: Scalar,
+    pub diagonal: Float,
     pub sensor: PixelSensor,
     pub filename: String,
 }
@@ -380,7 +380,7 @@ impl FilmBase {
         full_resolution: Point2i,
         pixel_bounds: Bounds2i,
         filter: Filter,
-        diagonal: Scalar,
+        diagonal: Float,
         sensor: PixelSensor,
         filename: String,
     ) -> FilmBase {
@@ -394,7 +394,7 @@ impl FilmBase {
         }
     }
 
-    pub fn sample_wavelengths(&self, u: Scalar) -> SampledWavelengths {
+    pub fn sample_wavelengths(&self, u: Float) -> SampledWavelengths {
         SampledWavelengths::sample_visible(u)
     }
 
@@ -413,9 +413,9 @@ impl FilmBase {
 pub struct RgbFilm {
     base: FilmBase,
     color_space: Arc<RgbColorSpace>,
-    max_component_value: Scalar,
+    max_component_value: Float,
     write_fp16: bool,
-    filter_integral: Scalar,
+    filter_integral: Float,
     output_rgb_from_sensor_rgb: Mat3,
     pixels: Vec2D<RgbFilmPixel>,
 }
@@ -430,13 +430,13 @@ struct RgbFilmPixel {
 impl RgbFilm {
     pub fn create(
         parameters: &mut ParameterDictionary,
-        exposure_time: Scalar,
+        exposure_time: Float,
         filter: Filter,
         color_space: Arc<RgbColorSpace>,
         loc: &FileLoc,
         options: &Options,
     ) -> RgbFilm {
-        let max_component_value = parameters.get_one_float("maxcomponentvalue", Scalar::INFINITY);
+        let max_component_value = parameters.get_one_float("maxcomponentvalue", Float::INFINITY);
         let write_fp16 = parameters.get_one_bool("savefp16", true);
 
         let sensor = PixelSensor::create(parameters, color_space.clone(), exposure_time, loc);
@@ -459,11 +459,11 @@ impl RgbFilm {
         full_resolution: Point2i,
         pixel_bounds: Bounds2i,
         filter: Filter,
-        diagonal: Scalar,
+        diagonal: Float,
         sensor: PixelSensor,
         filename: &str,
         color_space: Arc<RgbColorSpace>,
-        max_component_value: Scalar,
+        max_component_value: Float,
         write_fp16: bool,
     ) -> RgbFilm {
         debug_assert!(!pixel_bounds.is_empty());
@@ -498,12 +498,12 @@ impl FilmLike for RgbFilm {
             l: &SampledSpectrum,
             lambda: &SampledWavelengths,
             visible_surface: &Option<VisibleSurface>,
-            weight: Scalar,
+            weight: Float,
     ) {
         let rgb = self.base.sensor.to_sensor_rgb(l, lambda);
         debug_assert!(!rgb.has_nan());
 
-        let m = Scalar::max(Scalar::max(rgb.r, rgb.g), rgb.b);
+        let m = Float::max(Float::max(rgb.r, rgb.g), rgb.b);
         let rgb = if m > self.max_component_value {
             rgb * self.max_component_value / m
         } else {
@@ -522,7 +522,7 @@ impl FilmLike for RgbFilm {
         let rgb = self.base.sensor.to_sensor_rgb(l, lambda);
         debug_assert!(!rgb.has_nan());
         
-        let m = Scalar::max(Scalar::max(rgb.r, rgb.g), rgb.b);
+        let m = Float::max(Float::max(rgb.r, rgb.g), rgb.b);
         let rgb = if m > self.max_component_value {
             rgb * self.max_component_value / m
         } else {
@@ -569,7 +569,7 @@ impl FilmLike for RgbFilm {
         self.base.sample_bounds()
     }
 
-    fn diagonal(&self) -> Scalar {
+    fn diagonal(&self) -> Float {
         self.base.diagonal
     }
 
@@ -577,11 +577,11 @@ impl FilmLike for RgbFilm {
         false
     }
 
-    fn sample_wavelengths(&self, u: Scalar) -> SampledWavelengths {
+    fn sample_wavelengths(&self, u: Float) -> SampledWavelengths {
         self.base.sample_wavelengths(u)
     }
 
-    fn get_image(&self, metadata: &mut ImageMetadata, splat_scale: Scalar) -> Image {
+    fn get_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> Image {
         let format = if self.write_fp16 {
             PixelFormat::Float16
         } else {
@@ -606,7 +606,7 @@ impl FilmLike for RgbFilm {
                 if self.write_fp16
                     && [rgb.r, rgb.g, rgb.b]
                         .iter()
-                        .fold(Scalar::NEG_INFINITY, |a, b| Scalar::max(a, *b))
+                        .fold(Float::NEG_INFINITY, |a, b| Float::max(a, *b))
                         > max_f16
                 {
                     if rgb.r > max_f16 {
@@ -635,7 +635,7 @@ impl FilmLike for RgbFilm {
         image
     }
 
-    fn write_image(&self, metadata: &mut ImageMetadata, splat_scale: Scalar) -> std::io::Result<()> {
+    fn write_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> std::io::Result<()> {
         let image = self.get_image(metadata, splat_scale);
         image.write(&PathBuf::from(self.get_filename()), metadata)?;
         Ok(())
@@ -646,21 +646,21 @@ impl FilmLike for RgbFilm {
         self.output_rgb_from_sensor_rgb * sensor_rgb
     }
 
-    fn get_pixel_rgb(&self, p: Point2i, splat_scale: Scalar) -> Rgb {
+    fn get_pixel_rgb(&self, p: Point2i, splat_scale: Float) -> Rgb {
         let pixel = self.pixels.get(p);
         let mut rgb = Rgb::new(
-            pixel.rgb_sum[0] as Scalar,
-            pixel.rgb_sum[1] as Scalar,
-            pixel.rgb_sum[2] as Scalar,
+            pixel.rgb_sum[0] as Float,
+            pixel.rgb_sum[1] as Float,
+            pixel.rgb_sum[2] as Float,
         );
 
         let weight_sum = pixel.weight_sum;
         if weight_sum != 0.0 {
-            rgb /= weight_sum as Scalar;
+            rgb /= weight_sum as Float;
         }
 
         for c in 0..3 {
-            rgb[c] += splat_scale * pixel.rgb_splat[c] as Scalar / self.filter_integral;
+            rgb[c] += splat_scale * pixel.rgb_splat[c] as Float / self.filter_integral;
         }
 
         self.output_rgb_from_sensor_rgb * rgb
@@ -685,7 +685,7 @@ pub struct VisibleSurface {
     pub n: Normal3f,
     pub ns: Normal3f,
     pub uv: Point2f,
-    pub time: Scalar,
+    pub time: Float,
     pub dpdx: Vec3f,
     pub dpdy: Vec3f,
     pub albedo: SampledSpectrum,
@@ -720,14 +720,14 @@ pub struct PixelSensor {
     r_bar: DenselySampledSpectrum,
     g_bar: DenselySampledSpectrum,
     b_bar: DenselySampledSpectrum,
-    imaging_ratio: Scalar,
+    imaging_ratio: Float,
 }
 
 impl PixelSensor {
     pub fn create(
         parameters: &mut ParameterDictionary,
         colorspace: Arc<RgbColorSpace>,
-        exposure_time: Scalar,
+        exposure_time: Float,
         loc: &FileLoc
     ) -> PixelSensor {
         let iso = parameters.get_one_float("iso", 100.0);
@@ -772,7 +772,7 @@ impl PixelSensor {
     pub fn new(
         output_colorspace: &RgbColorSpace,
         sensor_illum: &Option<Spectrum>,
-        imaging_ratio: Scalar,
+        imaging_ratio: Float,
     ) -> PixelSensor {
         let xyz_from_sensor_rgb = if let Some(illum) = sensor_illum {
             let source_white = Xyz::from_spectrum(illum).xy();
@@ -797,7 +797,7 @@ impl PixelSensor {
         b: Arc<Spectrum>,
         output_colorspace: &RgbColorSpace,
         sensor_illum: &Spectrum,
-        imaging_ratio: Scalar,
+        imaging_ratio: Float,
     ) -> PixelSensor {
         let mut rgb_camera = [[0.0; 3]; NUM_SWATCH_REFLECTANCES];
         for i in 0..NUM_SWATCH_REFLECTANCES {
@@ -861,13 +861,13 @@ impl PixelSensor {
         b3: &Spectrum,
     ) -> T 
     where
-        T: Default + IndexMut<usize> + MulAssign<Scalar> + Div<Scalar, Output = T>,
-        <T as Index<usize>>::Output: AddAssign<Scalar> 
+        T: Default + IndexMut<usize> + MulAssign<Float> + Div<Float, Output = T>,
+        <T as Index<usize>>::Output: AddAssign<Float> 
     {
         let mut result = T::default();
         let mut g_integral = 0.0;
         for lambda in (LAMBDA_MIN as i32)..=(LAMBDA_MAX as i32) {
-            let lambda = lambda as Scalar;
+            let lambda = lambda as Float;
             g_integral += b2.get(lambda) * illum.get(lambda);
             result[0] += b1.get(lambda) * ref1.get(lambda) * illum.get(lambda);
             result[1] += b2.get(lambda) * ref1.get(lambda) * illum.get(lambda);

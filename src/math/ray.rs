@@ -4,7 +4,7 @@ use crate::{math::*, media::Medium};
 
 
 pub trait RayLike {
-    fn at(&self, t: Scalar) -> Point3f;
+    fn at(&self, t: Float) -> Point3f;
 }
 
 
@@ -12,7 +12,7 @@ pub trait RayLike {
 pub struct Ray {
     pub origin: Point3f,
     pub direction: Vec3f,
-    pub time: Scalar,
+    pub time: Float,
     pub medium: Option<Medium>,
 }
 
@@ -37,13 +37,13 @@ impl Ray {
 
     /// Create a new [`Ray`] from an `origin`, `direction` and `time`.
     #[inline]
-    pub fn new_with_time(origin: Point3f, direction: Vec3f, time: Scalar) -> Self {
+    pub fn new_with_time(origin: Point3f, direction: Vec3f, time: Float) -> Self {
         debug_assert!(direction.is_normalized());
         Self { origin, direction, time, medium: None }
     }
 
     #[inline]
-    pub fn new_with_medium_time(origin: Point3f, direction: Vec3f, time: Scalar, medium: Option<Medium>) -> Self {
+    pub fn new_with_medium_time(origin: Point3f, direction: Vec3f, time: Float, medium: Option<Medium>) -> Self {
         debug_assert!(direction.is_normalized());
         Self { origin, direction, time, medium }
     }
@@ -108,16 +108,16 @@ impl Ray {
             if o > 0.0 { next_float_up(p) } else if o < 0.0 { next_float_down(p) } else { p })
     }
 
-    pub fn spawn_ray(pi: Point3fi, n: Normal3f, time: Scalar, d: Vec3f) -> Ray {
+    pub fn spawn_ray(pi: Point3fi, n: Normal3f, time: Float, d: Vec3f) -> Ray {
         Ray::new_with_time(Ray::offset_ray_origin(pi, n, d), d, time)
     }
 
-    pub fn spawn_ray_to(p_from: Point3fi, n: Normal3f, time: Scalar, p_to: Point3f) -> Ray {
+    pub fn spawn_ray_to(p_from: Point3fi, n: Normal3f, time: Float, p_to: Point3f) -> Ray {
         let d = p_to - Point3f::from(p_from);
         Self::spawn_ray(p_from, n, time, d.into())
     }
 
-    pub fn spawn_ray_to_both_offset(p_from: Point3fi, n_from: Normal3f, time: Scalar, p_to: Point3fi, n_to: Normal3f) -> Ray {
+    pub fn spawn_ray_to_both_offset(p_from: Point3fi, n_from: Normal3f, time: Float, p_to: Point3fi, n_to: Normal3f) -> Ray {
         let pf = Self::offset_ray_origin(p_from, n_from, (Point3f::from(p_to) - Point3f::from(p_from)).into());
         let pt = Self::offset_ray_origin(p_to, n_to, (pf - Point3f::from(p_to)).into());
 
@@ -134,7 +134,7 @@ impl Ray {
 impl RayLike for Ray {
     /// Computes the point along this [`Ray`] at a given `t`.
     #[inline]
-    fn at(&self, t: Scalar) -> Point3f {
+    fn at(&self, t: Float) -> Point3f {
         self.origin + self.direction * t
     }
 }
@@ -153,7 +153,7 @@ impl RayDifferential {
     }
 
     /// Scales the auxiliary rays given an estimated spacing of `s`.
-    pub fn scale_differentials(&mut self, s: Scalar) {
+    pub fn scale_differentials(&mut self, s: Float) {
         if let Some(aux) = &mut self.aux {
             aux.rx_origin = self.ray.origin + (aux.rx_origin - self.ray.origin) * s;
             aux.ry_origin = self.ray.origin + (aux.ry_origin - self.ray.origin) * s;
@@ -167,7 +167,7 @@ impl RayDifferential {
 impl RayLike for RayDifferential {
     /// Computes the point along this [`Ray`] at a given `t`.
     #[inline]
-    fn at(&self, t: Scalar) -> Point3f {
+    fn at(&self, t: Float) -> Point3f {
         self.ray.at(t)
     }
 }

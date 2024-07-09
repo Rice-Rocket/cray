@@ -524,14 +524,14 @@ macro_rules! impl_interval {
 }
 
 impl_interval!(
-    TPoint2 => Scalar: x,y;
-    TPoint3 => Scalar: x,y,z;
-    TPoint4 => Scalar: x,y,z,w;
-    TVec2 => Scalar: x,y;
-    TVec3 => Scalar: x,y,z;
-    TVec4 => Scalar: x,y,z,w;
-    TNormal2 => Scalar: x,y;
-    TNormal3 => Scalar: x,y,z;
+    TPoint2 => Float: x,y;
+    TPoint3 => Float: x,y,z;
+    TPoint4 => Float: x,y,z,w;
+    TVec2 => Float: x,y;
+    TVec3 => Float: x,y,z;
+    TVec4 => Float: x,y,z,w;
+    TNormal2 => Float: x,y;
+    TNormal3 => Float: x,y,z;
 );
 
 

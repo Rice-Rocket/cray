@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tracing::warn;
 
-use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, media::Medium, options::Options, ray::RayLike, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::sample_uniform_disk_concentric, transform::Transform, AuxiliaryRays, Bounds2f, Normal3f, Point2f, Point3f, Ray, RayDifferential, Scalar, Vec3f};
+use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, media::Medium, options::Options, ray::RayLike, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::sample_uniform_disk_concentric, transform::Transform, AuxiliaryRays, Bounds2f, Normal3f, Point2f, Point3f, Ray, RayDifferential, Float, Vec3f};
 
 use super::{film::{Film, FilmLike as _}, filter::FilterLike as _, Camera, CameraBase, CameraBaseParameters, CameraRay, CameraRayDifferential, CameraSample, CameraTransform};
 
@@ -13,15 +13,15 @@ pub struct ProjectiveCamera {
     camera_from_raster: Transform,
     raster_from_screen: Transform,
     screen_from_raster: Transform,
-    lens_radius: Scalar,
-    focal_distance: Scalar,
+    lens_radius: Float,
+    focal_distance: Float,
 }
 
 impl ProjectiveCamera {
     pub fn new(
         base_parameters: CameraBaseParameters,
-        lens_radius: Scalar,
-        focal_distance: Scalar,
+        lens_radius: Float,
+        focal_distance: Float,
         screen_from_camera: Transform,
         screen_window: Bounds2f,
     ) -> ProjectiveCamera {
@@ -44,8 +44,8 @@ impl ProjectiveCamera {
         )) * Transform::from_translation(Point3f::new(-screen_window.min.x, -screen_window.max.y, 0.0));
 
         let raster_from_ndc = Transform::from_scale(Vec3f::new(
-            camera_base.film.full_resolution().x as Scalar,
-            -camera_base.film.full_resolution().y as Scalar,
+            camera_base.film.full_resolution().x as Float,
+            -camera_base.film.full_resolution().y as Float,
             1.0
         ));
 
@@ -98,8 +98,8 @@ impl OrthographicCamera {
         let lens_radius = parameters.get_one_float("lensradius", 0.0);
         let focal_distance = parameters.get_one_float("focaldistance", 1e6);
 
-        let x = camera_base_params.film.full_resolution().x as Scalar;
-        let y = camera_base_params.film.full_resolution().y as Scalar;
+        let x = camera_base_params.film.full_resolution().x as Float;
+        let y = camera_base_params.film.full_resolution().y as Float;
         let frame = parameters.get_one_float("frameaspectratio", x / y);
 
         let mut screen = if frame > 1.0 {
@@ -129,8 +129,8 @@ impl OrthographicCamera {
 
     pub fn new(
         camera_base_params: CameraBaseParameters,
-        lens_radius: Scalar,
-        focal_distance: Scalar,
+        lens_radius: Float,
+        focal_distance: Float,
         screen_window: Bounds2f,
     ) -> OrthographicCamera {
         let screen_from_camera = Transform::orthographic(0.0, 1.0);
@@ -241,7 +241,7 @@ impl Camera for OrthographicCamera {
         &mut self.projective.camera_base.film
     }
 
-    fn sample_time(&self, u: Scalar) -> Scalar {
+    fn sample_time(&self, u: Float) -> Float {
         self.projective.camera_base.sample_time(u)
     }
 
@@ -257,7 +257,7 @@ impl Camera for OrthographicCamera {
         &self,
         p: Point3f,
         n: Normal3f,
-        time: Scalar,
+        time: Float,
         samples_per_pixel: i32,
         options: &Options,
     ) -> (Vec3f, Vec3f) {
@@ -270,8 +270,8 @@ pub struct PerspectiveCamera {
     projective: ProjectiveCamera,
     dx_camera: Vec3f,
     dy_camera: Vec3f,
-    cos_total_width: Scalar,
-    area: Scalar,
+    cos_total_width: Float,
+    area: Float,
 }
 
 impl PerspectiveCamera {
@@ -288,8 +288,8 @@ impl PerspectiveCamera {
         let lens_radius = parameters.get_one_float("lensradius", 0.0);
         let focal_distance = parameters.get_one_float("focaldistance", 1e6);
 
-        let x = camera_base_params.film.full_resolution().x as Scalar;
-        let y = camera_base_params.film.full_resolution().y as Scalar;
+        let x = camera_base_params.film.full_resolution().x as Float;
+        let y = camera_base_params.film.full_resolution().y as Float;
         let frame = parameters.get_one_float("frameaspectratio", x / y);
 
         let mut screen = if frame > 1.0 {
@@ -321,10 +321,10 @@ impl PerspectiveCamera {
 
     pub fn new(
         camera_base_params: CameraBaseParameters,
-        fov: Scalar,
+        fov: Float,
         screen_window: Bounds2f,
-        lens_radius: Scalar,
-        focal_distance: Scalar,
+        lens_radius: Float,
+        focal_distance: Float,
     ) -> PerspectiveCamera {
         let screen_from_camera = Transform::perspective(fov, 1e-2, 1000.0);
         let mut projective = ProjectiveCamera::new(
@@ -347,12 +347,12 @@ impl PerspectiveCamera {
 
         let res = projective.camera_base.film.full_resolution();
         let mut p_min = projective.camera_from_raster * Point3f::ZERO;
-        let mut p_max = projective.camera_from_raster * Point3f::new(res.x as Scalar, res.y as Scalar, 0.0);
+        let mut p_max = projective.camera_from_raster * Point3f::new(res.x as Float, res.y as Float, 0.0);
 
         p_min = p_min / p_min.z;
         p_max = p_max / p_max.z;
 
-        let area = Scalar::abs((p_max.x - p_min.x) * (p_max.y - p_min.y));
+        let area = Float::abs((p_max.x - p_min.x) * (p_max.y - p_min.y));
 
         let camera = PerspectiveCamera {
             projective: projective.clone(),
@@ -460,7 +460,7 @@ impl Camera for PerspectiveCamera {
         self.projective.camera_base.get_film_mut()
     }
 
-    fn sample_time(&self, u: Scalar) -> Scalar {
+    fn sample_time(&self, u: Float) -> Float {
         self.projective.camera_base.sample_time(u)
     }
 
@@ -476,7 +476,7 @@ impl Camera for PerspectiveCamera {
         &self,
         p: Point3f,
         n: Normal3f,
-        time: Scalar,
+        time: Float,
         samples_per_pixel: i32,
         options: &Options,
     ) -> (Vec3f, Vec3f) {

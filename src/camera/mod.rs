@@ -3,7 +3,7 @@ use std::{ops::Mul, sync::Arc};
 use film::{Film, FilmLike as _};
 use tracing::warn;
 
-use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, math::*, media::Medium, options::{CameraRenderingSpace, Options}, ray::RayLike, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, AuxiliaryRays, Frame, Normal3f, Point2f, Point3f, Ray, RayDifferential, Scalar, Vec3f};
+use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, math::*, media::Medium, options::{CameraRenderingSpace, Options}, ray::RayLike, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, AuxiliaryRays, Frame, Normal3f, Point2f, Point3f, Ray, RayDifferential, Float, Vec3f};
 
 pub mod projective;
 pub mod film;
@@ -14,10 +14,10 @@ pub trait Camera {
     fn generate_ray_differential(&self, sample: &CameraSample, lambda: &SampledWavelengths) -> Option<CameraRayDifferential>;
     fn get_film_mut(&mut self) -> &mut Arc<Film>;
     fn get_film(&self) -> &Arc<Film>;
-    fn sample_time(&self, u: Scalar) -> Scalar;
+    fn sample_time(&self, u: Float) -> Float;
     fn init_metadata(&self, metadata: &mut ImageMetadata);
     fn get_camera_transform(&self) -> &CameraTransform;
-    fn approximate_dp_dxy(&self, p: Point3f, n: Normal3f, time: Scalar, samples_per_pixel: i32, options: &Options) -> (Vec3f, Vec3f);
+    fn approximate_dp_dxy(&self, p: Point3f, n: Normal3f, time: Float, samples_per_pixel: i32, options: &Options) -> (Vec3f, Vec3f);
 }
 
 #[derive(Debug, Clone, Default)]
@@ -49,7 +49,7 @@ impl CameraTransform {
         self.render_from_camera * v
     }
 
-    pub fn camera_from_render<T>(&self, v: T, _time: Scalar) -> T
+    pub fn camera_from_render<T>(&self, v: T, _time: Float) -> T
     where Transform: Mul<T, Output = T> {
         self.render_from_camera.inverse() * v
     }
@@ -62,11 +62,11 @@ impl CameraTransform {
         self.world_from_render.inverse()
     }
 
-    pub fn camera_from_render_mat(&self, _time: Scalar) -> Transform {
+    pub fn camera_from_render_mat(&self, _time: Float) -> Transform {
         self.render_from_camera.inverse()
     }
 
-    pub fn camera_from_world(&self, _time: Scalar) -> Transform {
+    pub fn camera_from_world(&self, _time: Float) -> Transform {
         (self.world_from_render * self.render_from_camera).inverse()
     }
 
@@ -82,8 +82,8 @@ impl CameraTransform {
 #[derive(Debug, Clone)]
 pub struct CameraBase {
     camera_transform: CameraTransform,
-    shutter_open: Scalar,
-    shutter_close: Scalar,
+    shutter_open: Float,
+    shutter_close: Float,
     film: Arc<Film>,
     medium: Option<Medium>,
     min_pos_differential_x: Vec3f,
@@ -110,12 +110,12 @@ impl CameraBase {
         self.camera_transform.render_from_camera(v)
     }
 
-    pub fn camera_from_render<T>(&self, v: T, time: Scalar) -> T
+    pub fn camera_from_render<T>(&self, v: T, time: Float) -> T
     where Transform: Mul<T, Output = T> {
         self.camera_transform.camera_from_render(v, time)
     }
 
-    pub fn sample_time(&self, u: Scalar) -> Scalar {
+    pub fn sample_time(&self, u: Float) -> Float {
         lerp(self.shutter_open, self.shutter_close, u)
     }
 
@@ -129,7 +129,7 @@ impl CameraBase {
 
         let rx = [0.05, -0.05]
             .iter()
-            .map(|eps| -> (Scalar, CameraSample) {
+            .map(|eps| -> (Float, CameraSample) {
                 let mut sshift = sample.clone();
                 sshift.p_film.x += eps;
                 (*eps, sshift)
@@ -143,7 +143,7 @@ impl CameraBase {
 
         let ry = [0.05, -0.05]
             .iter()
-            .map(|eps| -> (Scalar, CameraSample) {
+            .map(|eps| -> (Float, CameraSample) {
                 let mut sshift = sample.clone();
                 sshift.p_film.y += eps;
                 (*eps, sshift)
@@ -173,7 +173,7 @@ impl CameraBase {
         &self,
         p: Point3f,
         n: Normal3f,
-        time: Scalar,
+        time: Float,
         samples_per_pixel: i32,
         options: &Options
     ) -> (Vec3f, Vec3f) {
@@ -199,7 +199,7 @@ impl CameraBase {
         let py = y_ray.at(ty);
 
         let spp_scale = if options.disable_pixel_jitter { 1.0 } else {
-            Scalar::max(0.125, 1.0 / (samples_per_pixel as Scalar).sqrt())
+            Float::max(0.125, 1.0 / (samples_per_pixel as Float).sqrt())
         };
 
         let dpdx = self.render_from_camera(down_z_from_camera.inverse() * (px - p_down_z)) * spp_scale;
@@ -209,10 +209,10 @@ impl CameraBase {
     }
 
     pub fn find_minimum_differentials<T: Camera>(&mut self, camera: &T) {
-        self.min_pos_differential_x = Vec3f::splat(Scalar::INFINITY);
-        self.min_pos_differential_y = Vec3f::splat(Scalar::INFINITY);
-        self.min_dir_differential_x = Vec3f::splat(Scalar::INFINITY);
-        self.min_dir_differential_y = Vec3f::splat(Scalar::INFINITY);
+        self.min_pos_differential_x = Vec3f::splat(Float::INFINITY);
+        self.min_pos_differential_y = Vec3f::splat(Float::INFINITY);
+        self.min_dir_differential_x = Vec3f::splat(Float::INFINITY);
+        self.min_dir_differential_y = Vec3f::splat(Float::INFINITY);
         
         let mut sample = CameraSample {
             p_film: Point2f::default(),
@@ -225,8 +225,8 @@ impl CameraBase {
 
         let n = 512;
         for i in 0..n {
-            sample.p_film.x = i as Scalar / (n - 1) as Scalar * self.film.full_resolution().x as Scalar;
-            sample.p_film.y = i as Scalar / (n - 1) as Scalar * self.film.full_resolution().y as Scalar;
+            sample.p_film.x = i as Float / (n - 1) as Float * self.film.full_resolution().x as Float;
+            sample.p_film.y = i as Float / (n - 1) as Float * self.film.full_resolution().y as Float;
 
             let Some(mut crd) = camera.generate_ray_differential(&sample, &lambda) else { continue };
 
@@ -264,8 +264,8 @@ impl CameraBase {
 
 pub struct CameraBaseParameters {
     pub camera_transform: CameraTransform,
-    pub shutter_open: Scalar,
-    pub shutter_close: Scalar,
+    pub shutter_open: Float,
+    pub shutter_close: Float,
     pub film: Arc<Film>,
     pub medium: Option<Medium>,
 }
@@ -300,8 +300,8 @@ impl CameraBaseParameters {
 pub struct CameraSample {
     pub p_film: Point2f,
     pub p_lens: Point2f,
-    pub time: Scalar,
-    pub filter_weight: Scalar,
+    pub time: Float,
+    pub filter_weight: Float,
 }
 
 impl Default for CameraSample {

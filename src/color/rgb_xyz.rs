@@ -5,20 +5,20 @@ use fast_polynomial::poly;
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
 
-use crate::{mat::mul_mat_vec, math::safe, numeric::HasNan, Mat3, Point2f, Scalar};
+use crate::{mat::mul_mat_vec, math::safe, numeric::HasNan, Mat3, Point2f, Float};
 
 use super::{cie::{Cie, CIE_Y_INTEGRAL}, spectrum::{inner_product, Spectrum, SpectrumLike, LAMBDA_MAX, LAMBDA_MIN}};
 
 #[derive(Debug, PartialEq, PartialOrd, Default)]
 pub struct Xyz {
-    pub x: Scalar,
-    pub y: Scalar,
-    pub z: Scalar,
+    pub x: Float,
+    pub y: Float,
+    pub z: Float,
 }
 
 impl Xyz {
     #[inline]
-    pub const fn new(x: Scalar, y: Scalar, z: Scalar) -> Xyz {
+    pub const fn new(x: Float, y: Float, z: Float) -> Xyz {
         Xyz { x, y, z }
     }
 
@@ -34,7 +34,7 @@ impl Xyz {
         Self::from_xyy(xy, 1.0)
     }
 
-    pub fn from_xyy(xy: &Point2f, y: Scalar) -> Xyz {
+    pub fn from_xyy(xy: &Point2f, y: Float) -> Xyz {
         if xy.y == 0.0 {
             return Xyz::new(0.0, 0.0, 0.0);
         }
@@ -50,7 +50,7 @@ impl Xyz {
 }
 
 impl HasNan for Xyz {
-    const NAN: Self = Self::new(Scalar::NAN, Scalar::NAN, Scalar::NAN);
+    const NAN: Self = Self::new(Float::NAN, Float::NAN, Float::NAN);
 
     fn has_nan(&self) -> bool {
         self.x.is_nan() || self.y.is_nan() || self.z.is_nan()
@@ -62,7 +62,7 @@ impl HasNan for Xyz {
 }
 
 impl Index<usize> for Xyz {
-    type Output = Scalar;
+    type Output = Float;
 
     fn index(&self, index: usize) -> &Self::Output {
         if index == 0 {
@@ -115,46 +115,46 @@ impl_op_ex!(/ |a: &Xyz, b: &Xyz| -> Xyz {
     Xyz::new(a.x / b.x, a.y / b.y, a.z / b.z)
 });
 
-impl_op_ex!(+ |a: &Xyz, b: &Scalar| -> Xyz
+impl_op_ex!(+ |a: &Xyz, b: &Float| -> Xyz
 {
     debug_assert!(!b.is_nan());
     Xyz { x: a.x + b, y: a.y + b, z: a.z + b }
 });
 
-impl_op_ex!(- |a: &Xyz, b: &Scalar| -> Xyz {
+impl_op_ex!(- |a: &Xyz, b: &Float| -> Xyz {
     debug_assert!(!b.is_nan());
     Xyz::new(a.x - b, a.y - b, a.z - b)
 });
 
-impl_op_ex!(* |a: &Xyz, b: &Scalar| -> Xyz {
+impl_op_ex!(* |a: &Xyz, b: &Float| -> Xyz {
     debug_assert!(!b.is_nan());
     Xyz::new(a.x * b, a.y * b, a.z * b)
 });
 
-impl_op_ex!(/ |a: &Xyz, b: &Scalar| -> Xyz {
+impl_op_ex!(/ |a: &Xyz, b: &Float| -> Xyz {
     debug_assert!(!b.is_nan());
     Xyz::new(a.x / b, a.y / b, a.z / b)
 });
 
-impl_op_ex!(+= |a: &mut Xyz, b: &Scalar| {
+impl_op_ex!(+= |a: &mut Xyz, b: &Float| {
     a.x += b;
     a.y += b;
     a.z += b;
 });
 
-impl_op_ex!(-= |a: &mut Xyz, b: &Scalar| {
+impl_op_ex!(-= |a: &mut Xyz, b: &Float| {
     a.x -= b;
     a.y -= b;
     a.z -= b;
 });
 
-impl_op_ex!(*= |a: &mut Xyz, b: &Scalar| {
+impl_op_ex!(*= |a: &mut Xyz, b: &Float| {
     a.x *= b;
     a.y *= b;
     a.z *= b;
 });
 
-impl_op_ex!(/= |a: &mut Xyz, b: &Scalar| {
+impl_op_ex!(/= |a: &mut Xyz, b: &Float| {
     a.x /= b;
     a.y /= b;
     a.z /= b;
@@ -163,22 +163,22 @@ impl_op_ex!(/= |a: &mut Xyz, b: &Scalar| {
 
 #[derive(Debug, Copy, Clone, Default)]
 pub struct Rgb {
-    pub r: Scalar,
-    pub g: Scalar,
-    pub b: Scalar,
+    pub r: Float,
+    pub g: Float,
+    pub b: Float,
 }
 
 impl Rgb {
     #[inline]
-    pub const fn new(r: Scalar, g: Scalar, b: Scalar) -> Rgb {
+    pub const fn new(r: Float, g: Float, b: Float) -> Rgb {
         Rgb { r, g, b }
     }
 
     pub fn clamp_zero(self) -> Rgb {
         Rgb::new(
-            Scalar::max(0.0, self.r),
-            Scalar::max(0.0, self.g),
-            Scalar::max(0.0, self.b),
+            Float::max(0.0, self.r),
+            Float::max(0.0, self.g),
+            Float::max(0.0, self.b),
         )
     }
 }
@@ -206,13 +206,13 @@ impl_op_ex!(* |a: &Rgb, b: &Rgb| -> Rgb { Rgb::new(a.r * b.r, a.g * b.g, a.b * b
 
 impl_op_ex!(/ |a: &Rgb, b: &Rgb| -> Rgb { Rgb::new(a.r / b.r, a.g / b.g, a.b / b.b) });
 
-impl_op_ex!(+ |a: &Rgb, b: &Scalar| -> Rgb { Rgb::new(a.r + b, a.g + b, a.b + b) });
+impl_op_ex!(+ |a: &Rgb, b: &Float| -> Rgb { Rgb::new(a.r + b, a.g + b, a.b + b) });
 
-impl_op_ex!(- |a: &Rgb, b: &Scalar| -> Rgb { Rgb::new(a.r - b, a.g - b, a.b - b) });
+impl_op_ex!(- |a: &Rgb, b: &Float| -> Rgb { Rgb::new(a.r - b, a.g - b, a.b - b) });
 
-impl_op_ex!(* |a: &Rgb, b: &Scalar| -> Rgb { Rgb::new(a.r * b, a.g * b, a.b * b) });
+impl_op_ex!(* |a: &Rgb, b: &Float| -> Rgb { Rgb::new(a.r * b, a.g * b, a.b * b) });
 
-impl_op_ex!(/ |a: &Rgb, b: &Scalar| -> Rgb { Rgb::new(a.r / b, a.g / b, a.b / b) });
+impl_op_ex!(/ |a: &Rgb, b: &Float| -> Rgb { Rgb::new(a.r / b, a.g / b, a.b / b) });
 
 impl_op_ex!(+= |a: &mut Rgb, b: &Rgb| {
     a.r += b.r;
@@ -238,32 +238,32 @@ impl_op_ex!(/= |a: &mut Rgb, b: &Rgb| {
     a.b /= b.b;
 });
 
-impl_op_ex!(+= |a: &mut Rgb, b: &Scalar| {
+impl_op_ex!(+= |a: &mut Rgb, b: &Float| {
     a.r += b;
     a.g += b;
     a.b += b;
 });
 
-impl_op_ex!(-= |a: &mut Rgb, b: &Scalar| {
+impl_op_ex!(-= |a: &mut Rgb, b: &Float| {
     a.r -= b;
     a.g -= b;
     a.b -= b;
 });
 
-impl_op_ex!(*= |a: &mut Rgb, b: &Scalar| {
+impl_op_ex!(*= |a: &mut Rgb, b: &Float| {
     a.r *= b;
     a.g *= b;
     a.b *= b;
 });
 
-impl_op_ex!(/= |a: &mut Rgb, b: &Scalar| {
+impl_op_ex!(/= |a: &mut Rgb, b: &Float| {
     a.r /= b;
     a.g /= b;
     a.b /= b;
 });
 
 impl HasNan for Rgb {
-    const NAN: Self = Rgb::new(Scalar::NAN, Scalar::NAN, Scalar::NAN);
+    const NAN: Self = Rgb::new(Float::NAN, Float::NAN, Float::NAN);
 
     fn has_nan(&self) -> bool {
         self.r.is_nan() || self.g.is_nan() || self.b.is_nan()
@@ -275,7 +275,7 @@ impl HasNan for Rgb {
 }
 
 impl Index<usize> for Rgb {
-    type Output = Scalar;
+    type Output = Float;
 
     fn index(&self, index: usize) -> &Self::Output {
         if index == 0 {
@@ -303,37 +303,37 @@ impl IndexMut<usize> for Rgb {
 
 #[derive(Debug, PartialEq, Default)]
 pub struct RgbSigmoidPolynomial {
-    c0: Scalar,
-    c1: Scalar,
-    c2: Scalar,
+    c0: Float,
+    c1: Float,
+    c2: Float,
 }
 
 impl RgbSigmoidPolynomial {
     #[inline]
-    pub const fn new(c0: Scalar, c1: Scalar, c2: Scalar) -> RgbSigmoidPolynomial {
+    pub const fn new(c0: Float, c1: Float, c2: Float) -> RgbSigmoidPolynomial {
         RgbSigmoidPolynomial { c0, c1, c2 }
     }
 
     #[inline]
-    pub const fn from_array(c: [Scalar; 3]) -> RgbSigmoidPolynomial {
+    pub const fn from_array(c: [Float; 3]) -> RgbSigmoidPolynomial {
         RgbSigmoidPolynomial { c0: c[0], c1: c[1], c2: c[2] }
     }
 
-    pub fn get(&self, lambda: Scalar) -> Scalar {
+    pub fn get(&self, lambda: Float) -> Float {
         Self::s(poly(lambda, &[self.c2, self.c1, self.c0]))
     }
 
-    pub fn max_value(&self) -> Scalar {
-        let result = Scalar::max(self.get(LAMBDA_MIN), self.get(LAMBDA_MAX));
+    pub fn max_value(&self) -> Float {
+        let result = Float::max(self.get(LAMBDA_MIN), self.get(LAMBDA_MAX));
         let lambda = -self.c1 / (2.0 * self.c0);
         if (LAMBDA_MIN..=LAMBDA_MAX).contains(&lambda) {
-            Scalar::max(result, self.get(lambda))
+            Float::max(result, self.get(lambda))
         } else {
             result
         }
     }
 
-    fn s(x: Scalar) -> Scalar {
+    fn s(x: Float) -> Float {
         if x.is_infinite() {
             if x > 0.0 {
                 return 1.0;
@@ -342,12 +342,12 @@ impl RgbSigmoidPolynomial {
             }
         }
 
-        0.5 + x / (2.0 * Scalar::sqrt(1.0 + x * x))
+        0.5 + x / (2.0 * Float::sqrt(1.0 + x * x))
     }
 }
 
 impl HasNan for RgbSigmoidPolynomial {
-    const NAN: Self = RgbSigmoidPolynomial::new(Scalar::NAN, Scalar::NAN, Scalar::NAN);
+    const NAN: Self = RgbSigmoidPolynomial::new(Float::NAN, Float::NAN, Float::NAN);
 
     fn has_nan(&self) -> bool {
         self.c0.is_nan() || self.c1.is_nan() || self.c2.is_nan()
@@ -387,10 +387,10 @@ pub fn white_balance(src_white: &Point2f, target_white: &Point2f) -> Mat3 {
 
 
 pub trait ColorEncodingLike {
-    fn to_linear(&self, vin: &[u8], vout: &mut [Scalar]);
+    fn to_linear(&self, vin: &[u8], vout: &mut [Float]);
     #[allow(clippy::wrong_self_convention)]
-    fn from_linear(&self, vin: &[Scalar], vout: &mut [u8]);
-    fn to_float_linear(&self, v: Scalar) -> Scalar;
+    fn from_linear(&self, vin: &[Float], vout: &mut [u8]);
+    fn to_float_linear(&self, v: Float) -> Float;
 }
 
 #[derive(Debug, Clone)]
@@ -410,7 +410,7 @@ impl Hash for ColorEncodingPtr {
     }
 }
 
-pub struct ColorEncodingCache(HashMap<OrderedFloat<Scalar>, ColorEncodingPtr>);
+pub struct ColorEncodingCache(HashMap<OrderedFloat<Float>, ColorEncodingPtr>);
 
 impl ColorEncodingCache {
     pub fn new() -> ColorEncodingCache {
@@ -448,7 +448,7 @@ impl ColorEncoding {
                 panic!("expected gamma <value> for color encoding");
             }
 
-            let gamma = params[1].parse::<Scalar>().expect("unable to parse gamma float value");
+            let gamma = params[1].parse::<Float>().expect("unable to parse gamma float value");
             if gamma == 0.0 {
                 panic!("gamma value cannot be 0.0");
             }
@@ -471,7 +471,7 @@ impl ColorEncoding {
 }
 
 impl ColorEncodingLike for ColorEncoding {
-    fn to_linear(&self, vin: &[u8], vout: &mut [Scalar]) {
+    fn to_linear(&self, vin: &[u8], vout: &mut [Float]) {
         match self {
             ColorEncoding::Linear(e) => e.to_linear(vin, vout),
             ColorEncoding::SRgb(e) => e.to_linear(vin, vout),
@@ -479,7 +479,7 @@ impl ColorEncodingLike for ColorEncoding {
         }
     }
 
-    fn from_linear(&self, vin: &[Scalar], vout: &mut [u8]) {
+    fn from_linear(&self, vin: &[Float], vout: &mut [u8]) {
         match self {
             ColorEncoding::Linear(e) => e.from_linear(vin, vout),
             ColorEncoding::SRgb(e) => e.from_linear(vin, vout),
@@ -487,7 +487,7 @@ impl ColorEncodingLike for ColorEncoding {
         }
     }
 
-    fn to_float_linear(&self, v: Scalar) -> Scalar {
+    fn to_float_linear(&self, v: Float) -> Float {
         match self {
             ColorEncoding::Linear(e) => e.to_float_linear(v),
             ColorEncoding::SRgb(e) => e.to_float_linear(v),
@@ -500,21 +500,21 @@ impl ColorEncodingLike for ColorEncoding {
 pub struct LinearColorEncoding;
 
 impl ColorEncodingLike for LinearColorEncoding {
-    fn to_linear(&self, vin: &[u8], vout: &mut [Scalar]) {
+    fn to_linear(&self, vin: &[u8], vout: &mut [Float]) {
         debug_assert!(vin.len() == vout.len());
         for i in 0..vin.len() {
-            vout[i] = vin[i] as Scalar / 255.0;
+            vout[i] = vin[i] as Float / 255.0;
         }
     }
 
-    fn from_linear(&self, vin: &[Scalar], vout: &mut [u8]) {
+    fn from_linear(&self, vin: &[Float], vout: &mut [u8]) {
         debug_assert!(vin.len() == vout.len());
         for i in 0..vin.len() {
             vout[i] = (vin[i] * 255.0 + 0.5).clamp(0.0, 255.0) as u8
         }
     }
 
-    fn to_float_linear(&self, v: Scalar) -> Scalar {
+    fn to_float_linear(&self, v: Float) -> Float {
         v
     }
 }
@@ -523,47 +523,47 @@ impl ColorEncodingLike for LinearColorEncoding {
 pub struct SRgbColorEncoding;
 
 impl ColorEncodingLike for SRgbColorEncoding {
-    fn to_linear(&self, vin: &[u8], vout: &mut [Scalar]) {
+    fn to_linear(&self, vin: &[u8], vout: &mut [Float]) {
         debug_assert!(vin.len() == vout.len());
         for i in 0..vin.len() {
             vout[i] = srgb_8_to_linear(vin[i]);
         }
     }
 
-    fn from_linear(&self, vin: &[Scalar], vout: &mut [u8]) {
+    fn from_linear(&self, vin: &[Float], vout: &mut [u8]) {
         debug_assert!(vin.len() == vout.len());
         for i in 0..vin.len() {
             vout[i] = linear_to_srgb_8(vin[i], 0.0);
         }
     }
 
-    fn to_float_linear(&self, v: Scalar) -> Scalar {
+    fn to_float_linear(&self, v: Float) -> Float {
         srgb_to_linear(v)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct GammaColorEncoding {
-    gamma: Scalar,
-    apply_lut: [Scalar; 256],
-    inverse_lut: [Scalar; 1024],
+    gamma: Float,
+    apply_lut: [Float; 256],
+    inverse_lut: [Float; 1024],
 }
 
 impl GammaColorEncoding {
-    pub fn new(gamma: Scalar) -> GammaColorEncoding {
+    pub fn new(gamma: Float) -> GammaColorEncoding {
         let mut apply_lut = [0.0; 256];
 
         for (i, lut_v) in apply_lut.iter_mut().enumerate() {
-            let v = i as Scalar / 255.0;
-            *lut_v = Scalar::powf(v, gamma);
+            let v = i as Float / 255.0;
+            *lut_v = Float::powf(v, gamma);
 
         }
 
         let mut inverse_lut = [0.0; 1024];
 
         for i in 0..1024 {
-            let v = i as Scalar / (inverse_lut.len() - 1) as Scalar;
-            inverse_lut[i] = Scalar::clamp(255.0 * Scalar::powf(v, 1.0 / gamma) + 0.5, 0.0, 255.0);
+            let v = i as Float / (inverse_lut.len() - 1) as Float;
+            inverse_lut[i] = Float::clamp(255.0 * Float::powf(v, 1.0 / gamma) + 0.5, 0.0, 255.0);
         }
 
         GammaColorEncoding { gamma, apply_lut, inverse_lut }
@@ -571,30 +571,30 @@ impl GammaColorEncoding {
 }
 
 impl ColorEncodingLike for GammaColorEncoding {
-    fn to_linear(&self, vin: &[u8], vout: &mut [Scalar]) {
+    fn to_linear(&self, vin: &[u8], vout: &mut [Float]) {
         debug_assert!(vin.len() == vout.len());
         for i in 0..vin.len() {
             vout[i] = self.apply_lut[vin[i] as usize];
         }
     }
 
-    fn from_linear(&self, vin: &[Scalar], vout: &mut [u8]) {
+    fn from_linear(&self, vin: &[Float], vout: &mut [u8]) {
         debug_assert!(vin.len() == vout.len());
         for i in 0..vin.len() {
-            vout[i] = self.inverse_lut[Scalar::clamp(
-                vin[i] * (self.inverse_lut.len() - 1) as Scalar,
+            vout[i] = self.inverse_lut[Float::clamp(
+                vin[i] * (self.inverse_lut.len() - 1) as Float,
                 0.0,
-                (self.inverse_lut.len() - 1) as Scalar,
+                (self.inverse_lut.len() - 1) as Float,
             ) as usize] as u8;
         }
     }
 
-    fn to_float_linear(&self, v: Scalar) -> Scalar {
-        Scalar::powf(v, self.gamma)
+    fn to_float_linear(&self, v: Float) -> Float {
+        Float::powf(v, self.gamma)
     }
 }
 
-fn linear_to_srgb(value: Scalar) -> Scalar {
+fn linear_to_srgb(value: Float) -> Float {
     if value <= 0.0031308 {
         return 12.92 * value;
     }
@@ -624,7 +624,7 @@ fn linear_to_srgb(value: Scalar) -> Scalar {
     p / q * value
 }
 
-fn srgb_to_linear(value: Scalar) -> Scalar {
+fn srgb_to_linear(value: Float) -> Float {
     if value <= 0.04045 {
         return value * (1.0 / 12.92);
     }
@@ -652,21 +652,21 @@ fn srgb_to_linear(value: Scalar) -> Scalar {
     p / q * value
 }
 
-fn linear_to_srgb_8(value: Scalar, dither: Scalar) -> u8 {
+fn linear_to_srgb_8(value: Float, dither: Float) -> u8 {
     if value <= 0.0 {
         0
     } else if value >= 1.0 {
         255
     } else {
-        Scalar::round(255.0 * linear_to_srgb(value) + dither).clamp(0.0, 255.0) as u8
+        Float::round(255.0 * linear_to_srgb(value) + dither).clamp(0.0, 255.0) as u8
     }
 }
 
-fn srgb_8_to_linear(value: u8) -> Scalar {
+fn srgb_8_to_linear(value: u8) -> Float {
     SRGB_TO_LINEAR_LUT[value as usize]
 }
 
-const SRGB_TO_LINEAR_LUT: [Scalar; 256] = [
+const SRGB_TO_LINEAR_LUT: [Float; 256] = [
     0.0000000000,
     0.0003035270,
     0.0006070540,

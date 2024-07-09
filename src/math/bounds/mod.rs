@@ -5,13 +5,13 @@ pub mod direction;
 pub use bounds2::TBounds2;
 pub use bounds3::TBounds3;
 
-use crate::math::Scalar;
+use crate::math::Float;
 
 
 /// A 3-dimensional axis-aligned bounding box of type [`Scalar`]
-pub type Bounds3f = TBounds3<Scalar>;
+pub type Bounds3f = TBounds3<Float>;
 /// A 2-dimensional axis-aligned bounding box of type [`Scalar`]
-pub type Bounds2f = TBounds2<Scalar>;
+pub type Bounds2f = TBounds2<Float>;
 /// A 3-dimensional axis-aligned bounding box of type [`i32`]
 pub type Bounds3i = TBounds3<i32>;
 /// A 2-dimensional axis-aligned bounding box of type [`i32`]

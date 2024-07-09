@@ -1,16 +1,16 @@
 use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex}};
 
-use crate::{color::{rgb_xyz::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, Rgb}, sampled::SampledSpectrum, spectrum::{ConstantSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum, SpectrumLike as _}, wavelengths::SampledWavelengths}, file::resolve_filename, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, reader::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::FileLoc}, spherical_theta, sqr, transform::Transform, Normal3f, Point2f, Point3f, Scalar, Vec2f, Vec3f, FRAC_1_PI, FRAC_1_TAU, PI};
+use crate::{color::{rgb_xyz::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, Rgb}, sampled::SampledSpectrum, spectrum::{ConstantSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum, SpectrumLike as _}, wavelengths::SampledWavelengths}, file::resolve_filename, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, reader::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::FileLoc}, spherical_theta, sqr, transform::Transform, Normal3f, Point2f, Point3f, Float, Vec2f, Vec3f, FRAC_1_PI, FRAC_1_TAU, PI};
 
 pub trait FloatTextureLike {
-    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar;
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Float;
 }
 
 #[derive(Debug)]
 pub struct ImageTextureBase {
     mapping: TextureMapping2D,
     filename: String,
-    scale: Scalar,
+    scale: Float,
     invert: bool,
     mipmap: Arc<MIPMap>,
 }
@@ -21,7 +21,7 @@ impl ImageTextureBase {
         filename: String,
         filter_options: MIPMapFilterOptions,
         wrap_mode: WrapMode,
-        scale: Scalar,
+        scale: Float,
         invert: bool,
         encoding: ColorEncodingPtr,
         texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
@@ -121,7 +121,7 @@ impl FloatTexture {
 }
 
 impl FloatTextureLike for FloatTexture {
-    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         match self {
             FloatTexture::Constant(t) => t.evaluate(ctx),
             FloatTexture::Scaled(t) => t.evaluate(ctx),
@@ -134,11 +134,11 @@ impl FloatTextureLike for FloatTexture {
 
 #[derive(Debug)]
 pub struct FloatConstantTexture {
-    value: Scalar,
+    value: Float,
 }
 
 impl FloatConstantTexture {
-    pub fn new(value: Scalar) -> Self {
+    pub fn new(value: Float) -> Self {
         Self { value }
     }
 
@@ -154,7 +154,7 @@ impl FloatConstantTexture {
 }
 
 impl FloatTextureLike for FloatConstantTexture {
-    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         self.value
     }
 }
@@ -183,7 +183,7 @@ impl FloatScaledTexture {
 }
 
 impl FloatTextureLike for FloatScaledTexture {
-    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         let sc = self.scale.evaluate(ctx);
         if sc == 0.0 {
             return 0.0;
@@ -219,7 +219,7 @@ impl FloatMixTexture {
 }
 
 impl FloatTextureLike for FloatMixTexture {
-    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         let amt = self.amount.evaluate(ctx);
         let mut t1 = 0.0;
         let mut t2 = 0.0;
@@ -261,7 +261,7 @@ impl FloatDirectionMixTexture {
 }
 
 impl FloatTextureLike for FloatDirectionMixTexture {
-    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         let amt = ctx.n.dot(self.dir.into());
         let mut t1 = 0.0;
         let mut t2 = 0.0;
@@ -286,7 +286,7 @@ impl FloatImageTexture {
         filename: String,
         filter_options: MIPMapFilterOptions,
         wrap_mode: WrapMode,
-        scale: Scalar,
+        scale: Float,
         invert: bool,
         encoding: ColorEncodingPtr,
         texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
@@ -359,12 +359,12 @@ impl FloatImageTexture {
 }
 
 impl FloatTextureLike for FloatImageTexture {
-    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         let mut c = self.base.mapping.map(ctx);
         c.st[1] = 1.0 - c.st[1];
 
-        let v = self.base.mipmap.filter::<Scalar>(c.st, Vec2f::new(c.dsdx, c.dtdx), Vec2f::new(c.dsdy, c.dtdy)) * self.base.scale;
-        if self.base.invert { Scalar::max(0.0, 1.0 - v) } else { v }
+        let v = self.base.mipmap.filter::<Float>(c.st, Vec2f::new(c.dsdx, c.dtdx), Vec2f::new(c.dsdy, c.dtdy)) * self.base.scale;
+        if self.base.invert { Float::max(0.0, 1.0 - v) } else { v }
     }
 }
 
@@ -665,7 +665,7 @@ impl SpectrumImageTexture {
         filename: String,
         filter_options: MIPMapFilterOptions,
         wrap_mode: WrapMode,
-        scale: Scalar,
+        scale: Float,
         invert: bool,
         encoding: ColorEncodingPtr,
         texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
@@ -828,10 +828,10 @@ impl TextureMapping2DLike for TextureMapping2D {
 
 #[derive(Debug)]
 pub struct UVMapping {
-    su: Scalar,
-    sv: Scalar,
-    du: Scalar,
-    dv: Scalar,
+    su: Float,
+    sv: Float,
+    du: Float,
+    dv: Float,
 }
 
 impl Default for UVMapping {
@@ -921,7 +921,7 @@ impl TextureMapping2DLike for CylindricalMapping {
         let dtdy = dtdp.dot(dpdy);
 
         let st = Point2f::new(
-            PI + Scalar::atan2(pt.y, pt.x) * FRAC_1_TAU,
+            PI + Float::atan2(pt.y, pt.x) * FRAC_1_TAU,
             pt.z,
         );
 
@@ -940,8 +940,8 @@ pub struct PlanarMapping {
     texture_from_render: Transform,
     vs: Vec3f,
     vt: Vec3f,
-    ds: Scalar,
-    dt: Scalar,
+    ds: Float,
+    dt: Float,
 }
 
 impl TextureMapping2DLike for PlanarMapping {
@@ -970,10 +970,10 @@ impl TextureMapping2DLike for PlanarMapping {
 
 pub struct TexCoord2D {
     st: Point2f,
-    dsdx: Scalar,
-    dsdy: Scalar,
-    dtdx: Scalar,
-    dtdy: Scalar,
+    dsdx: Float,
+    dsdy: Float,
+    dtdx: Float,
+    dtdy: Float,
 }
 
 pub struct TextureEvalContext {
@@ -982,10 +982,10 @@ pub struct TextureEvalContext {
     dpdy: Vec3f,
     n: Normal3f,
     uv: Point2f,
-    dudx: Scalar,
-    dudy: Scalar,
-    dvdx: Scalar,
-    dvdy: Scalar,
+    dudx: Float,
+    dudy: Float,
+    dvdx: Float,
+    dvdy: Float,
 }
 
 impl TextureEvalContext {
@@ -995,10 +995,10 @@ impl TextureEvalContext {
         dpdy: Vec3f,
         n: Normal3f,
         uv: Point2f,
-        dudx: Scalar,
-        dudy: Scalar,
-        dvdx: Scalar,
-        dvdy: Scalar,
+        dudx: Float,
+        dudy: Float,
+        dvdx: Float,
+        dvdy: Float,
     ) -> TextureEvalContext {
         TextureEvalContext {
             p,

@@ -8,13 +8,13 @@ use crate::{color::cie::CIE_Y_INTEGRAL, file::read_float_file, math::*};
 use super::{cie::{Cie, NUM_CIES_SAMPLES}, colorspace::RgbColorSpace, named_spectrum::{NamedSpectrum, CIE_S0, CIE_S1, CIE_S2, CIE_S_LAMBDA}, rgb_xyz::{Rgb, RgbSigmoidPolynomial}, sampled::{SampledSpectrum, NUM_SPECTRUM_SAMPLES}, wavelengths::SampledWavelengths};
 
 /// Minimum wavelength of visible light. Nanometers
-pub const LAMBDA_MIN: Scalar = 360.0;
+pub const LAMBDA_MIN: Float = 360.0;
 /// Maximum wavelength of visible light. Nanometers
-pub const LAMBDA_MAX: Scalar = 830.0;
+pub const LAMBDA_MAX: Float = 830.0;
 
 pub trait SpectrumLike {
-    fn get(&self, lambda: Scalar) -> Scalar;
-    fn max_value(&self) -> Scalar;
+    fn get(&self, lambda: Float) -> Float;
+    fn max_value(&self) -> Float;
     fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum;
 }
 
@@ -77,7 +77,7 @@ impl Spectrum {
 
 impl SpectrumLike for Spectrum {
     /// Gets the value of the spectral distributions at wavelength `lambda`.
-    fn get(&self, lambda: Scalar) -> Scalar {
+    fn get(&self, lambda: Float) -> Float {
         match self {
             Spectrum::Constant(s) => s.get(lambda),
             Spectrum::DenselySampled(s) => s.get(lambda),
@@ -89,7 +89,7 @@ impl SpectrumLike for Spectrum {
         }
     }
 
-    fn max_value(&self) -> Scalar {
+    fn max_value(&self) -> Float {
         match self {
             Spectrum::Constant(s) => s.max_value(),
             Spectrum::DenselySampled(s) => s.max_value(),
@@ -117,22 +117,22 @@ impl SpectrumLike for Spectrum {
 
 #[derive(Debug, PartialEq)]
 pub struct ConstantSpectrum {
-    c: Scalar,
+    c: Float,
 }
 
 impl ConstantSpectrum {
     #[inline]
-    pub const fn new(c: Scalar) -> ConstantSpectrum {
+    pub const fn new(c: Float) -> ConstantSpectrum {
         ConstantSpectrum { c }
     }
 }
 
 impl SpectrumLike for ConstantSpectrum {
-    fn get(&self, _lambda: Scalar) -> Scalar {
+    fn get(&self, _lambda: Float) -> Float {
         self.c
     }
 
-    fn max_value(&self) -> Scalar {
+    fn max_value(&self) -> Float {
         self.c
     }
 
@@ -145,7 +145,7 @@ impl SpectrumLike for ConstantSpectrum {
 pub struct DenselySampledSpectrum {
     lambda_min: i32,
     lambda_max: i32,
-    values: Vec<Scalar>
+    values: Vec<Float>
 }
 
 impl DenselySampledSpectrum {
@@ -154,7 +154,7 @@ impl DenselySampledSpectrum {
     }
 
     pub fn new_range(spectrum: &Spectrum, lambda_min: i32, lambda_max: i32) -> DenselySampledSpectrum {
-        let values: Vec<Scalar> = (lambda_min..=lambda_max).map(|lambda: i32| spectrum.get(lambda as Scalar)).collect();
+        let values: Vec<Float> = (lambda_min..=lambda_max).map(|lambda: i32| spectrum.get(lambda as Float)).collect();
         DenselySampledSpectrum {
             lambda_min,
             lambda_max,
@@ -162,10 +162,10 @@ impl DenselySampledSpectrum {
         }
     }
 
-    pub fn sample_fn(f: impl Fn(Scalar) -> Scalar, lambda_min: usize, lambda_max: usize) -> DenselySampledSpectrum {
+    pub fn sample_fn(f: impl Fn(Float) -> Float, lambda_min: usize, lambda_max: usize) -> DenselySampledSpectrum {
         let mut values = vec![0.0; lambda_max - lambda_min + 1];
         for lambda in lambda_min..=lambda_max {
-            values[lambda - lambda_min] = f(lambda as Scalar);
+            values[lambda - lambda_min] = f(lambda as Float);
         }
         DenselySampledSpectrum {
             values,
@@ -174,13 +174,13 @@ impl DenselySampledSpectrum {
         }
     }
 
-    pub fn d(temperature: Scalar) -> DenselySampledSpectrum {
+    pub fn d(temperature: Float) -> DenselySampledSpectrum {
         let cct = temperature * 1.4388 / 1.4380;
 
         if cct < 4000.0 {
             let bb = BlackbodySpectrum::new(cct);
             let blackbody = DenselySampledSpectrum::sample_fn(
-                |lambda: Scalar| bb.get(lambda),
+                |lambda: Float| bb.get(lambda),
                 LAMBDA_MIN as usize,
                 LAMBDA_MAX as usize,
             );
@@ -188,12 +188,12 @@ impl DenselySampledSpectrum {
         }
 
         let x = if cct <= 7000.0 {
-            -4.607 * 1e9 / Scalar::powi(cct, 3)
+            -4.607 * 1e9 / Float::powi(cct, 3)
                 + 2.9678 * 1e6 / cct * cct
                 + 0.09911 * 1e3 / cct
                 + 0.244063
         } else {
-            -2.0064 * 1e9 / Scalar::powi(cct, 3)
+            -2.0064 * 1e9 / Float::powi(cct, 3)
                 + 1.9018 * 1e6 / cct * cct
                 + 0.24748 * 1e3 / cct
                 + 0.23704
@@ -205,7 +205,7 @@ impl DenselySampledSpectrum {
         let m1 = (-1.3515 - 1.7703 * x + 5.9114 * y) / m;
         let m2 = (0.0300 - 31.4424 * x + 30.0717 * y) / m;
 
-        let mut values: Vec<Scalar> = Vec::with_capacity(NUM_CIES_SAMPLES);
+        let mut values: Vec<Float> = Vec::with_capacity(NUM_CIES_SAMPLES);
         for i in 0..NUM_CIES_SAMPLES {
             values.push((CIE_S0[i] + CIE_S1[i] * m1 + CIE_S2[i] * m2) * 0.01);
         }
@@ -220,7 +220,7 @@ impl DenselySampledSpectrum {
 }
 
 impl SpectrumLike for DenselySampledSpectrum {
-    fn get(&self, lambda: Scalar) -> Scalar {
+    fn get(&self, lambda: Float) -> Float {
         let offset = lambda as i32 - self.lambda_min;
         if offset < 0 || offset >= self.values.len() as i32 {
             return 0.0;
@@ -228,8 +228,8 @@ impl SpectrumLike for DenselySampledSpectrum {
         self.values[offset as usize]
     }
 
-    fn max_value(&self) -> Scalar {
-        let max = self.values.iter().fold(Scalar::NAN, |a, &b| a.max(b));
+    fn max_value(&self) -> Float {
+        let max = self.values.iter().fold(Float::NAN, |a, &b| a.max(b));
         if max.is_nan() {
             panic!("Empty DenselySampledSpectrum");
         }
@@ -252,12 +252,12 @@ impl SpectrumLike for DenselySampledSpectrum {
 
 #[derive(Debug, PartialEq)]
 pub struct PiecewiseLinearSpectrum {
-    lambdas: Vec<Scalar>,
-    values: Vec<Scalar>,
+    lambdas: Vec<Float>,
+    values: Vec<Float>,
 }
 
 impl PiecewiseLinearSpectrum {
-    pub fn new(lambdas: &[Scalar], values: &[Scalar]) -> PiecewiseLinearSpectrum {
+    pub fn new(lambdas: &[Float], values: &[Float]) -> PiecewiseLinearSpectrum {
         debug_assert_eq!(lambdas.len(), values.len());
 
         let mut l = vec![0.0; lambdas.len()];
@@ -274,7 +274,7 @@ impl PiecewiseLinearSpectrum {
     }
 
     pub fn from_interleaved<const N: usize, const S: usize>(
-        samples: &[Scalar; N],
+        samples: &[Float; N],
         normalize: bool,
     ) -> PiecewiseLinearSpectrum {
         debug_assert_eq!(N / 2, S);
@@ -356,7 +356,7 @@ impl PiecewiseLinearSpectrum {
         })
     }
 
-    pub fn scale(&mut self, s: Scalar) {
+    pub fn scale(&mut self, s: Float) {
         for v in &mut self.values {
             *v *= s;
         }
@@ -364,7 +364,7 @@ impl PiecewiseLinearSpectrum {
 }
 
 impl SpectrumLike for PiecewiseLinearSpectrum {
-    fn get(&self, lambda: Scalar) -> Scalar {
+    fn get(&self, lambda: Float) -> Float {
         if self.lambdas.is_empty()
         || lambda < *self.lambdas.first().unwrap()
         || lambda > *self.lambdas.last().unwrap() {
@@ -381,8 +381,8 @@ impl SpectrumLike for PiecewiseLinearSpectrum {
         lerp(self.values[o], self.values[o + 1], t)
     }
 
-    fn max_value(&self) -> Scalar {
-        let max = self.values.iter().fold(Scalar::NAN, |a, &b| a.max(b));
+    fn max_value(&self) -> Float {
+        let max = self.values.iter().fold(Float::NAN, |a, &b| a.max(b));
         if max.is_nan() {
             panic!("empty or NaN-filled spectrum");
         }
@@ -401,18 +401,18 @@ impl SpectrumLike for PiecewiseLinearSpectrum {
 
 #[derive(Debug, PartialEq)]
 pub struct BlackbodySpectrum {
-    t: Scalar,
-    normalization_factor: Scalar,
+    t: Float,
+    normalization_factor: Float,
 }
 
 impl BlackbodySpectrum {
-    pub fn new(t: Scalar) -> BlackbodySpectrum {
+    pub fn new(t: Float) -> BlackbodySpectrum {
         let lambda_max = 2.8977721e-3 / t;
         let normalization_factor = 1.0 / BlackbodySpectrum::blackbody(lambda_max * 1e9, t);
         BlackbodySpectrum { t, normalization_factor }
     }
 
-    fn blackbody(lambda: Scalar, temperature: Scalar) -> Scalar {
+    fn blackbody(lambda: Float, temperature: Float) -> Float {
         if temperature < 0.0 {
             return 0.0;
         }
@@ -422,7 +422,7 @@ impl BlackbodySpectrum {
         let kb = 1.3806488e-23;
         let l = lambda * 1e-9;
 
-        let le = (2.0 * h * c * c) / (l.powi(5) * (Scalar::exp((h * c) / (l * kb * temperature)) - 1.0));
+        let le = (2.0 * h * c * c) / (l.powi(5) * (Float::exp((h * c) / (l * kb * temperature)) - 1.0));
 
         debug_assert!(!le.is_nan());
 
@@ -431,11 +431,11 @@ impl BlackbodySpectrum {
 }
 
 impl SpectrumLike for BlackbodySpectrum {
-    fn get(&self, lambda: Scalar) -> Scalar {
+    fn get(&self, lambda: Float) -> Float {
         BlackbodySpectrum::blackbody(lambda, self.t) * self.normalization_factor
     }
 
-    fn max_value(&self) -> Scalar {
+    fn max_value(&self) -> Float {
         1.0
     }
 
@@ -455,8 +455,8 @@ pub struct RgbAlbedoSpectrum {
 
 impl RgbAlbedoSpectrum {
     pub fn new(cs: &RgbColorSpace, rgb: &Rgb) -> RgbAlbedoSpectrum {
-        debug_assert!(Scalar::max(Scalar::max(rgb.r, rgb.g), rgb.b) <= 1.0);
-        debug_assert!(Scalar::min(Scalar::min(rgb.r, rgb.g), rgb.b) >= 0.0);
+        debug_assert!(Float::max(Float::max(rgb.r, rgb.g), rgb.b) <= 1.0);
+        debug_assert!(Float::min(Float::min(rgb.r, rgb.g), rgb.b) >= 0.0);
 
         RgbAlbedoSpectrum {
             rsp: cs.to_rgb_coeffs(rgb),
@@ -465,11 +465,11 @@ impl RgbAlbedoSpectrum {
 }
 
 impl SpectrumLike for RgbAlbedoSpectrum {
-    fn get(&self, lambda: Scalar) -> Scalar {
+    fn get(&self, lambda: Float) -> Float {
         self.rsp.get(lambda)
     }
 
-    fn max_value(&self) -> Scalar {
+    fn max_value(&self) -> Float {
         self.rsp.max_value()
     }
 
@@ -484,13 +484,13 @@ impl SpectrumLike for RgbAlbedoSpectrum {
 
 #[derive(Debug, PartialEq)]
 pub struct RgbUnboundedSpectrum {
-    scale: Scalar,
+    scale: Float,
     rsp: RgbSigmoidPolynomial,
 }
 
 impl RgbUnboundedSpectrum {
     pub fn new(cs: &RgbColorSpace, rgb: &Rgb) -> RgbUnboundedSpectrum {
-        let m = Scalar::max(Scalar::max(rgb.r, rgb.g), rgb.b);
+        let m = Float::max(Float::max(rgb.r, rgb.g), rgb.b);
         let scale = 2.0 * m;
         let rsp = if scale != 0.0 {
             cs.to_rgb_coeffs(&(rgb / scale))
@@ -502,11 +502,11 @@ impl RgbUnboundedSpectrum {
 }
 
 impl SpectrumLike for RgbUnboundedSpectrum {
-    fn get(&self, lambda: Scalar) -> Scalar {
+    fn get(&self, lambda: Float) -> Float {
         self.scale * self.rsp.get(lambda)
     }
 
-    fn max_value(&self) -> Scalar {
+    fn max_value(&self) -> Float {
         self.scale * self.rsp.max_value()
     }
 
@@ -521,14 +521,14 @@ impl SpectrumLike for RgbUnboundedSpectrum {
 
 #[derive(Debug, PartialEq)]
 pub struct RgbIlluminantSpectrum {
-    scale: Scalar,
+    scale: Float,
     rsp: RgbSigmoidPolynomial,
     illuminant: Arc<Spectrum>,
 }
 
 impl RgbIlluminantSpectrum {
     pub fn new(cs: &RgbColorSpace, rgb: &Rgb) -> RgbIlluminantSpectrum {
-        let m = Scalar::max(Scalar::max(rgb.r, rgb.g), rgb.b);
+        let m = Float::max(Float::max(rgb.r, rgb.g), rgb.b);
         let scale = 2.0 * m;
         let rsp = if scale != 0.0 {
             cs.to_rgb_coeffs(&(rgb / scale))
@@ -540,11 +540,11 @@ impl RgbIlluminantSpectrum {
 }
 
 impl SpectrumLike for RgbIlluminantSpectrum {
-    fn get(&self, lambda: Scalar) -> Scalar {
+    fn get(&self, lambda: Float) -> Float {
         self.scale * self.rsp.get(lambda) * self.illuminant.get(lambda)
     }
 
-    fn max_value(&self) -> Scalar {
+    fn max_value(&self) -> Float {
         self.scale * self.rsp.max_value() * self.illuminant.max_value()
     }
 
@@ -558,10 +558,10 @@ impl SpectrumLike for RgbIlluminantSpectrum {
 }
 
 
-pub fn inner_product<T: SpectrumLike, U: SpectrumLike>(a: &T, b: &U) -> Scalar {
+pub fn inner_product<T: SpectrumLike, U: SpectrumLike>(a: &T, b: &U) -> Float {
     let mut integral = 0.0;
     for lambda in (LAMBDA_MIN as i32)..=(LAMBDA_MAX as i32) {
-        integral += a.get(lambda as Scalar) * b.get(lambda as Scalar);
+        integral += a.get(lambda as Float) * b.get(lambda as Float);
     }
     integral
 }

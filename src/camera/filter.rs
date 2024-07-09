@@ -1,11 +1,11 @@
-use crate::{lerp, Point2f, Scalar, Vec2f};
+use crate::{lerp, Point2f, Float, Vec2f};
 
 pub trait FilterLike {
     fn radius(&self) -> Vec2f;
 
-    fn evaluate(&self, p: Point2f) -> Scalar;
+    fn evaluate(&self, p: Point2f) -> Float;
 
-    fn integral(&self) -> Scalar;
+    fn integral(&self) -> Float;
 
     fn sample(&self, u: Point2f) -> FilterSample;
 }
@@ -31,13 +31,13 @@ impl FilterLike for Filter {
         }
     }
 
-    fn evaluate(&self, p: Point2f) -> Scalar {
+    fn evaluate(&self, p: Point2f) -> Float {
         match self {
             Filter::BoxFilter(f) => f.evaluate(p),
         }
     }
 
-    fn integral(&self) -> Scalar {
+    fn integral(&self) -> Float {
         match self {
             Filter::BoxFilter(f) => f.integral(),
         }
@@ -77,15 +77,15 @@ impl FilterLike for BoxFilter {
         self.radius
     }
 
-    fn evaluate(&self, p: Point2f) -> Scalar {
-        if Scalar::abs(p.x) <= self.radius.x && Scalar::abs(p.y) <= self.radius.y {
+    fn evaluate(&self, p: Point2f) -> Float {
+        if Float::abs(p.x) <= self.radius.x && Float::abs(p.y) <= self.radius.y {
             1.0
         } else {
             0.0
         }
     }
 
-    fn integral(&self) -> Scalar {
+    fn integral(&self) -> Float {
         2.0 * self.radius.x * 2.0 * self.radius.y
     }
 
@@ -100,5 +100,5 @@ impl FilterLike for BoxFilter {
 
 pub struct FilterSample {
     pub p: Point2f,
-    pub weight: Scalar,
+    pub weight: Float,
 }

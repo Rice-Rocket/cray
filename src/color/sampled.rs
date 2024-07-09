@@ -13,22 +13,22 @@ pub const NUM_SPECTRUM_SAMPLES: usize = 4;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Default)]
 pub struct SampledSpectrum {
-    pub values: [Scalar; NUM_SPECTRUM_SAMPLES],
+    pub values: [Float; NUM_SPECTRUM_SAMPLES],
 }
 
 impl SampledSpectrum {
-    pub fn new(values: [Scalar; NUM_SPECTRUM_SAMPLES]) -> SampledSpectrum {
+    pub fn new(values: [Float; NUM_SPECTRUM_SAMPLES]) -> SampledSpectrum {
         SampledSpectrum { values }
     }
 
-    pub fn from_const(c: Scalar) -> SampledSpectrum {
+    pub fn from_const(c: Float) -> SampledSpectrum {
         SampledSpectrum {
             values: [c; NUM_SPECTRUM_SAMPLES],
         }
     }
 
     pub fn is_zero(&self) -> bool {
-        self.values.iter().all(|x: &Scalar| *x == f32::ZERO)
+        self.values.iter().all(|x: &Float| *x == f32::ZERO)
     }
 
     pub fn safe_div(&self, other: &SampledSpectrum) -> SampledSpectrum {
@@ -44,7 +44,7 @@ impl SampledSpectrum {
         SampledSpectrum::new(result)
     }
 
-    pub fn clamp(&self, min: Scalar, max: Scalar) -> SampledSpectrum {
+    pub fn clamp(&self, min: Float, max: Float) -> SampledSpectrum {
         let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
         for (i, res) in result.iter_mut().enumerate() {
             *res = self.values[i].clamp(min, max);
@@ -56,13 +56,13 @@ impl SampledSpectrum {
     pub fn clamp_zero(&self) -> SampledSpectrum {
         let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
         for (i, res) in result.iter_mut().enumerate() {
-            *res = Scalar::max(0.0, self.values[i])
+            *res = Float::max(0.0, self.values[i])
         }
         debug_assert!(!result.has_nan());
         SampledSpectrum::new(result)
     }
 
-    pub fn powf(&self, e: Scalar) -> SampledSpectrum {
+    pub fn powf(&self, e: Float) -> SampledSpectrum {
         let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
         for (i, res) in result.iter_mut().enumerate() {
             *res = self.values[i].powf(e);
@@ -90,24 +90,24 @@ impl SampledSpectrum {
         SampledSpectrum::new(result)
     }
 
-    pub fn lerp(&self, other: &SampledSpectrum, t: Scalar) -> SampledSpectrum {
+    pub fn lerp(&self, other: &SampledSpectrum, t: Float) -> SampledSpectrum {
         (1.0 - t) * self + t * other
     }
 
-    pub fn average(&self) -> Scalar {
-        self.values.iter().sum::<Scalar>() / (self.values.len() as Scalar)
+    pub fn average(&self) -> Float {
+        self.values.iter().sum::<Float>() / (self.values.len() as Float)
     }
 
-    pub fn min_component_value(&self) -> Scalar {
+    pub fn min_component_value(&self) -> Float {
         debug_assert!(!self.values.has_nan());
-        let min = self.values.iter().fold(Scalar::NAN, |a, &b| a.min(b));
+        let min = self.values.iter().fold(Float::NAN, |a, &b| a.min(b));
         debug_assert!(!min.is_nan());
         min
     }
 
-    pub fn max_component_value(&self) -> Scalar {
+    pub fn max_component_value(&self) -> Float {
         debug_assert!(!self.values.has_nan());
-        let max = self.values.iter().fold(Scalar::NAN, |a, &b| a.max(b));
+        let max = self.values.iter().fold(Float::NAN, |a, &b| a.max(b));
         debug_assert!(!max.is_nan());
         max
     }
@@ -129,7 +129,7 @@ impl SampledSpectrum {
 
     /// Similar to to_xyz(), but only computes the y value for when only
     /// luminance is needed, thereby saving computations.
-    pub fn y(&self, lambda: &SampledWavelengths) -> Scalar {
+    pub fn y(&self, lambda: &SampledWavelengths) -> Float {
         let ys = Spectrum::get_cie(Cie::Y).sample(lambda);
         let pdf = lambda.pdf();
         (ys * self).safe_div(&pdf).average() / CIE_Y_INTEGRAL
@@ -142,7 +142,7 @@ impl SampledSpectrum {
 }
 
 impl Index<usize> for SampledSpectrum {
-    type Output = Scalar;
+    type Output = Float;
 
     fn index(&self, index: usize) -> &Self::Output {
         self.values.index(index)
@@ -157,7 +157,7 @@ impl IndexMut<usize> for SampledSpectrum {
 
 // We implement Deref so that we can use the array's iter().
 impl Deref for SampledSpectrum {
-    type Target = [Scalar; NUM_SPECTRUM_SAMPLES];
+    type Target = [Float; NUM_SPECTRUM_SAMPLES];
 
     fn deref(&self) -> &Self::Target {
         &self.values
@@ -171,7 +171,7 @@ impl_op_ex!(+|s1: &SampledSpectrum, s2: &SampledSpectrum| -> SampledSpectrum
     {
         result[i] = s1[i] + s2[i];
     }
-    debug_assert!(!result.contains(&Scalar::NAN));
+    debug_assert!(!result.contains(&Float::NAN));
     SampledSpectrum::new(result)
 });
 
@@ -181,7 +181,7 @@ impl_op_ex!(
         for i in 0..NUM_SPECTRUM_SAMPLES {
             result[i] = s1[i] - s2[i];
         }
-        debug_assert!(!result.contains(&Scalar::NAN));
+        debug_assert!(!result.contains(&Float::NAN));
         SampledSpectrum::new(result)
     }
 );
@@ -192,21 +192,21 @@ impl_op_ex!(
         for i in 0..NUM_SPECTRUM_SAMPLES {
             result[i] = s1[i] * s2[i];
         }
-        debug_assert!(!result.contains(&Scalar::NAN));
+        debug_assert!(!result.contains(&Float::NAN));
         SampledSpectrum::new(result)
     }
 );
 
-impl_op_ex_commutative!(*|s1: &SampledSpectrum, v: &Scalar| -> SampledSpectrum {
+impl_op_ex_commutative!(*|s1: &SampledSpectrum, v: &Float| -> SampledSpectrum {
     let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
     for i in 0..NUM_SPECTRUM_SAMPLES {
         result[i] = s1[i] * v;
     }
-    debug_assert!(!result.contains(&Scalar::NAN));
+    debug_assert!(!result.contains(&Float::NAN));
     SampledSpectrum::new(result)
 });
 
-impl_op_ex!(/|s: &SampledSpectrum, v: &Scalar| -> SampledSpectrum
+impl_op_ex!(/|s: &SampledSpectrum, v: &Float| -> SampledSpectrum
 {
     debug_assert!(*v != 0.0);
     debug_assert!(!v.is_nan());
@@ -215,7 +215,7 @@ impl_op_ex!(/|s: &SampledSpectrum, v: &Scalar| -> SampledSpectrum
     {
         result[i] = s[i] / v;
     }
-    debug_assert!(!result.contains(&Scalar::NAN));
+    debug_assert!(!result.contains(&Float::NAN));
     SampledSpectrum::new(result)
 });
 
@@ -226,7 +226,7 @@ impl_op_ex!(/ |s1: &SampledSpectrum, s2: &SampledSpectrum| -> SampledSpectrum
     {
         result[i] = s1[i] / s2[i];
     }
-    debug_assert!(!result.contains(&Scalar::NAN));
+    debug_assert!(!result.contains(&Float::NAN));
     SampledSpectrum::new(result)
 });
 
@@ -262,7 +262,7 @@ impl_op_ex!(/= |s1: &mut SampledSpectrum, s2: &SampledSpectrum|
     }
 });
 
-impl_op_ex!(/= |s1: &mut SampledSpectrum, v: &Scalar|
+impl_op_ex!(/= |s1: &mut SampledSpectrum, v: &Float|
 {
     for i in 0..NUM_SPECTRUM_SAMPLES
     {

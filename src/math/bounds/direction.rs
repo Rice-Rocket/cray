@@ -5,13 +5,13 @@ use crate::math::*;
 #[derive(Clone, Copy)]
 pub struct DirectionCone {
     pub w: Vec3f,
-    pub cos_theta: Scalar,
+    pub cos_theta: Float,
 }
 
 impl DirectionCone {
     /// Creates a new [`DirectionCone`] from the given direction `w` and the
     /// cosine of half the central angle of a cone.
-    pub fn new(w: Vec3f, cos_theta: Scalar) -> Self {
+    pub fn new(w: Vec3f, cos_theta: Float) -> Self {
         debug_assert!(w.is_normalized());
         Self { w, cos_theta }
     }
@@ -67,7 +67,7 @@ impl DirectionCone {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.cos_theta == Scalar::INFINITY
+        self.cos_theta == Float::INFINITY
     }
 
     pub fn inside(&self, w: Vec3f) -> bool {

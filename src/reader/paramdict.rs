@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Display, str::FromStr as _, sync::Arc};
 
 use tracing::warn;
 
-use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, named_spectrum::NamedSpectrum, rgb_xyz::Rgb, spectrum::{BlackbodySpectrum, PiecewiseLinearSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}}, texture::{FloatConstantTexture, FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Normal3f, Point2f, Point3f, Scalar, Vec2f, Vec3f};
+use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, named_spectrum::NamedSpectrum, rgb_xyz::Rgb, spectrum::{BlackbodySpectrum, PiecewiseLinearSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}}, texture::{FloatConstantTexture, FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Normal3f, Point2f, Point3f, Float, Vec2f, Vec3f};
 
 use super::{param::{Param, ParamType}, target::{FileLoc, ParsedParameterVector}, utils::{dequote_string, is_quoted_string}};
 
@@ -50,8 +50,8 @@ impl ParameterType for FloatParam {
 
     const N_PER_ITEM: i32 = 1;
 
-    type ConvertType = Scalar;
-    type ReturnType = Scalar;
+    type ConvertType = Float;
+    type ReturnType = Float;
 
     fn convert(v: &[Self::ConvertType], _loc: &FileLoc) -> Self::ReturnType {
         v[0]
@@ -84,7 +84,7 @@ impl ParameterType for Point2fParam {
 
     const N_PER_ITEM: i32 = 2;
 
-    type ConvertType = Scalar;
+    type ConvertType = Float;
     type ReturnType = Point2f;
 
     fn convert(v: &[Self::ConvertType], _loc: &FileLoc) -> Self::ReturnType {
@@ -101,7 +101,7 @@ impl ParameterType for Vec2fParam {
 
     const N_PER_ITEM: i32 = 2;
 
-    type ConvertType = Scalar;
+    type ConvertType = Float;
     type ReturnType = Vec2f;
 
     fn convert(v: &[Self::ConvertType], _loc: &FileLoc) -> Self::ReturnType {
@@ -118,7 +118,7 @@ impl ParameterType for Point3fParam {
 
     const N_PER_ITEM: i32 = 3;
 
-    type ConvertType = Scalar;
+    type ConvertType = Float;
     type ReturnType = Point3f;
 
     fn convert(v: &[Self::ConvertType], _loc: &FileLoc) -> Self::ReturnType {
@@ -135,7 +135,7 @@ impl ParameterType for Vec3fParam {
 
     const N_PER_ITEM: i32 = 3;
 
-    type ConvertType = Scalar;
+    type ConvertType = Float;
     type ReturnType = Vec3f;
 
     fn convert(v: &[Self::ConvertType], _loc: &FileLoc) -> Self::ReturnType {
@@ -152,7 +152,7 @@ impl ParameterType for Normal3fParam {
 
     const N_PER_ITEM: i32 = 3;
 
-    type ConvertType = Scalar;
+    type ConvertType = Float;
     type ReturnType = Normal3f;
 
     fn convert(v: &[Self::ConvertType], _loc: &FileLoc) -> Self::ReturnType {
@@ -195,7 +195,7 @@ pub struct ParsedParameter {
     pub name: String,
     pub param_type: String,
     pub loc: FileLoc,
-    pub floats: Vec<Scalar>,
+    pub floats: Vec<Float>,
     pub ints: Vec<i32>,
     pub strings: Vec<String>,
     pub bools: Vec<bool>,
@@ -205,7 +205,7 @@ pub struct ParsedParameter {
 }
 
 impl ParsedParameter {
-    pub fn add_float(&mut self, v: Scalar) {
+    pub fn add_float(&mut self, v: Float) {
         assert!(self.ints.is_empty() && self.strings.is_empty() && self.bools.is_empty());
         self.floats.push(v);
     }
@@ -319,7 +319,7 @@ impl<'a> From<Param<'a>> for ParsedParameter {
                 if val_type == ValueType::Integer {
                     param.add_int(v.parse::<i32>().expect("Expected integer"));
                 } else {
-                    param.add_float(v.parse::<Scalar>().expect("Expected float"));
+                    param.add_float(v.parse::<Float>().expect("Expected float"));
                 }
             }
         }
@@ -472,7 +472,7 @@ impl ParameterDictionary {
         default_value
     }
 
-    pub fn get_one_float(&mut self, name: &str, default_value: Scalar) -> Scalar {
+    pub fn get_one_float(&mut self, name: &str, default_value: Float) -> Float {
         self.lookup_single::<FloatParam>(name, default_value)
     }
 
@@ -555,7 +555,7 @@ impl ParameterDictionary {
                 &param.name,
                 &mut param.looked_up,
                 3,
-                |v: &[Scalar], loc: &FileLoc| -> Arc<Spectrum> {
+                |v: &[Float], loc: &FileLoc| -> Arc<Spectrum> {
                     let rgb = Rgb::new(v[0], v[1], v[2]);
                     let cs = if let Some(cs) = &param.color_space {
                         cs.clone()
@@ -598,7 +598,7 @@ impl ParameterDictionary {
                 &param.name,
                 &mut param.looked_up,
                 1,
-                |v: &[Scalar], _loc: &FileLoc| -> Arc<Spectrum> {
+                |v: &[Float], _loc: &FileLoc| -> Arc<Spectrum> {
                     Arc::new(Spectrum::Blackbody(BlackbodySpectrum::new(v[0])))
                 },
             );
@@ -619,7 +619,7 @@ impl ParameterDictionary {
                 &param.name,
                 &mut param.looked_up,
                 param.floats.len() as i32,
-                |v: &[Scalar], _loc: &FileLoc| -> Arc<Spectrum> {
+                |v: &[Float], _loc: &FileLoc| -> Arc<Spectrum> {
                     let mut lambda = vec![0.0; n_samples];
                     let mut value = vec![0.0; n_samples];
                     for i in 0..n_samples {
@@ -731,7 +731,7 @@ impl ParameterDictionary {
         Vec::new()
     }
 
-    pub fn get_float_array(&mut self, name: &str) -> Vec<Scalar> {
+    pub fn get_float_array(&mut self, name: &str) -> Vec<Float> {
         self.lookup_array::<FloatParam>(name)
     }
 
@@ -781,7 +781,7 @@ impl TextureParameterDictionary {
         Self { dict }
     }
 
-    pub fn get_one_float(&mut self, name: &str, default_value: Scalar) -> Scalar {
+    pub fn get_one_float(&mut self, name: &str, default_value: Float) -> Float {
         self.dict.get_one_float(name, default_value)
     }
 
@@ -828,7 +828,7 @@ impl TextureParameterDictionary {
         self.dict.get_one_string(name, default_value)
     }
 
-    pub fn get_float_array(&mut self, name: &str) -> Vec<Scalar> {
+    pub fn get_float_array(&mut self, name: &str) -> Vec<Float> {
         self.dict.get_float_array(name)
     }
 
@@ -877,7 +877,7 @@ impl TextureParameterDictionary {
     pub fn get_float_texture(
         &mut self,
         name: &str,
-        default_value: Scalar,
+        default_value: Float,
         textures: &NamedTextures,
     ) -> Arc<FloatTexture> {
         let tex = self.get_float_texture_or_none(name, textures);

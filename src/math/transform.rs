@@ -37,7 +37,7 @@ impl Transform {
     }
 
     #[inline]
-    pub fn from_rotation_x(sin_theta: Scalar, cos_theta: Scalar) -> Transform {
+    pub fn from_rotation_x(sin_theta: Float, cos_theta: Float) -> Transform {
         let m = Mat4::from_rotation_x(sin_theta, cos_theta);
         Transform {
             m,
@@ -46,7 +46,7 @@ impl Transform {
     }
 
     #[inline]
-    pub fn from_rotation_y(sin_theta: Scalar, cos_theta: Scalar) -> Transform {
+    pub fn from_rotation_y(sin_theta: Float, cos_theta: Float) -> Transform {
         let m = Mat4::from_rotation_y(sin_theta, cos_theta);
         Transform {
             m,
@@ -55,7 +55,7 @@ impl Transform {
     }
 
     #[inline]
-    pub fn from_rotation_z(sin_theta: Scalar, cos_theta: Scalar) -> Transform {
+    pub fn from_rotation_z(sin_theta: Float, cos_theta: Float) -> Transform {
         let m = Mat4::from_rotation_z(sin_theta, cos_theta);
         Transform {
             m,
@@ -64,7 +64,7 @@ impl Transform {
     }
 
     #[inline]
-    pub fn from_rotation(sin_theta: Scalar, cos_theta: Scalar, axis: Vec3f) -> Transform {
+    pub fn from_rotation(sin_theta: Float, cos_theta: Float, axis: Vec3f) -> Transform {
         debug_assert!(axis.is_normalized());
 
         let m = Mat4::from_rotation(sin_theta, cos_theta, axis);
@@ -162,7 +162,7 @@ impl Transform {
     }
 
     #[inline]
-    pub fn has_scale(self, epsilon: Scalar) -> bool {
+    pub fn has_scale(self, epsilon: Float) -> bool {
         let la2 = (self * Point3f::new(1.0, 0.0, 0.0)).length_squared();
         let lb2 = (self * Point3f::new(0.0, 1.0, 0.0)).length_squared();
         let lc2 = (self * Point3f::new(0.0, 0.0, 1.0)).length_squared();
@@ -180,13 +180,13 @@ impl Transform {
     }
 
     #[inline]
-    pub fn orthographic(z_near: Scalar, z_far: Scalar) -> Transform {
+    pub fn orthographic(z_near: Float, z_far: Float) -> Transform {
         Transform::from_scale(Vec3f::new(1.0, 1.0, 1.0 / (z_far - z_near)))
             * Transform::from_translation(Point3f::new(0.0, 0.0, -z_near))
     }
 
     #[inline]
-    pub fn perspective(fov: Scalar, n: Scalar, f: Scalar) -> Transform {
+    pub fn perspective(fov: Float, n: Float, f: Float) -> Transform {
         let per = Mat4::new(
             1.0, 0.0, 0.0, 0.0,
             0.0, 1.0, 0.0, 0.0,
@@ -194,7 +194,7 @@ impl Transform {
             0.0, 0.0, 1.0, 0.0,
         );
 
-        let inv_tan_ang = 1.0 / Scalar::tan(to_radians(fov) / 2.0);
+        let inv_tan_ang = 1.0 / Float::tan(to_radians(fov) / 2.0);
         Transform::from_scale(Vec3f::new(inv_tan_ang, inv_tan_ang, 1.0)) * Transform::new_with_inverse(per)
     }
 }

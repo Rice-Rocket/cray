@@ -2,7 +2,7 @@ use std::{ops::{Add, Div, Mul}, path::PathBuf, sync::Arc};
 
 use ordered_float::OrderedFloat;
 
-use crate::{color::{colorspace::RgbColorSpace, rgb_xyz::{ColorEncodingPtr, Rgb}}, image::{Image, WrapMode}, lerp_float, options::Options, safe, sqr, Point2f, Point2i, Scalar, Vec2f};
+use crate::{color::{colorspace::RgbColorSpace, rgb_xyz::{ColorEncodingPtr, Rgb}}, image::{Image, WrapMode}, lerp_float, options::Options, safe, sqr, Point2f, Point2i, Float, Vec2f};
 
 #[derive(Debug)]
 pub struct MIPMap {
@@ -117,17 +117,17 @@ impl MIPMap {
                     return T::bilerp(self, 0, st);
                 }
 
-                let lod = Scalar::max(0.0, self.levels() as Scalar - 1.0 + shorter_vec_length.log2());
+                let lod = Float::max(0.0, self.levels() as Float - 1.0 + shorter_vec_length.log2());
                 let ilod = lod.floor() as usize;
 
-                lerp_float(T::ewa(self, ilod, st, dst0, dst1), T::ewa(self, ilod + 1, st, dst0, dst1), lod - ilod as Scalar)
+                lerp_float(T::ewa(self, ilod, st, dst0, dst1), T::ewa(self, ilod + 1, st, dst0, dst1), lod - ilod as Float)
             },
             _ => {
-                let width: Scalar = 2.0 * [dst0[0].abs(), dst0[1].abs(), dst1[0].abs(), dst1[1].abs()].into_iter().reduce(|acc, e| acc.max(e)).unwrap();
+                let width: Float = 2.0 * [dst0[0].abs(), dst0[1].abs(), dst1[0].abs(), dst1[1].abs()].into_iter().reduce(|acc, e| acc.max(e)).unwrap();
 
                 let n_levels = self.levels();
-                let level = n_levels as Scalar - 1.0 + width.max(1e-8).log2();
-                if level >= n_levels as Scalar - 1.0 {
+                let level = n_levels as Float - 1.0 + width.max(1e-8).log2();
+                if level >= n_levels as Float - 1.0 {
                     return T::texel(self, n_levels - 1, Point2i::ZERO);
                 }
 
@@ -137,8 +137,8 @@ impl MIPMap {
                     FilterFunction::Point => {
                         let resolution = self.level_resolution(i_level);
                         let sti = Point2i::new(
-                            Scalar::round(st[0] * resolution.x as Scalar - 0.5) as i32,
-                            Scalar::round(st[1] * resolution.y as Scalar - 0.5) as i32,
+                            Float::round(st[0] * resolution.x as Float - 0.5) as i32,
+                            Float::round(st[1] * resolution.y as Float - 0.5) as i32,
                         );
                         T::texel(self, i_level, sti)
                     },
@@ -149,8 +149,8 @@ impl MIPMap {
                         if i_level == 0 {
                             T::bilerp(self, 0, st)
                         } else {
-                            debug_assert!(level - i_level as Scalar <= 1.0);
-                            lerp_float(T::bilerp(self, i_level, st), T::bilerp(self, i_level + 1, st), level - i_level as Scalar)
+                            debug_assert!(level - i_level as Float <= 1.0);
+                            lerp_float(T::bilerp(self, i_level, st), T::bilerp(self, i_level + 1, st), level - i_level as Float)
                         }
                     },
                     _ => unreachable!(),
@@ -175,13 +175,13 @@ impl MIPMap {
         }
     }
 
-    pub fn texel_float(&self, level: usize, st: Point2i) -> Scalar {
+    pub fn texel_float(&self, level: usize, st: Point2i) -> Float {
         debug_assert!(level < self.pyramid.len());
         self.pyramid[level].get_channel_wrapped(st, 0, self.wrap_mode.into())
     }
 }
 
-pub trait TexelType: Add<Self, Output = Self> + Mul<Scalar, Output = Self> + Div<Scalar, Output = Self> + Sized + Default {
+pub trait TexelType: Add<Self, Output = Self> + Mul<Float, Output = Self> + Div<Float, Output = Self> + Sized + Default {
     fn texel(mipmap: &MIPMap, level: usize, st: Point2i) -> Self;
 
     fn bilerp(mipmap: &MIPMap, level: usize, st: Point2f) -> Self;
@@ -193,12 +193,12 @@ pub trait TexelType: Add<Self, Output = Self> + Mul<Scalar, Output = Self> + Div
 
         let level_res = mipmap.level_resolution(level);
 
-        st[0] = st[0] * level_res.x as Scalar - 0.5;
-        st[1] = st[1] * level_res.y as Scalar - 0.5;
-        dst0[0] *= level_res.x as Scalar;
-        dst0[1] *= level_res.y as Scalar;
-        dst1[0] *= level_res.x as Scalar;
-        dst1[1] *= level_res.y as Scalar;
+        st[0] = st[0] * level_res.x as Float - 0.5;
+        st[1] = st[1] * level_res.y as Float - 0.5;
+        dst0[0] *= level_res.x as Float;
+        dst0[1] *= level_res.y as Float;
+        dst1[0] *= level_res.x as Float;
+        dst1[1] *= level_res.y as Float;
 
         let mut a = sqr(dst0[1]) + sqr(dst1[1]) + 1.0;
         let mut b = -2.0 * (dst0[0] * dst0[1] + dst1[0] * dst1[1]);
@@ -212,21 +212,21 @@ pub trait TexelType: Add<Self, Output = Self> + Mul<Scalar, Output = Self> + Div
         let inv_det = 1.0 / det;
         let u_sqrt = safe::sqrt(det * c);
         let v_sqrt = safe::sqrt(a * det);
-        let s0 = Scalar::ceil(st[0] - 2.0 * inv_det * u_sqrt) as i32;
-        let s1 = Scalar::floor(st[0] + 2.0 * inv_det * u_sqrt) as i32;
-        let t0 = Scalar::ceil(st[1] - 2.0 * inv_det * v_sqrt) as i32;
-        let t1 = Scalar::floor(st[1] + 2.0 * inv_det * v_sqrt) as i32;
+        let s0 = Float::ceil(st[0] - 2.0 * inv_det * u_sqrt) as i32;
+        let s1 = Float::floor(st[0] + 2.0 * inv_det * u_sqrt) as i32;
+        let t0 = Float::ceil(st[1] - 2.0 * inv_det * v_sqrt) as i32;
+        let t1 = Float::floor(st[1] + 2.0 * inv_det * v_sqrt) as i32;
 
         let mut sum = Self::default();
         let mut sum_wts = 0.0;
 
         for it in t0..=t1 {
-            let tt = it as Scalar - st[1];
+            let tt = it as Float - st[1];
             for is in s0..=s1 {
-                let ss = is as Scalar - st[0];
+                let ss = is as Float - st[0];
                 let r2 = a * sqr(ss) + b * ss * tt + c * sqr(tt);
                 if r2 < 1.0 {
-                    let index = usize::min((r2 * MIP_FILTER_LUT_SIZE as Scalar) as usize, MIP_FILTER_LUT_SIZE - 1);
+                    let index = usize::min((r2 * MIP_FILTER_LUT_SIZE as Float) as usize, MIP_FILTER_LUT_SIZE - 1);
                     let weight = MIP_FILTER_LUT[index];
                     sum = sum + Self::texel(mipmap, level, Point2i::new(is, it)) * weight;
                     sum_wts += weight;
@@ -238,7 +238,7 @@ pub trait TexelType: Add<Self, Output = Self> + Mul<Scalar, Output = Self> + Div
     }
 }
 
-impl TexelType for Scalar {
+impl TexelType for Float {
     fn texel(mipmap: &MIPMap, level: usize, st: Point2i) -> Self {
         mipmap.texel_float(level, st)
     }
@@ -297,11 +297,11 @@ impl FilterFunction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MIPMapFilterOptions {
     filter: FilterFunction,
-    max_anisotropy: OrderedFloat<Scalar>,
+    max_anisotropy: OrderedFloat<Float>,
 }
 
 impl MIPMapFilterOptions {
-    pub fn new(filter: FilterFunction, max_anisotropy: Scalar) -> MIPMapFilterOptions {
+    pub fn new(filter: FilterFunction, max_anisotropy: Float) -> MIPMapFilterOptions {
         MIPMapFilterOptions {
             filter,
             max_anisotropy: OrderedFloat(max_anisotropy),
@@ -319,7 +319,7 @@ impl Default for MIPMapFilterOptions {
 }
 
 const MIP_FILTER_LUT_SIZE: usize = 128;
-const MIP_FILTER_LUT: [Scalar; MIP_FILTER_LUT_SIZE] = [
+const MIP_FILTER_LUT: [Float; MIP_FILTER_LUT_SIZE] = [
     0.864664733,
     0.849040031,
     0.83365953,
