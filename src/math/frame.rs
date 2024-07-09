@@ -1,5 +1,6 @@
 use crate::math::*;
 
+#[derive(Debug, Clone, Copy)]
 pub struct Frame {
     pub x: Vec3f,
     pub y: Vec3f,

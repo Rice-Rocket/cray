@@ -5,7 +5,7 @@ use fast_polynomial::poly;
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
 
-use crate::{mat::mul_mat_vec, math::math::safe, numeric::HasNan, Mat3, Point2f, Scalar};
+use crate::{mat::mul_mat_vec, math::safe, numeric::HasNan, Mat3, Point2f, Scalar};
 
 use super::{cie::{Cie, CIE_Y_INTEGRAL}, spectrum::{inner_product, Spectrum, SpectrumLike, LAMBDA_MAX, LAMBDA_MIN}};
 

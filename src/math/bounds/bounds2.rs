@@ -17,8 +17,8 @@ where
 {
     /// Creates a new [`TBounds2`] with no points.
     #[inline]
-    pub const fn new() -> Self {
-        Self { min: TPoint2::new(T::MAX, T::MAX), max: TPoint2::new(T::MIN, T::MIN) }
+    pub const fn new(min: TPoint2<T>, max: TPoint2<T>) -> Self {
+        Self { min, max }
     }
 
     /// Creates a new [`TBounds2`] containing a single `point`.
@@ -30,7 +30,7 @@ where
     /// Creates a new [`TBounds2`] containing the given `points`.
     #[inline]
     pub fn from_points(points: Vec<TPoint2<T>>) -> Self {
-        points.iter().fold(TBounds2::new(), |bounds, p| bounds | *p)
+        points.iter().fold(TBounds2::default(), |bounds, p| bounds | *p)
     }
 
     /// Returns the position of the given `corner`.
@@ -79,7 +79,7 @@ where
     /// bounding box.
     #[inline]
     pub fn lerp(self, t: TPoint2<T>) -> TPoint2<T> {
-        TPoint2::new(math::lerp(self.min.x, self.max.x, t.x), math::lerp(self.min.y, self.max.y, t.y))
+        TPoint2::new(lerp(self.min.x, self.max.x, t.x), lerp(self.min.y, self.max.y, t.y))
     }
 
     /// Computes the position of a point `p` relative to the corners of the box.
@@ -146,6 +146,14 @@ where
     pub fn expand(self, delta: T) -> Self {
         Self { min: self.min - TPoint2::new(delta, delta), max: self.max + TPoint2::new(delta, delta) }
     }
+
+    pub fn width(&self) -> T {
+        self.max.x - self.min.x
+    }
+
+    pub fn height(&self) -> T {
+        self.max.y - self.min.y
+    }
 }
 
 impl<T> Default for TBounds2<T>
@@ -153,14 +161,14 @@ where
     T: Numeric + PartialOrd + Clone + Copy + Add<T, Output = T> + Mul<T, Output = T> + Sub<T, Output = T> + Div<T, Output = T>
 {
     fn default() -> Self {
-        Self::new()
+        Self::new(TPoint2::MAX, TPoint2::MIN)
     }
 }
 
 
 impl<T> TBounds2<T> 
 where 
-    T: NumericField + NumericNegative + NumericFloat
+    T: NumericField + NumericNegative + NumericFloat + Mul<Scalar, Output = T>
 {
     /// Computes the distance from point `p` to the edge of the bounding box.
     ///

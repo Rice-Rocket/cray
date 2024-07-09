@@ -16,7 +16,7 @@ impl Interaction {
         Self { pi, time, wo, n, uv }
     }
 
-    fn position(&self) -> Point3f {
+    pub fn position(&self) -> Point3f {
         self.pi.into()
     }
 
@@ -160,9 +160,9 @@ impl SurfaceInteraction {
         self.shading.n = ns;
         debug_assert!(self.shading.n != Normal3f::ZERO);
         if orientation_is_authoritative {
-            self.interaction.n = self.interaction.n.face(self.shading.n);
+            self.interaction.n = self.interaction.n.facing(self.shading.n);
         } else {
-            self.shading.n = self.shading.n.face(self.interaction.n);
+            self.shading.n = self.shading.n.facing(self.interaction.n);
         }
 
         self.shading.dpdu = dpdus;

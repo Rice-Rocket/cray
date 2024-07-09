@@ -4,7 +4,7 @@ use std::ops::{Index, IndexMut, Neg};
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
 use numeric::HasNan;
 
-use crate::math::{*, math::{next_float_up, next_float_down}};
+use crate::math::*;
 
 
 // Code adapted from https://github.com/jalberse/shimmer/blob/main/src/interval.rs

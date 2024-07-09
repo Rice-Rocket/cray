@@ -17,6 +17,10 @@ tracing = "0.1.40"
 ordered-float = "4.2.0"
 fast_polynomial = "0.1.0"
 rgb2spec = "0.1.1"
+half = "2.4.1"
+arrayvec = "0.7.4"
+png = "0.17.13"
+thiserror = "1.0.61"
 
 [dev-dependencies]
 # For comparison

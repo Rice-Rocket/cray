@@ -260,7 +260,7 @@ macro_rules! create_vect {
             }
 
             #[inline]
-            pub fn face(self, rhs: Self) -> Self {
+            pub fn facing(self, rhs: Self) -> Self {
                 if self.dot(rhs).nsign() < T::ZERO {
                     -self
                 } else {
@@ -630,8 +630,8 @@ impl<T: NumericField + NumericNegative + NumericFloat> TVec3<T> {
         let a = T::NEG_ONE / (sign + self.z);
         let b = self.x * self.y * a;
         (
-            TVec3::new(T::ONE + sign * math::sqr(self.x) * a, sign * b, -sign * self.x),
-            TVec3::new(b, sign + math::sqr(self.y) * a, -self.y)
+            TVec3::new(T::ONE + sign * sqr(self.x) * a, sign * b, -sign * self.x),
+            TVec3::new(b, sign + sqr(self.y) * a, -self.y)
         )
     }
 }

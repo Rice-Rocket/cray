@@ -5,7 +5,7 @@ use std::ops::Mul;
 use crate::math::*;
 
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Transform {
     pub m: Mat4,
     pub m_inv: Mat4,
@@ -178,6 +178,25 @@ impl Transform {
         );
         m.determinant() < 0.0
     }
+
+    #[inline]
+    pub fn orthographic(z_near: Scalar, z_far: Scalar) -> Transform {
+        Transform::from_scale(Vec3f::new(1.0, 1.0, 1.0 / (z_far - z_near)))
+            * Transform::from_translation(Point3f::new(0.0, 0.0, -z_near))
+    }
+
+    #[inline]
+    pub fn perspective(fov: Scalar, n: Scalar, f: Scalar) -> Transform {
+        let per = Mat4::new(
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, f / (f - n), -f * n / (f - n),
+            0.0, 0.0, 1.0, 0.0,
+        );
+
+        let inv_tan_ang = 1.0 / Scalar::tan(to_radians(fov) / 2.0);
+        Transform::from_scale(Vec3f::new(inv_tan_ang, inv_tan_ang, 1.0)) * Transform::new_with_inverse(per)
+    }
 }
 
 impl Mul<Vec3f> for Transform {
@@ -303,7 +322,7 @@ impl Mul<Bounds3f> for Transform {
 
     #[inline]
     fn mul(self, rhs: Bounds3f) -> Self::Output {
-        let mut b = Bounds3f::new();
+        let mut b = Bounds3f::default();
         for i in 0..8 {
             b |= self * rhs.corner(i);
         }

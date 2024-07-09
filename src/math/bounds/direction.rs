@@ -23,12 +23,12 @@ impl DirectionCone {
 
     pub fn bound_subtended_directions(b: Bounds3f, p: Point3f) -> Self {
         let (center, radius) = b.bounding_sphere();
-        if (p - center).length_squared() < math::sqr(radius) {
+        if (p - center).length_squared() < sqr(radius) {
             return Self::entire_sphere();
         }
         let w = Vec3f::from((p - center).normalize());
-        let sin2_theta_max = math::sqr(radius) / (p - center).length_squared();
-        let cos_theta_max = math::safe::sqrt(1.0 - sin2_theta_max);
+        let sin2_theta_max = sqr(radius) / (p - center).length_squared();
+        let cos_theta_max = safe::sqrt(1.0 - sin2_theta_max);
         Self { w, cos_theta: cos_theta_max }
     }
 
@@ -40,19 +40,19 @@ impl DirectionCone {
             return rhs;
         }
 
-        let theta_a = math::safe::acos(self.cos_theta);
-        let theta_b = math::safe::acos(rhs.cos_theta);
+        let theta_a = safe::acos(self.cos_theta);
+        let theta_b = safe::acos(rhs.cos_theta);
         let theta_d = self.w.angle(rhs.w);
 
-        if (theta_d + theta_b).min(math::PI) <= theta_a {
+        if (theta_d + theta_b).min(PI) <= theta_a {
             return self;
         }
-        if (theta_d + theta_a).min(math::PI) <= theta_b {
+        if (theta_d + theta_a).min(PI) <= theta_b {
             return rhs;
         }
 
         let theta_o = (theta_a + theta_b + theta_d) / 2.0;
-        if theta_o >= math::PI {
+        if theta_o >= PI {
             return Self::entire_sphere();
         }
 

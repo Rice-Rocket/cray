@@ -1,6 +1,6 @@
 // Pbrt 3.6 Rays
 
-use crate::math::*;
+use crate::{math::*, media::Medium};
 
 
 pub trait RayLike {
@@ -13,12 +13,12 @@ pub struct Ray {
     pub origin: Point3f,
     pub direction: Vec3f,
     pub time: Scalar,
-    // pub medium: Option<Medium>,
+    pub medium: Option<Medium>,
 }
 
 impl Default for Ray {
     fn default() -> Self {
-        Self { origin: Point3f::new(0.0, 0.0, 0.0), direction: Vec3f::new(0.0, 0.0, 1.0), time: 0.0 }
+        Self { origin: Point3f::new(0.0, 0.0, 0.0), direction: Vec3f::new(0.0, 0.0, 1.0), time: 0.0, medium: None }
     }
 }
 
@@ -27,28 +27,39 @@ impl Ray {
     #[inline]
     pub fn new(origin: Point3f, direction: Vec3f) -> Self {
         debug_assert!(direction.is_normalized());
-        Self { origin, direction, time: 0.0 }
+        Self { origin, direction, time: 0.0, medium: None }
+    }
+
+    #[inline]
+    pub fn new_with_medium(origin: Point3f, direction: Vec3f, medium: Option<Medium>) -> Self {
+        Self { origin, direction, time: 0.0, medium }
     }
 
     /// Create a new [`Ray`] from an `origin`, `direction` and `time`.
     #[inline]
     pub fn new_with_time(origin: Point3f, direction: Vec3f, time: Scalar) -> Self {
         debug_assert!(direction.is_normalized());
-        Self { origin, direction, time }
+        Self { origin, direction, time, medium: None }
+    }
+
+    #[inline]
+    pub fn new_with_medium_time(origin: Point3f, direction: Vec3f, time: Scalar, medium: Option<Medium>) -> Self {
+        debug_assert!(direction.is_normalized());
+        Self { origin, direction, time, medium }
     }
 
     /// Create a new [`Ray`] from an `origin` with a direction pointing along
     /// the positive Z axis.
     #[inline]
     pub const fn from_origin(origin: Point3f) -> Self {
-        Self { origin, direction: Vec3f::new(0.0, 0.0, 1.0), time: 0.0 }
+        Self { origin, direction: Vec3f::new(0.0, 0.0, 1.0), time: 0.0, medium: None }
     }
 
     /// Create a new [`Ray`] from a `direction` with an origin at `(0, 0, 0)`.
     #[inline]
     pub fn from_direction(direction: Vec3f) -> Self {
         debug_assert!(direction.is_normalized());
-        Self { origin: Point3f::new(0.0, 0.0, 0.0), direction, time: 0.0 }
+        Self { origin: Point3f::new(0.0, 0.0, 0.0), direction, time: 0.0, medium: None }
     }
 
     /// Returns whether or not this [`Ray`] contains an infinite value.
@@ -94,7 +105,7 @@ impl Ray {
         }
         let po = Point3f::from(pi) + offset;
         po.zip(offset.into()).map(|(p, o)| 
-            if o > 0.0 { math::next_float_up(p) } else if o < 0.0 { math::next_float_down(p) } else { p })
+            if o > 0.0 { next_float_up(p) } else if o < 0.0 { next_float_down(p) } else { p })
     }
 
     pub fn spawn_ray(pi: Point3fi, n: Normal3f, time: Scalar, d: Vec3f) -> Ray {
@@ -114,6 +125,7 @@ impl Ray {
             origin: pf,
             direction: (pt - pf).into(),
             time,
+            medium: None,
         }
     }
 }

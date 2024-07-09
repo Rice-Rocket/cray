@@ -17,8 +17,8 @@ where
 {
     /// Creates a new [`TBounds3`] with no points.
     #[inline]
-    pub const fn new() -> Self {
-        Self { min: TPoint3::new(T::MAX, T::MAX, T::MAX), max: TPoint3::new(T::MIN, T::MIN, T::MIN) }
+    pub const fn new(min: TPoint3<T>, max: TPoint3<T>) -> Self {
+        Self { min, max }
     }
 
     /// Creates a new [`TBounds3`] containing a single `point`.
@@ -30,7 +30,7 @@ where
     /// Creates a new [`TBounds3`] containing the given `points`.
     #[inline]
     pub fn from_points(points: Vec<TPoint3<T>>) -> Self {
-        points.iter().fold(TBounds3::new(), |bounds, p| bounds | *p)
+        points.iter().fold(TBounds3::default(), |bounds, p| bounds | *p)
     }
 
     /// Returns the position of the given `corner`.
@@ -89,9 +89,9 @@ where
     #[inline]
     pub fn lerp(self, t: TPoint3<T>) -> TPoint3<T> {
         TPoint3::new(
-            math::lerp(self.min.x, self.max.x, t.x),
-            math::lerp(self.min.y, self.max.y, t.y),
-            math::lerp(self.min.z, self.max.z, t.z),
+            lerp(self.min.x, self.max.x, t.x),
+            lerp(self.min.y, self.max.y, t.y),
+            lerp(self.min.z, self.max.z, t.z),
         )
     }
 
@@ -172,7 +172,7 @@ where
     T: Numeric + PartialOrd + Clone + Copy + Add<T, Output = T> + Mul<T, Output = T> + Sub<T, Output = T> + Div<T, Output = T>
 {
     fn default() -> Self {
-        Self::new()
+        Self::new(TPoint3::MAX, TPoint3::MIN)
     }
 }
 

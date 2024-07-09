@@ -19,7 +19,7 @@ impl SampledWavelengths {
         debug_assert!((0.0..=1.0).contains(&u));
 
         let mut lambda = [0.0; NUM_SPECTRUM_SAMPLES];
-        lambda[0] = math::lerp(lambda_min, lambda_max, u);
+        lambda[0] = lerp(lambda_min, lambda_max, u);
 
         let delta = (lambda_max - lambda_min) / (NUM_SPECTRUM_SAMPLES as Scalar);
         for i in 1..NUM_SPECTRUM_SAMPLES {

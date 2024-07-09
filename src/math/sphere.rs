@@ -35,7 +35,7 @@ pub fn spherical_direction(sin_theta: Scalar, cos_theta: Scalar, phi: Scalar) ->
 #[inline]
 pub fn spherical_theta(v: Vec3f) -> Scalar {
     debug_assert!(v.is_normalized());
-    math::safe::acos(v.z)
+    safe::acos(v.z)
 }
 
 /// Computes the angle `phi` of a vector `v` on the unit sphere.
@@ -48,7 +48,7 @@ pub fn spherical_phi(v: Vec3f) -> Scalar {
 
     let p = v.y.atan2(v.x);
     if p < 0.0 {
-        p + math::TAU
+        p + TAU
     } else {
         p
     }
@@ -139,7 +139,7 @@ pub fn cos_phi(w: Vec3f) -> Scalar {
 #[inline]
 pub fn cos_2_phi(w: Vec3f) -> Scalar {
     debug_assert!(w.is_normalized());
-    math::sqr(cos_phi(w))
+    sqr(cos_phi(w))
 }
 
 /// Computes the sine of the `phi` component of the given unit vector `w`.
@@ -165,7 +165,7 @@ pub fn sin_phi(w: Vec3f) -> Scalar {
 #[inline]
 pub fn sin_2_phi(w: Vec3f) -> Scalar {
     debug_assert!(w.is_normalized());
-    math::sqr(sin_phi(w))
+    sqr(sin_phi(w))
 }
 
 /// Computes the tangent of the `phi` component of the given unit vector `w`.
@@ -198,8 +198,8 @@ pub fn cos_d_phi(wa: Vec3f, wb: Vec3f) -> Scalar {
     debug_assert!(wa.is_normalized());
     debug_assert!(wb.is_normalized());
 
-    let waxy = math::sqr(wa.x) + math::sqr(wa.y);
-    let wbxy = math::sqr(wb.x) + math::sqr(wb.y);
+    let waxy = sqr(wa.x) + sqr(wa.y);
+    let wbxy = sqr(wb.x) + sqr(wb.y);
 
     if waxy == 0.0 || wbxy == 0.0 {
         return 1.0;
@@ -219,13 +219,13 @@ pub fn equal_area_square_to_sphere(p: Vec2f) -> Vec3f {
     let d = sd.abs();
     let r = 1.0 - d;
 
-    let phi = if r == 0.0 { 1.0 } else { ((vp - up) / r + 1.0) * math::FRAC_PI_4 };
+    let phi = if r == 0.0 { 1.0 } else { ((vp - up) / r + 1.0) * FRAC_PI_4 };
     let z = (1.0 - r * r) * sd.signum();
 
     let cos_phi = phi.cos() * u.signum();
     let sin_phi = phi.sin() * v.signum();
 
-    Vec3f::new(cos_phi * r * math::safe::sqrt(2.0 - r * r), sin_phi * r * math::safe::sqrt(2.0 - r * r), z)
+    Vec3f::new(cos_phi * r * safe::sqrt(2.0 - r * r), sin_phi * r * safe::sqrt(2.0 - r * r), z)
 }
 
 

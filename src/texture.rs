@@ -1,0 +1,1079 @@
+use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex}};
+
+use crate::{color::{rgb_xyz::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, Rgb}, sampled::SampledSpectrum, spectrum::{ConstantSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum, SpectrumLike as _}, wavelengths::SampledWavelengths}, file::resolve_filename, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, reader::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::FileLoc}, spherical_theta, sqr, transform::Transform, Normal3f, Point2f, Point3f, Scalar, Vec2f, Vec3f, FRAC_1_PI, FRAC_1_TAU, PI};
+
+pub trait FloatTextureLike {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar;
+}
+
+#[derive(Debug)]
+pub struct ImageTextureBase {
+    mapping: TextureMapping2D,
+    filename: String,
+    scale: Scalar,
+    invert: bool,
+    mipmap: Arc<MIPMap>,
+}
+
+impl ImageTextureBase {
+    pub fn new(
+        mapping: TextureMapping2D,
+        filename: String,
+        filter_options: MIPMapFilterOptions,
+        wrap_mode: WrapMode,
+        scale: Scalar,
+        invert: bool,
+        encoding: ColorEncodingPtr,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        options: &Options,
+    ) -> ImageTextureBase
+    {
+        // Get MIPMap from texture cache if present
+        let tex_info = TexInfo {
+            filename: filename.clone(),
+            filter_options,
+            wrap_mode,
+            encoding: encoding.clone(),
+        };
+
+        let mut texture_cache_guard = texture_cache.lock().unwrap();
+
+        let mipmap = match texture_cache_guard.get(&tex_info) {
+            Some(m) => m.clone(),
+            None => {
+                let m = Arc::new(MIPMap::create_from_file(
+                    &filename,
+                    filter_options,
+                    wrap_mode,
+                    encoding,
+                    options,
+                ));
+                texture_cache_guard.insert(tex_info, m.clone());
+                m
+            }
+        };
+
+        ImageTextureBase
+        {
+            mapping,
+            filename,
+            scale,
+            invert,
+            mipmap,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TexInfo {
+    filename: String,
+    filter_options: MIPMapFilterOptions,
+    wrap_mode: WrapMode,
+    encoding: ColorEncodingPtr,
+}
+
+#[derive(Debug)]
+pub enum FloatTexture {
+    Constant(FloatConstantTexture),
+    Scaled(FloatScaledTexture),
+    Mix(FloatMixTexture),
+    DirectionMix(FloatDirectionMixTexture),
+    Image(FloatImageTexture),
+}
+
+impl FloatTexture {
+    pub fn create(
+        name: &str,
+        render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        loc: &FileLoc,
+        textures: &NamedTextures,
+        options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
+    ) -> FloatTexture {
+        match name {
+            "constant" => {
+                let t = FloatConstantTexture::create(render_from_texture, parameters, loc, textures);
+                FloatTexture::Constant(t)
+            }
+            "scale" => {
+                let t = FloatScaledTexture::create(render_from_texture, parameters, loc, textures);
+                FloatTexture::Scaled(t)
+            }
+            "mix" => {
+                let t = FloatMixTexture::create(render_from_texture, parameters, loc, textures);
+                FloatTexture::Mix(t)
+            }
+            "directionmix" => {
+                let t = FloatDirectionMixTexture::create(render_from_texture, parameters, loc, textures);
+                FloatTexture::DirectionMix(t)
+            }
+            "imagemap" => {
+                let t = FloatImageTexture::create(&render_from_texture, parameters, loc, options, texture_cache, gamma_encoding_cache);
+                FloatTexture::Image(t)
+            }
+            _ => {
+                panic!("Texture {} unknown", name);
+            }
+        }
+    }
+}
+
+impl FloatTextureLike for FloatTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar {
+        match self {
+            FloatTexture::Constant(t) => t.evaluate(ctx),
+            FloatTexture::Scaled(t) => t.evaluate(ctx),
+            FloatTexture::Mix(t) => t.evaluate(ctx),
+            FloatTexture::DirectionMix(t) => t.evaluate(ctx),
+            FloatTexture::Image(t) => t.evaluate(ctx),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct FloatConstantTexture {
+    value: Scalar,
+}
+
+impl FloatConstantTexture {
+    pub fn new(value: Scalar) -> Self {
+        Self { value }
+    }
+
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        _loc: &FileLoc,
+        _textures: &NamedTextures,
+    ) -> FloatConstantTexture {
+        let v = parameters.get_one_float("value", 1.0);
+        FloatConstantTexture::new(v)
+    }
+}
+
+impl FloatTextureLike for FloatConstantTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar {
+        self.value
+    }
+}
+
+#[derive(Debug)]
+pub struct FloatScaledTexture {
+    tex: Arc<FloatTexture>,
+    scale: Arc<FloatTexture>,
+}
+
+impl FloatScaledTexture {
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        _loc: &FileLoc,
+        textures: &NamedTextures,
+    ) -> FloatScaledTexture {
+        let tex = parameters.get_float_texture("tex", 1.0, textures);
+        let scale = parameters.get_float_texture("scale", 1.0, textures);
+
+        FloatScaledTexture {
+            tex,
+            scale
+        }
+    }
+}
+
+impl FloatTextureLike for FloatScaledTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar {
+        let sc = self.scale.evaluate(ctx);
+        if sc == 0.0 {
+            return 0.0;
+        }
+        self.tex.evaluate(ctx) * sc
+    }
+}
+
+#[derive(Debug)]
+pub struct FloatMixTexture {
+    tex1: Arc<FloatTexture>,
+    tex2: Arc<FloatTexture>,
+    amount: Arc<FloatTexture>,
+}
+
+impl FloatMixTexture {
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        _loc: &FileLoc,
+        textures: &NamedTextures,
+    ) -> FloatMixTexture {
+        let tex1 = parameters.get_float_texture("tex1", 0.0, textures);
+        let tex2 = parameters.get_float_texture("tex2", 1.0, textures);
+        let amount = parameters.get_float_texture("amount", 0.5, textures);
+        
+        FloatMixTexture {
+            tex1,
+            tex2,
+            amount,
+        }
+    }
+}
+
+impl FloatTextureLike for FloatMixTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar {
+        let amt = self.amount.evaluate(ctx);
+        let mut t1 = 0.0;
+        let mut t2 = 0.0;
+        if amt != 1.0 {
+            t1 = self.tex1.evaluate(ctx);
+        }
+        if amt != 0.0 {
+            t2 = self.tex2.evaluate(ctx);
+        }
+
+        t1 * (1.0 - amt) + t2 * amt
+    }
+}
+
+#[derive(Debug)]
+pub struct FloatDirectionMixTexture {
+    tex1: Arc<FloatTexture>,
+    tex2: Arc<FloatTexture>,
+    dir: Vec3f,
+}
+
+impl FloatDirectionMixTexture {
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        _loc: &FileLoc,
+        textures: &NamedTextures,
+    ) -> FloatDirectionMixTexture {
+        let tex1 = parameters.get_float_texture("tex1", 0.0, textures);
+        let tex2 = parameters.get_float_texture("tex2", 1.0, textures);
+        let dir = parameters.get_one_vector3f("dir", Vec3f::new(0.0, 1.0, 0.0));
+        
+        FloatDirectionMixTexture {
+            tex1,
+            tex2,
+            dir,
+        }
+    }
+}
+
+impl FloatTextureLike for FloatDirectionMixTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar {
+        let amt = ctx.n.dot(self.dir.into());
+        let mut t1 = 0.0;
+        let mut t2 = 0.0;
+        if amt != 0.0 {
+            t1 = self.tex1.evaluate(ctx);
+        }
+        if amt != 1.0 {
+            t2 = self.tex2.evaluate(ctx);
+        }
+        amt * t1 + (1.0 - amt) * t2
+    }
+}
+
+#[derive(Debug)]
+pub struct FloatImageTexture {
+    base: ImageTextureBase,
+}
+
+impl FloatImageTexture {
+    pub fn new(
+        mapping: TextureMapping2D,
+        filename: String,
+        filter_options: MIPMapFilterOptions,
+        wrap_mode: WrapMode,
+        scale: Scalar,
+        invert: bool,
+        encoding: ColorEncodingPtr,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        options: &Options,
+    ) -> FloatImageTexture
+    {
+        let base = ImageTextureBase::new(
+            mapping,
+            filename,
+            filter_options,
+            wrap_mode,
+            scale,
+            invert,
+            encoding,
+            texture_cache,
+            options,
+        );
+
+        FloatImageTexture {
+            base,
+        }
+    }
+
+    pub fn create(
+        render_from_texture: &Transform,
+        parameters: &mut TextureParameterDictionary,
+        loc: &FileLoc,
+        options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
+    ) -> FloatImageTexture
+    {
+        let map = TextureMapping2D::create(&mut parameters.dict, render_from_texture, loc);
+
+        let max_aniso = parameters.get_one_float("maxanisotropy", 8.0);
+        let filter = parameters.get_one_string("filter", "bilinear");
+        
+        let ff = FilterFunction::parse(&filter).expect("Unknown filter function");
+        let filter_options = MIPMapFilterOptions::new(ff, max_aniso);
+
+        let wrap = parameters.get_one_string("wrap", "repeat");
+        let wrap = WrapMode::parse(&wrap).expect("Unknown wrap mode");
+
+        let scale = parameters.get_one_float("scale", 1.0);
+        let invert = parameters.get_one_bool("invert", false);
+        let filename = resolve_filename(options, &parameters.get_one_string("filename", ""));
+
+        let default_encoding = if PathBuf::from(&filename).extension().expect("Expected extension") == "png"
+        {
+            "sRGB"
+        } else {
+            "linear"
+        };
+        let encoding_string = parameters.get_one_string("encoding", default_encoding);
+
+        let encoding = ColorEncoding::get(&encoding_string, Some(gamma_encoding_cache));
+
+        FloatImageTexture::new(
+            map,
+            filename,
+            filter_options,
+            wrap,
+            scale,
+            invert,
+            encoding,
+            texture_cache,
+            options,
+        )
+    }
+}
+
+impl FloatTextureLike for FloatImageTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext) -> Scalar {
+        let mut c = self.base.mapping.map(ctx);
+        c.st[1] = 1.0 - c.st[1];
+
+        let v = self.base.mipmap.filter::<Scalar>(c.st, Vec2f::new(c.dsdx, c.dtdx), Vec2f::new(c.dsdy, c.dtdy)) * self.base.scale;
+        if self.base.invert { Scalar::max(0.0, 1.0 - v) } else { v }
+    }
+}
+
+
+pub trait SpectrumTextureLike {
+    fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum;
+}
+
+#[derive(Debug)]
+pub enum SpectrumTexture {
+    Constant(SpectrumConstantTexture),
+    Scaled(SpectrumScaledTexture),
+    Mix(SpectrumMixTexture),
+    DirectionMix(SpectrumDirectionMixTexture),
+    Image(SpectrumImageTexture),
+}
+
+impl SpectrumTexture {
+    pub fn create(
+        name: &str,
+        render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        textures: &NamedTextures,
+        loc: &FileLoc,
+        options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
+    ) -> SpectrumTexture {
+        match name {
+            "constant" => {
+                let t = SpectrumConstantTexture::create(
+                    render_from_texture,
+                    parameters,
+                    spectrum_type,
+                    cached_spectra,
+                    loc,
+                );
+                SpectrumTexture::Constant(t)
+            }
+            "scale" => {
+                let t = SpectrumScaledTexture::create(
+                    render_from_texture,
+                    parameters,
+                    spectrum_type,
+                    cached_spectra,
+                    textures,
+                    loc,
+                );
+                SpectrumTexture::Scaled(t)
+            }
+            "mix" => {
+                let t = SpectrumMixTexture::create(
+                    render_from_texture,
+                    parameters,
+                    spectrum_type,
+                    cached_spectra,
+                    textures,
+                    loc,
+                );
+                SpectrumTexture::Mix(t)
+            }
+            "directionmix" => {
+                let t = SpectrumDirectionMixTexture::create(
+                    render_from_texture,
+                    parameters,
+                    spectrum_type,
+                    cached_spectra,
+                    textures,
+                    loc,
+                );
+                SpectrumTexture::DirectionMix(t)
+            }
+            "imagemap" => {
+                let t = SpectrumImageTexture::create(&render_from_texture, parameters, spectrum_type, options, texture_cache, gamma_encoding_cache, loc);
+                SpectrumTexture::Image(t)
+            }
+            _ => {
+                panic!("Texture {} unknown", name);
+            }
+        }
+    }
+}
+
+impl SpectrumTextureLike for SpectrumTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
+        match self {
+            SpectrumTexture::Constant(t) => t.evaluate(ctx, lambda),
+            SpectrumTexture::Scaled(t) => t.evaluate(ctx, lambda),
+            SpectrumTexture::Mix(t) => t.evaluate(ctx, lambda),
+            SpectrumTexture::DirectionMix(t) => t.evaluate(ctx, lambda),
+            SpectrumTexture::Image(t) => t.evaluate(ctx, lambda),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct SpectrumConstantTexture {
+    pub value: Arc<Spectrum>,
+}
+
+impl SpectrumConstantTexture {
+    pub fn new(value: Arc<Spectrum>) -> Self {
+        Self { value }
+    }
+
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        _loc: &FileLoc,
+    ) -> SpectrumConstantTexture {
+        let one = Spectrum::Constant(ConstantSpectrum::new(1.0));
+        let c = parameters
+            .get_one_spectrum("value", Some(Arc::new(one)), spectrum_type, cached_spectra)
+            .unwrap();
+        SpectrumConstantTexture::new(c)
+    }
+}
+
+impl SpectrumTextureLike for SpectrumConstantTexture {
+    fn evaluate(&self, _ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
+        self.value.sample(lambda)
+    }
+}
+
+#[derive(Debug)]
+pub struct SpectrumScaledTexture {
+    tex: Arc<SpectrumTexture>,
+    scale: Arc<FloatTexture>,
+}
+
+impl SpectrumScaledTexture {
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        textures: &NamedTextures,
+        _loc: &FileLoc,
+    ) -> SpectrumScaledTexture {
+        let one = ConstantSpectrum::new(1.0);
+        let tex = parameters.get_spectrum_texture(
+            "tex", 
+            Some(Arc::new(Spectrum::Constant(one))),
+            spectrum_type,
+            cached_spectra,
+            textures).expect("Expected default value");
+        let scale = parameters.get_float_texture(
+            "scale", 
+            1.0, 
+            textures);
+        
+        SpectrumScaledTexture {
+            tex,
+            scale,
+        }
+    }
+}
+
+impl SpectrumTextureLike for SpectrumScaledTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let sc = self.scale.evaluate(ctx);
+        if sc == 0.0 {
+            return SampledSpectrum::from_const(0.0);
+        }
+        self.tex.evaluate(ctx, lambda) * sc
+    }
+}
+
+#[derive(Debug)]
+pub struct SpectrumMixTexture {
+    tex1: Arc<SpectrumTexture>,
+    tex2: Arc<SpectrumTexture>,
+    amount: Arc<FloatTexture>,
+}
+
+impl SpectrumMixTexture {
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        textures: &NamedTextures,
+        _loc: &FileLoc,
+    ) -> SpectrumMixTexture {
+        let zero = ConstantSpectrum::new(0.0);
+        let one = ConstantSpectrum::new(1.0);
+        let tex1 = parameters.get_spectrum_texture(
+            "tex1", 
+            Some(Arc::new(Spectrum::Constant(zero))),
+            spectrum_type,
+            cached_spectra,
+            textures).expect("Expected default value");
+        let tex2 = parameters.get_spectrum_texture(
+            "tex2", 
+            Some(Arc::new(Spectrum::Constant(one))),
+            spectrum_type,
+            cached_spectra,
+            textures).expect("Expected default value");
+        let amount = parameters.get_float_texture(
+            "amount", 
+            0.5, 
+            textures);
+        
+        SpectrumMixTexture {
+            tex1,
+            tex2,
+            amount,
+        }
+    }
+}
+
+impl SpectrumTextureLike for SpectrumMixTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let amt = self.amount.evaluate(ctx);
+        let mut t1 = SampledSpectrum::from_const(0.0);
+        let mut t2 = SampledSpectrum::from_const(0.0);
+        if amt != 1.0 {
+            t1 = self.tex1.evaluate(ctx, lambda);
+        }
+        if amt != 0.0 {
+            t2 = self.tex2.evaluate(ctx, lambda);
+        }
+        t1 * (1.0 - amt) + t2 * amt
+    }
+}
+
+#[derive(Debug)]
+pub struct SpectrumDirectionMixTexture {
+    tex1: Arc<SpectrumTexture>,
+    tex2: Arc<SpectrumTexture>,
+    dir: Vec3f,
+}
+
+impl SpectrumDirectionMixTexture {
+    pub fn create(
+        _render_from_texture: Transform,
+        parameters: &mut TextureParameterDictionary,
+        spectrum_type: SpectrumType,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        textures: &NamedTextures,
+        _loc: &FileLoc,
+    ) -> SpectrumDirectionMixTexture {
+        let zero = ConstantSpectrum::new(0.0);
+        let one = ConstantSpectrum::new(1.0);
+        let tex1 = parameters.get_spectrum_texture(
+            "tex1", 
+            Some(Arc::new(Spectrum::Constant(zero))),
+            spectrum_type,
+            cached_spectra,
+            textures).expect("Expected default value");
+        let tex2 = parameters.get_spectrum_texture(
+            "tex2", 
+            Some(Arc::new(Spectrum::Constant(one))),
+            spectrum_type,
+            cached_spectra,
+            textures).expect("Expected default value");
+        let dir = parameters.get_one_vector3f("dir", Vec3f::new(0.0, 1.0, 0.0));
+        
+        SpectrumDirectionMixTexture {
+            tex1,
+            tex2,
+            dir,
+        }
+    }
+}
+
+impl SpectrumTextureLike for SpectrumDirectionMixTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let amt = ctx.n.dot(self.dir.into());
+        let mut t1 = SampledSpectrum::from_const(0.0);
+        let mut t2 = SampledSpectrum::from_const(0.0);
+        if amt != 0.0 
+        {
+            t1 = self.tex1.evaluate(ctx, lambda);
+        }
+        if amt != 1.0
+        {
+            t2 = self.tex2.evaluate(ctx, lambda);
+        }
+        amt * t1 + (1.0 - amt) * t2
+    }
+}
+
+#[derive(Debug)]
+pub struct SpectrumImageTexture {
+    base: ImageTextureBase,
+    spectrum_type: SpectrumType,
+}
+
+impl SpectrumImageTexture {
+    pub fn new(
+        spectrum_type: SpectrumType,
+        mapping: TextureMapping2D,
+        filename: String,
+        filter_options: MIPMapFilterOptions,
+        wrap_mode: WrapMode,
+        scale: Scalar,
+        invert: bool,
+        encoding: ColorEncodingPtr,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        options: &Options,
+    ) -> SpectrumImageTexture {
+        let base = ImageTextureBase::new(
+            mapping,
+            filename,
+            filter_options,
+            wrap_mode,
+            scale,
+            invert,
+            encoding,
+            texture_cache,
+            options,
+        );
+
+        SpectrumImageTexture {
+            base,
+            spectrum_type,
+        }
+    }
+
+    pub fn create(
+        render_from_texture: &Transform,
+        parameters: &mut TextureParameterDictionary,
+        spectrum_type: SpectrumType,
+        options: &Options,
+        texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
+        gamma_encoding_cache: &mut ColorEncodingCache,
+        loc: &FileLoc
+    ) -> SpectrumImageTexture {
+        let map = TextureMapping2D::create(&mut parameters.dict, render_from_texture, loc);
+
+        let max_aniso = parameters.get_one_float("maxanisotropy", 8.0);
+        let filter = parameters.get_one_string("filter", "bilinear");
+
+        let ff = FilterFunction::parse(&filter).expect("Unknown filter function");
+        let filter_options = MIPMapFilterOptions::new(ff, max_aniso);
+
+        let wrap = parameters.get_one_string("wrap", "repeat");
+        let wrap = WrapMode::parse(&wrap).expect("Unknown wrap mode");
+
+        let scale = parameters.get_one_float("scale", 1.0);
+        let invert = parameters.get_one_bool("invert", false);
+        let filename = resolve_filename(options, &parameters.get_one_string("filename", ""));
+        
+        let default_encoding = if PathBuf::from(&filename).extension().expect("Expected extension") == "png" {
+            "sRGB"
+        } else {
+            "linear"
+        };
+        let encoding_string = parameters.get_one_string("encoding", default_encoding);
+        let encoding = ColorEncoding::get(&encoding_string, Some(gamma_encoding_cache));
+
+        SpectrumImageTexture::new(
+            spectrum_type,
+            map,
+            filename,
+            filter_options,
+            wrap,
+            scale,
+            invert,
+            encoding,
+            texture_cache,
+            options,
+        )
+    }
+}
+
+impl SpectrumTextureLike for SpectrumImageTexture {
+    fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
+        let mut c = self.base.mapping.map(ctx);
+        c.st[1] = 1.0 - c.st[1];
+
+        let rgb = self.base.mipmap.filter::<Rgb>(c.st, Vec2f::new(c.dsdx, c.dtdx), Vec2f::new(c.dsdy, c.dtdy)) * self.base.scale;
+        let rgb = if self.base.invert { Rgb::new(1.0, 1.0, 1.0) - rgb } else { rgb };
+        let rgb = rgb.clamp_zero();
+
+        if let Some(cs) = self.base.mipmap.get_color_space()
+        {
+            match self.spectrum_type
+            {
+                SpectrumType::Illuminant => {
+                    RgbIlluminantSpectrum::new(&cs, &rgb).sample(lambda)
+                },
+                SpectrumType::Albedo => {
+                    RgbAlbedoSpectrum::new(&cs, &rgb).sample(lambda)
+                },
+                SpectrumType::Unbounded => {
+                    RgbUnboundedSpectrum::new(&cs, &rgb).sample(lambda)
+                },
+            }
+        } else {
+            // If no colorspace, then it should be a one-channel texture
+            debug_assert!(rgb[0] == rgb[1] && rgb[1] == rgb[2]);
+            SampledSpectrum::from_const(rgb[0])
+        }
+    }
+}
+
+
+pub trait TextureMapping2DLike {
+    fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D;
+}
+
+#[derive(Debug)]
+pub enum TextureMapping2D {
+    UV(UVMapping),
+    Spherical(SphericalMapping),
+    Cylindrical(CylindricalMapping),
+    Planar(PlanarMapping),
+}
+
+impl TextureMapping2D {
+    pub fn create(
+        parameters: &mut ParameterDictionary,
+        render_from_texture: &Transform,
+        _loc: &FileLoc,
+    ) -> TextureMapping2D {
+        // TODO change the default to take &str...
+        let ty = parameters.get_one_string("mapping", "uv");
+        match ty.as_str()
+        {
+            "uv" => {
+                let su = parameters.get_one_float("uscale", 1.0);
+                let sv = parameters.get_one_float("vscale", 1.0);
+                let du = parameters.get_one_float("udelta", 0.0);
+                let dv = parameters.get_one_float("vdelta", 0.0);
+                TextureMapping2D::UV(UVMapping { su, sv, du, dv })
+            },
+            "spherical" => TextureMapping2D::Spherical(SphericalMapping {
+                texture_from_render: render_from_texture.inverse(),
+            }),
+            "cylindrical" => TextureMapping2D::Cylindrical(CylindricalMapping{
+                texture_from_render: render_from_texture.inverse(),
+            }),
+            "planar" => TextureMapping2D::Planar(PlanarMapping {
+                texture_from_render: render_from_texture.inverse(),
+                vs: parameters.get_one_vector3f("v1", Vec3f::new(1.0, 0.0, 0.0)),
+                vt: parameters.get_one_vector3f("v2", Vec3f::new(0.0, 1.0, 0.0)),
+                ds: parameters.get_one_float("udelta", 0.0),
+                dt: parameters.get_one_float("vdelta", 0.0)
+            }),
+            _ => panic!("Unknown texture mapping type {}", ty),
+        }
+    }
+}
+
+impl TextureMapping2DLike for TextureMapping2D {
+    fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
+        match self {
+            TextureMapping2D::UV(m) => m.map(ctx),
+            TextureMapping2D::Spherical(m) => m.map(ctx),
+            TextureMapping2D::Cylindrical(m) => m.map(ctx),
+            TextureMapping2D::Planar(m) => m.map(ctx),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct UVMapping {
+    su: Scalar,
+    sv: Scalar,
+    du: Scalar,
+    dv: Scalar,
+}
+
+impl Default for UVMapping {
+    fn default() -> Self {
+        Self {
+            su: 1.0,
+            sv: 1.0,
+            du: 0.0,
+            dv: 0.0,
+        }
+    }
+}
+
+impl TextureMapping2DLike for UVMapping {
+    fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
+        let dsdx = self.su * ctx.dudx;
+        let dsdy = self.su * ctx.dudy;
+        let dtdx = self.sv * ctx.dvdx;
+        let dtdy = self.sv * ctx.dvdy;
+
+        let st = Point2f::new(self.su * ctx.uv[0] + self.du, self.sv * ctx.uv[1] * self.dv);
+        TexCoord2D {
+            st,
+            dsdx,
+            dsdy,
+            dtdx,
+            dtdy,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct SphericalMapping {
+    texture_from_render: Transform,
+}
+
+impl TextureMapping2DLike for SphericalMapping {
+    fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
+        let pt = self.texture_from_render * ctx.p;
+        let x2y2 = sqr(pt.x) + sqr(pt.y);
+        let sqrtx2y2 = x2y2.sqrt();
+        let dsdp = Vec3f::new(-pt.y, pt.x, 0.0) / (2.0 * PI * x2y2);
+        let dtdp = Vec3f::new(pt.x * pt.z / sqrtx2y2, pt.y * pt.z / sqrtx2y2, -sqrtx2y2) *
+            (1.0 / (PI * (x2y2 + sqr(pt.z))));
+            
+        
+        let dpdx = self.texture_from_render * ctx.dpdx;
+        let dpdy = self.texture_from_render * ctx.dpdy;
+
+        let dsdx = dsdp.dot(dpdx);
+        let dsdy = dsdp.dot(dpdy);
+        let dtdx = dtdp.dot(dpdx);
+        let dtdy = dtdp.dot(dpdy);
+
+        let vec = (pt - Point3f::ZERO).normalize();
+        let st = Point2f::new(
+            spherical_theta(vec.into()) * FRAC_1_PI,
+            spherical_theta(vec.into()) * FRAC_1_TAU,
+        );
+        
+        TexCoord2D {
+            st,
+            dsdx,
+            dsdy,
+            dtdx,
+            dtdy,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct CylindricalMapping {
+    texture_from_render: Transform,
+}
+
+impl TextureMapping2DLike for CylindricalMapping {
+    fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
+        let pt = self.texture_from_render * ctx.p;
+        let x2y2 = sqr(pt.x) + sqr(pt.y);
+        let dsdp = Vec3f::new(-pt.y, pt.x, 0.0) / (2.0 * PI * x2y2);
+        let dtdp = Vec3f::new(0.0, 0.0, 1.0);
+        let dpdx = self.texture_from_render * ctx.dpdx;
+        let dpdy = self.texture_from_render * ctx.dpdy;
+        let dsdx = dsdp.dot(dpdx);
+        let dsdy = dsdp.dot(dpdy);
+        let dtdx = dtdp.dot(dpdx);
+        let dtdy = dtdp.dot(dpdy);
+
+        let st = Point2f::new(
+            PI + Scalar::atan2(pt.y, pt.x) * FRAC_1_TAU,
+            pt.z,
+        );
+
+        TexCoord2D {
+            st,
+            dsdx,
+            dsdy,
+            dtdx,
+            dtdy,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PlanarMapping {
+    texture_from_render: Transform,
+    vs: Vec3f,
+    vt: Vec3f,
+    ds: Scalar,
+    dt: Scalar,
+}
+
+impl TextureMapping2DLike for PlanarMapping {
+    fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
+        let vec: Vec3f = (self.texture_from_render * ctx.p).into();
+        let dpdx = self.texture_from_render * ctx.dpdx;
+        let dpdy = self.texture_from_render * ctx.dpdy;
+        let dsdx = self.vs.dot(dpdx);
+        let dsdy = self.vs.dot(dpdy);
+        let dtdx = self.vt.dot(dpdx);
+        let dtdy = self.vt.dot(dpdy);
+
+        let st = Point2f::new(
+            self.ds + vec.dot(self.vs),
+            self.dt + vec.dot(self.vt),
+        );
+        TexCoord2D {
+            st,
+            dsdx,
+            dsdy,
+            dtdx,
+            dtdy,
+        }
+    }
+}
+
+pub struct TexCoord2D {
+    st: Point2f,
+    dsdx: Scalar,
+    dsdy: Scalar,
+    dtdx: Scalar,
+    dtdy: Scalar,
+}
+
+pub struct TextureEvalContext {
+    p: Point3f,
+    dpdx: Vec3f,
+    dpdy: Vec3f,
+    n: Normal3f,
+    uv: Point2f,
+    dudx: Scalar,
+    dudy: Scalar,
+    dvdx: Scalar,
+    dvdy: Scalar,
+}
+
+impl TextureEvalContext {
+    pub fn new(
+        p: Point3f,
+        dpdx: Vec3f,
+        dpdy: Vec3f,
+        n: Normal3f,
+        uv: Point2f,
+        dudx: Scalar,
+        dudy: Scalar,
+        dvdx: Scalar,
+        dvdy: Scalar,
+    ) -> TextureEvalContext {
+        TextureEvalContext {
+            p,
+            dpdx,
+            dpdy,
+            n,
+            uv,
+            dudx,
+            dudy,
+            dvdx,
+            dvdy,
+        }
+    }
+}
+
+impl From<SurfaceInteraction> for TextureEvalContext {
+    fn from(value: SurfaceInteraction) -> Self {
+        Self {
+            p: value.position(),
+            dpdx: value.dpdx,
+            dpdy: value.dpdy,
+            n: value.interaction.n,
+            uv: value.interaction.uv,
+            dudx: value.dudx,
+            dudy: value.dudy,
+            dvdx: value.dvdx,
+            dvdy: value.dvdy,
+        }
+    }
+}
+
+impl From<&SurfaceInteraction> for TextureEvalContext {
+    fn from(value: &SurfaceInteraction) -> Self {
+        Self {
+            p: value.position(),
+            dpdx: value.dpdx,
+            dpdy: value.dpdy,
+            n: value.interaction.n,
+            uv: value.interaction.uv,
+            dudx: value.dudx,
+            dudy: value.dudy,
+            dvdx: value.dvdx,
+            dvdy: value.dvdy,
+        }
+    }
+}
+
+// impl From<&NormalBumpEvalContext> for TextureEvalContext {
+//     fn from(value: &NormalBumpEvalContext) -> Self {
+//         Self {
+//             p: value.p,
+//             dpdx: value.dpdx,
+//             dpdy: value.dpdy,
+//             n: value.n,
+//             uv: value.uv,
+//             dudx: value.dudx,
+//             dudy: value.dudy,
+//             dvdx: value.dvdx,
+//             dvdy: value.dvdy,
+//         }
+//     }
+// }
+
+impl From<Interaction> for TextureEvalContext {
+    fn from(value: Interaction) -> Self {
+        Self {
+            p: value.position(),
+            dpdx: Default::default(),
+            dpdy: Default::default(),
+            n: Default::default(),
+            uv: value.uv,
+            dudx: Default::default(),
+            dudy: Default::default(),
+            dvdx: Default::default(),
+            dvdy: Default::default(),
+        }
+    }
+}

@@ -85,11 +85,9 @@ macro_rules! create_mat {
     }
 }
 
-
 create_mat!(TMat2; TVec2; 2, 2; 0;0;m00-1;m01,1;0;m10-1;m11);
 create_mat!(TMat3; TVec3; 3, 3; 0;0;m00-1;m01-2;m02,1;0;m10-1;m11-2;m12,2;0;m20-1;m21-2;m22);
 create_mat!(TMat4; TVec4; 4, 4; 0;0;m00-1;m01-2;m02-3;m03,1;0;m10-1;m11-2;m12-3;m13,2;0;m20-1;m21-2;m22-3;m23,3;0;m30-1;m31-2;m32-3;m33);
-
 
 macro_rules! impl_mul_vect {
     ($name:ident -> $($vect:ident: $($i:expr),*);*) => {
@@ -111,7 +109,6 @@ impl_mul_vect!(TMat2 -> TVec2:0,1; TPoint2:0,1; TNormal2:0,1);
 impl_mul_vect!(TMat3 -> TVec3:0,1,2; TPoint3:0,1,2; TNormal3:0,1,2);
 impl_mul_vect!(TMat4 -> TVec4:0,1,2,3; TPoint4:0,1,2,3);
 
-
 macro_rules! impl_interval {
     ($($ty:ident -> $prim:ident: $($i:tt,$j:tt)-*);*) => {
         $(
@@ -129,6 +126,20 @@ macro_rules! impl_interval {
 impl_interval!(TMat2 -> Scalar: 0,0-0,1-1,0-1,1);
 impl_interval!(TMat3 -> Scalar: 0,0-0,1-0,2-1,0-1,1-1,2-2,0-2,1-2,2);
 impl_interval!(TMat4 -> Scalar: 0,0-0,1-0,2-0,3-1,0-1,1-1,2-1,3-2,0-2,1-2,2-2,3-3,0-3,1-3,2-3,3);
+
+macro_rules! impl_default {
+    ($($ty:ident),*) => {
+        $(
+            impl<T: Numeric> Default for $ty<T> {
+                fn default() -> Self {
+                    Self::IDENTITY
+                }
+            }
+        )*
+    }
+}
+
+impl_default!(TMat2, TMat3, TMat4);
 
 
 impl<T: Numeric> TMat2<T> {
@@ -159,17 +170,27 @@ where
 
     #[inline]
     pub fn inverse(self) -> Self {
+        self.try_inverse().unwrap()
+    }
+
+    #[inline]
+    pub fn try_inverse(self) -> Option<Self> {
         let inv_det = {
             let det = self.determinant();
-            debug_assert!(det != T::ZERO);
+            
+            if det == T::ZERO {
+                return None;
+            }
+
             det.ninv()
         };
-        Self::new(
+
+        Some(Self::new(
             self.rowc::<1>().y * inv_det,
             self.rowc::<0>().y * -inv_det,
             self.rowc::<1>().x * -inv_det,
             self.rowc::<0>().x * inv_det,
-        )
+        ))
     }
 }
 
@@ -204,13 +225,22 @@ where
 
     #[inline]
     pub fn inverse(self) -> Self {
+        self.try_inverse().unwrap()
+    }
+
+    #[inline]
+    pub fn try_inverse(self) -> Option<Self> {
         let tmp0 = self.rowc::<1>().cross(self.rowc::<2>());
         let tmp1 = self.rowc::<2>().cross(self.rowc::<0>());
         let tmp2 = self.rowc::<0>().cross(self.rowc::<1>());
         let det = self.rowc::<2>().dot(tmp2);
-        debug_assert!(det != T::ZERO);
+
+        if det == T::ZERO {
+            return None;
+        }
+
         let inv_det = TVec3::splat(det.ninv());
-        Self([tmp0.mul(inv_det).into(), tmp1.mul(inv_det).into(), tmp2.mul(inv_det).into()]).transpose()
+        Some(Self([tmp0.mul(inv_det).into(), tmp1.mul(inv_det).into(), tmp2.mul(inv_det).into()]).transpose())
     }
 }
 
@@ -257,6 +287,11 @@ where
 
     #[inline]
     pub fn inverse(self) -> Self {
+        self.try_inverse().unwrap()
+    }
+
+    #[inline]
+    pub fn try_inverse(self) -> Option<Self> {
         let (m00, m01, m02, m03) = self.rowc::<0>().into();
         let (m10, m11, m12, m13) = self.rowc::<1>().into();
         let (m20, m21, m22, m23) = self.rowc::<2>().into();
@@ -323,10 +358,12 @@ where
         let dot0 = self.rowc::<0>().mul(col0);
         let dot1 = dot0.x + dot0.y + dot0.z + dot0.w;
 
-        debug_assert!(dot1 != T::ZERO);
+        if dot1 == T::ZERO {
+            return None;
+        }
 
         let rcp_det = dot1.ninv();
-        inverse.mul(rcp_det)
+        Some(inverse.mul(rcp_det))
     }
 }
 

@@ -141,7 +141,7 @@ impl SpectrumLike for ConstantSpectrum {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DenselySampledSpectrum {
     lambda_min: i32,
     lambda_max: i32,
@@ -371,14 +371,14 @@ impl SpectrumLike for PiecewiseLinearSpectrum {
             return 0.0;
         }
 
-        let o = math::find_interval(self.lambdas.len(), |i| -> bool {
+        let o = find_interval(self.lambdas.len(), |i| -> bool {
             self.lambdas[i] <= lambda
         });
 
         debug_assert!(lambda >= self.lambdas[o] && lambda <= self.lambdas[o + 1]);
 
         let t = (lambda - self.lambdas[o]) / (self.lambdas[o + 1] - self.lambdas[o]);
-        math::lerp(self.values[o], self.values[o + 1], t)
+        lerp(self.values[o], self.values[o + 1], t)
     }
 
     fn max_value(&self) -> Scalar {
