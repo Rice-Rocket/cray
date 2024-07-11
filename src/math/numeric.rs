@@ -223,3 +223,53 @@ macro_rules! impl_has_nan_array {
 }
 
 impl_has_nan_array!(f32; 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32);
+
+
+pub trait DifferenceOfProducts {
+    fn difference_of_products(a: Self, b: Self, c: Self, d: Self) -> Self;
+    fn sum_of_products(a: Self, b: Self, c: Self, d: Self) -> Self;
+}
+
+impl DifferenceOfProducts for f32 {
+    fn difference_of_products(a: Self, b: Self, c: Self, d: Self) -> Self {
+        let cd = c * d;
+        let diff = f32::mul_add(a, b, -cd);
+        let err = f32::mul_add(-c, d, cd);
+        diff + err
+    }
+
+    fn sum_of_products(a: Self, b: Self, c: Self, d: Self) -> Self {
+        Self::difference_of_products(a, b, -c, d)
+    }
+}
+
+impl DifferenceOfProducts for f64 {
+    fn difference_of_products(a: Self, b: Self, c: Self, d: Self) -> Self {
+        let cd = c * d;
+        let diff = f64::mul_add(a, b, -cd);
+        let err = f64::mul_add(-c, d, cd);
+        diff + err
+    }
+
+    fn sum_of_products(a: Self, b: Self, c: Self, d: Self) -> Self {
+        Self::difference_of_products(a, b, -c, d)
+    }
+}
+
+macro_rules! impl_diff_of_products {
+    ($($ty:ident),* $(,)*) => {
+        $(
+            impl DifferenceOfProducts for $ty {
+                fn difference_of_products(a: Self, b: Self, c: Self, d: Self) -> Self {
+                    a * b - c * d
+                }
+
+                fn sum_of_products(a: Self, b: Self, c: Self, d: Self) -> Self {
+                    a * b + c * d
+                }
+            }
+        )*
+    }
+}
+
+impl_diff_of_products!(i8, i16, i32, i64, i128, u8, u16, u32, u64, u128);

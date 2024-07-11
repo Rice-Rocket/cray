@@ -343,7 +343,6 @@ macro_rules! create_vect {
                     )*}
                 }
             }
-
         )*
         $(
             impl<T> From<$alias0<T>> for $name<T> {
@@ -620,6 +619,36 @@ impl_approx!(
     TNormal2: x,y;
     TNormal3: x,y,z;
 );
+
+
+macro_rules! impl_mul_prim {
+    ($($prim:ident: $($ty:ident),*);*) => {
+        $(
+            $(
+                impl Mul<$ty<$prim>> for $prim {
+                    type Output = $ty<$prim>;
+                    #[inline]
+                    fn mul(self, rhs: $ty<$prim>) -> Self::Output {
+                        rhs * self
+                    }
+                }
+            )*
+        )*
+    }
+}
+
+impl_mul_prim!(f32: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
+               f64: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
+               i8: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
+               i16: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
+               i32: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
+               i64: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
+               i128: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
+               u8: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
+               u16: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
+               u32: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
+               u64: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
+               u128: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3);
 
 
 impl<T: NumericField + NumericNegative + NumericFloat> TVec3<T> {

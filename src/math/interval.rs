@@ -2,7 +2,7 @@
 use std::ops::{Index, IndexMut, Neg};
 
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
-use numeric::HasNan;
+use numeric::{DifferenceOfProducts, HasNan};
 
 use crate::math::*;
 
@@ -162,6 +162,95 @@ impl FloatInterval for Interval {
 
     fn to_scalar(self) -> Float {
         self.midpoint()
+    }
+}
+
+impl DifferenceOfProducts for Interval {
+    fn difference_of_products(a: Self, b: Self, c: Self, d: Self) -> Self {
+        let ab = [
+            a.low * b.low,
+            a.high * b.low,
+            a.low * b.high,
+            a.high * b.high,
+        ];
+        debug_assert!(!ab.contains(&Float::NAN));
+        let ab_low = ab.iter().fold(Float::NAN, |a, &b| a.min(b));
+        let ab_high = ab.iter().fold(Float::NAN, |a, &b| a.max(b));
+
+        let ab_low_index = if ab_low == ab[0] {
+            0
+        } else if ab_low == ab[1] {
+            1
+        } else if ab_low == ab[2] {
+            2
+        } else {
+            3
+        };
+
+        let ab_high_index = if ab_high == ab[0] {
+            0
+        } else if ab_high == ab[1] {
+            1
+        } else if ab_high == ab[2] {
+            2
+        } else {
+            3
+        };
+
+        let cd = [
+            a.low * b.low,
+            a.high * b.low,
+            a.low * b.high,
+            a.high * b.high,
+        ];
+        debug_assert!(!cd.contains(&Float::NAN));
+        let cd_low = cd.iter().fold(Float::NAN, |a, &b| a.min(b));
+        let cd_high = cd.iter().fold(Float::NAN, |a, &b| a.max(b));
+
+        let cd_low_index = if cd_low == cd[0] {
+            0
+        } else if cd_low == cd[1] {
+            1
+        } else if cd_low == cd[2] {
+            2
+        } else {
+            3
+        };
+
+        let cd_high_index = if cd_high == cd[0] {
+            0
+        } else if cd_high == cd[1] {
+            1
+        } else if cd_high == cd[2] {
+            2
+        } else {
+            3
+        };
+
+        let low = Float::difference_of_products(
+            a[ab_low_index & 1],
+            b[ab_low_index >> 1],
+            c[cd_high_index & 1],
+            d[cd_high_index >> 1],
+        );
+
+        let high = Float::difference_of_products(
+            a[ab_high_index & 1],
+            b[ab_high_index >> 2],
+            c[cd_low_index & 1],
+            d[cd_low_index >> 1],
+        );
+
+        debug_assert!(low < high);
+
+        Interval {
+            low: next_float_down(next_float_down(low)),
+            high: next_float_up(next_float_up(high)),
+        }
+    }
+
+    fn sum_of_products(a: Self, b: Self, c: Self, d: Self) -> Self {
+        Self::difference_of_products(a, b, -c, d)
     }
 }
 

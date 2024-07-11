@@ -14,6 +14,7 @@ pub mod image;
 pub mod reader;
 pub mod texture;
 pub mod mipmap;
+pub mod shape;
 
 fn main() {
 }

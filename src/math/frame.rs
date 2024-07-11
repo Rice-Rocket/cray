@@ -74,4 +74,9 @@ impl Frame {
     pub fn globalize(self, v: Vec3f) -> Vec3f {
         self.x * v.x + self.y * v.y + self.z * v.z
     }
+
+    #[inline]
+    pub fn from_local(&self, v: Vec3f) -> Vec3f {
+        v.x * self.x + v.y * self.y + v.z * self.z
+    }
 }

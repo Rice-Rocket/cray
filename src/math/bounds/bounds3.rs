@@ -167,6 +167,76 @@ where
     }
 }
 
+impl TBounds3<Float> {
+    pub fn intersect_p(&self, o: Point3f, d: Vec3f, t_max: Float) -> Option<HitTimes> {
+        let mut t0 = 0.0;
+        let mut t1 = t_max;
+        for i in 0..3 {
+            let inv_ray_dir = 1.0 / d[i];
+            let t_near = (self.min[i] - o[i]) * inv_ray_dir;
+            let t_far = (self.max[i] - o[i]) * inv_ray_dir;
+            let (t_near, t_far) = if t_near > t_far {
+                (t_far, t_near)
+            } else {
+                (t_near, t_far)
+            };
+
+            let t_far = t_far * (1.0 + 2.0 * gamma(3));
+
+            t0 = if t_near > 0.0 { t_near } else { t0 };
+            t1 = if t_far < t1 { t_far } else { t1 };
+            if t0 > t1 {
+                return None;
+            }
+        }
+
+        Some(HitTimes { t0, t1 })
+    }
+
+    pub fn intersect_p_cached(&self, o: Point3f, _d: Vec3f, ray_t_max: Float, inv_dir: Vec3f, dir_is_neg: [u8; 3]) -> bool {
+        let mut t_min = (self[dir_is_neg[0]].x - o.x) * inv_dir.x;
+        let mut t_max = (self[1 - dir_is_neg[0]].x - o.x) * inv_dir.x;
+        let ty_min = (self[dir_is_neg[1]].y - o.y) * inv_dir.y;
+        let mut ty_max = (self[1 - dir_is_neg[1]].y - o.y) * inv_dir.y;
+
+        t_max *= 1.0 + 2.0 * gamma(3);
+        ty_max *= 1.0 + 2.0 * gamma(3);
+
+        if t_min > ty_max || ty_min > t_max {
+            return false;
+        }
+        if ty_min > t_min {
+            t_min = ty_min;
+        }
+        if ty_max < t_max {
+            t_max = ty_max;
+        }
+
+        // Check for ray intersection
+        let tz_min = (self[dir_is_neg[2]].z - o.z) * inv_dir.z;
+        let mut tz_max = (self[1 - dir_is_neg[2]].z - o.z) * inv_dir.z;
+        // Update the maximum value to ensure robust bounds intersection
+        tz_max *= 1.0 + 2.0 * gamma(3);
+
+        if t_min > tz_max || tz_min > t_max {
+            return false;
+        }
+        if tz_min > t_min {
+            t_min = tz_min;
+        }
+        if tz_max < t_max {
+            t_max = tz_max;
+        }
+
+        t_min < ray_t_max && t_max > 0.0
+    }
+}
+
+pub struct HitTimes {
+    pub t0: Float,
+    pub t1: Float,
+}
+
 impl<T> Default for TBounds3<T>
 where
     T: Numeric + PartialOrd + Clone + Copy + Add<T, Output = T> + Mul<T, Output = T> + Sub<T, Output = T> + Div<T, Output = T>

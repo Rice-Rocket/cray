@@ -51,6 +51,7 @@ pub const FRAC_PI_2: Float = 1.57079632679489661923;
 pub const FRAC_PI_4: Float = 0.78539816339744830961;
 /// √2
 pub const SQRT_2: Float = 1.41421356237309504880;
+pub const MACHINE_EPSILON: Float = Float::EPSILON * 0.5;
 
 /// Computse the linear interpolation between `a` and `b` at input `t`.
 pub fn lerp<T: std::ops::Add<T, Output = T> + std::ops::Sub<T, Output = T> + std::ops::Mul<T, Output = T> + Copy>(
@@ -319,6 +320,9 @@ pub fn windowed_sinc(x: Float, radius: Float, tau: Float) -> Float {
     sinc(x) * sinc(x / tau)
 }
 
+pub fn gamma(n: i32) -> Float {
+    (n as Float * MACHINE_EPSILON) / (1.0 - n as Float * MACHINE_EPSILON)
+}
 
 pub mod safe {
     use crate::{math::{Numeric, Float}, NumericFloat};

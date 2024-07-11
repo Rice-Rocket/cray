@@ -2,6 +2,8 @@
 
 use std::ops::Mul;
 
+use interaction::{Interaction, SurfaceInteraction, SurfaceInteractionShading};
+
 use crate::math::*;
 
 
@@ -234,8 +236,133 @@ impl Mul<Point3fi> for Transform {
     type Output = Point3fi;
 
     fn mul(self, rhs: Point3fi) -> Self::Output {
-        let p = Mat4i::from(self.m) * Point4fi::new(rhs.x, rhs.y, rhs.z, Interval::from_val(1.0));
-        p.xyz() / p.w
+        let x: Float = rhs.x.into();
+        let y: Float = rhs.y.into();
+        let z: Float = rhs.z.into();
+        // Compute transformed coordinates
+        let xp: Float = (self.m[(0, 0)] * x + self.m[(0, 1)] * y)
+            + (self.m[(0, 2)] * z + self.m[(0, 3)]);
+        let yp: Float = (self.m[(1, 0)] * x + self.m[(1, 1)] * y)
+            + (self.m[(1, 2)] * z + self.m[(1, 3)]);
+        let zp: Float = (self.m[(2, 0)] * x + self.m[(2, 1)] * y)
+            + (self.m[(2, 2)] * z + self.m[(2, 3)]);
+        let wp: Float = (self.m[(3, 0)] * x + self.m[(3, 1)] * y)
+            + (self.m[(3, 2)] * z + self.m[(3, 3)]);
+
+        // Compute absolute error for transformed point
+        let p_error: Vec3f = if rhs.is_exact() {
+            // Compute error for transformed exact _p_
+            let err_x = gamma(3)
+                * (Float::abs(self.m[(0, 0)] * x)
+                    + Float::abs(self.m[(0, 1)] * y)
+                    + Float::abs(self.m[(0, 2)] * z)
+                    + Float::abs(self.m[(0, 3)]));
+            let err_y = gamma(3)
+                * (Float::abs(self.m[(1, 0)] * x)
+                    + Float::abs(self.m[(1, 1)] * y)
+                    + Float::abs(self.m[(1, 2)] * z)
+                    + Float::abs(self.m[(1, 3)]));
+            let err_z = gamma(3)
+                * (Float::abs(self.m[(2, 0)] * x)
+                    + Float::abs(self.m[(2, 1)] * y)
+                    + Float::abs(self.m[(2, 2)] * z)
+                    + Float::abs(self.m[(2, 3)]));
+            Vec3f::new(err_x, err_y, err_z)
+        } else {
+            // Compute error for transformed approximate _p_
+            let p_in_error = rhs.error();
+            let err_x = (gamma(3) + 1.0)
+                * (Float::abs(self.m[(0, 0)]) * p_in_error.x
+                    + Float::abs(self.m[(0, 1)]) * p_in_error.y
+                    + Float::abs(self.m[(0, 2)]) * p_in_error.z)
+                + gamma(3)
+                    * (Float::abs(self.m[(0, 0)] * x)
+                        + Float::abs(self.m[(0, 1)] * y)
+                        + Float::abs(self.m[(0, 2)] * z)
+                        + Float::abs(self.m[(0, 3)]));
+            let err_y = (gamma(3) + 1.0)
+                * (Float::abs(self.m[(1, 0)]) * p_in_error.x
+                    + Float::abs(self.m[(1, 1)]) * p_in_error.y
+                    + Float::abs(self.m[(1, 2)]) * p_in_error.z)
+                + gamma(3)
+                    * (Float::abs(self.m[(1, 0)] * x)
+                        + Float::abs(self.m[(1, 1)] * y)
+                        + Float::abs(self.m[(1, 2)] * z)
+                        + Float::abs(self.m[(1, 3)]));
+            let err_z = (gamma(3) + 1.0)
+                * (Float::abs(self.m[(2, 0)]) * p_in_error.x
+                    + Float::abs(self.m[(2, 1)]) * p_in_error.y
+                    + Float::abs(self.m[(2, 2)]) * p_in_error.z)
+                + gamma(3)
+                    * (Float::abs(self.m[(2, 0)] * x)
+                        + Float::abs(self.m[(2, 1)] * y)
+                        + Float::abs(self.m[(2, 2)] * z)
+                        + Float::abs(self.m[(2, 3)]));
+            Vec3f::new(err_x, err_y, err_z)
+        };
+        if wp == 1.0 {
+            Point3fi::from_errors(Point3f::new(xp, yp, zp), p_error.into())
+        } else {
+            Point3fi::from_errors(Point3f::new(xp, yp, zp), p_error.into()) / Interval::from(wp)
+        }
+    }
+}
+
+impl Mul<Vec3fi> for Transform {
+    type Output = Vec3fi;
+
+    fn mul(self, rhs: Vec3fi) -> Self::Output {
+        let x: Float = rhs.x.into();
+        let y: Float = rhs.y.into();
+        let z: Float = rhs.z.into();
+        let v_out_err = if rhs.is_exact() {
+            let x_err = gamma(3)
+                * (Float::abs(self.m[(0, 0)] * x)
+                    + Float::abs(self.m[(0, 1)] * y)
+                    + Float::abs(self.m[(0, 2)] * z));
+            let y_err = gamma(3)
+                * (Float::abs(self.m[(1, 0)] * x)
+                    + Float::abs(self.m[(1, 1)] * y)
+                    + Float::abs(self.m[(1, 2)] * z));
+            let z_err = gamma(3)
+                * (Float::abs(self.m[(2, 0)] * x)
+                    + Float::abs(self.m[(2, 1)] * y)
+                    + Float::abs(self.m[(2, 2)] * z));
+            Vec3f::new(x_err, y_err, z_err)
+        } else {
+            let v_in_error = rhs.error();
+            let x_err = (gamma(3) + 1.0)
+                * (Float::abs(self.m[(0, 0)]) * v_in_error.x
+                    + Float::abs(self.m[(0, 1)]) * v_in_error.y
+                    + Float::abs(self.m[(0, 2)]) * v_in_error.z)
+                + gamma(3)
+                    * (Float::abs(self.m[(0, 0)] * x)
+                        + Float::abs(self.m[(0, 1)] * y)
+                        + Float::abs(self.m[(0, 2)] * z));
+            let y_err = (gamma(3) + 1.0)
+                * (Float::abs(self.m[(1, 0)]) * v_in_error.x
+                    + Float::abs(self.m[(1, 1)]) * v_in_error.y
+                    + Float::abs(self.m[(1, 2)]) * v_in_error.z)
+                + gamma(3)
+                    * (Float::abs(self.m[(1, 0)] * x)
+                        + Float::abs(self.m[(1, 1)] * y)
+                        + Float::abs(self.m[(1, 2)] * z));
+            let z_err = (gamma(3) + 1.0)
+                * (Float::abs(self.m[(2, 0)]) * v_in_error.x
+                    + Float::abs(self.m[(2, 1)]) * v_in_error.y
+                    + Float::abs(self.m[(2, 2)]) * v_in_error.z)
+                + gamma(3)
+                    * (Float::abs(self.m[(2, 0)] * x)
+                        + Float::abs(self.m[(2, 1)] * y)
+                        + Float::abs(self.m[(2, 2)] * z));
+            Vec3f::new(x_err, y_err, z_err)
+        };
+
+        let xp: Float = self.m[(0, 0)] * x + self.m[(0, 1)] * y + self.m[(0, 2)] * z;
+        let yp: Float = self.m[(1, 0)] * x + self.m[(1, 1)] * y + self.m[(1, 2)] * z;
+        let zp: Float = self.m[(2, 0)] * x + self.m[(2, 1)] * y + self.m[(2, 2)] * z;
+
+        Vec3fi::from_errors(Vec3f::new(xp, yp, zp), v_out_err)
     }
 }
 
@@ -327,6 +454,46 @@ impl Mul<Bounds3f> for Transform {
             b |= self * rhs.corner(i);
         }
         b
+    }
+}
+
+impl Mul<SurfaceInteraction> for Transform {
+    type Output = SurfaceInteraction;
+
+    fn mul(self, rhs: SurfaceInteraction) -> Self::Output {
+        let t = self.inverse();
+
+        let n = (t * rhs.interaction.n).normalize();
+
+        SurfaceInteraction {
+            interaction: Interaction {
+                pi: self * rhs.interaction.pi,
+                time: rhs.interaction.time,
+                wo: (t * rhs.interaction.wo).normalize(),
+                n,
+                uv: rhs.interaction.uv
+            },
+            dpdu: t * rhs.dpdu,
+            dpdv: t * rhs.dpdv,
+            dndu: t * rhs.dndu,
+            dndv: t * rhs.dndv,
+            shading: SurfaceInteractionShading {
+                n: (t * rhs.shading.n).normalize().facing(n),
+                dpdu: t * rhs.shading.dpdu,
+                dpdv: t * rhs.shading.dpdv,
+                dndu: t * rhs.shading.dndu,
+                dndv: t * rhs.shading.dndv,
+            },
+            face_index: rhs.face_index,
+            material: rhs.material.clone(),
+            area_light: rhs.area_light.clone(),
+            dpdx: t * rhs.dpdx,
+            dpdy: t * rhs.dpdy,
+            dudx: rhs.dudx,
+            dvdx: rhs.dvdx,
+            dudy: rhs.dudy,
+            dvdy: rhs.dvdy,
+        }
     }
 }
 
