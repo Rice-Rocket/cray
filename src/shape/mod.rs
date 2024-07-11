@@ -1,3 +1,5 @@
+use sphere::Sphere;
+
 use crate::{interaction::{Interaction, SurfaceInteraction}, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
 
 pub mod sphere;

@@ -1,4 +1,4 @@
-use std::ops::{Add, Sub, Mul, Div, Neg, Index, IndexMut};
+use std::ops::{Add, Sub, Mul, Div, AddAssign, SubAssign, MulAssign, DivAssign, Neg, Index, IndexMut};
 use approx::{AbsDiffEq, RelativeEq, UlpsEq};
 
 use crate::math::*;
@@ -306,6 +306,22 @@ macro_rules! create_vect {
             }
         }
 
+        impl<T: Clone + Copy + MulAssign<T>> MulAssign<T> for $name<T> {
+            fn mul_assign(&mut self, rhs: T) {
+                $(
+                    self.$v *= rhs;
+                )*
+            }
+        }
+
+        impl<T: Clone + Copy + DivAssign<T>> DivAssign<T> for $name<T> {
+            fn div_assign(&mut self, rhs: T) {
+                $(
+                    self.$v /= rhs;
+                )*
+            }
+        }
+
         $(
             impl<T: Add<T, Output = T>> Add<$alias<T>> for $name<T> {
                 type Output = $out<T>;
@@ -341,6 +357,38 @@ macro_rules! create_vect {
                     $out {$(
                         $z: self.$z / rhs.$z,
                     )*}
+                }
+            }
+
+            impl<T: AddAssign<T>> AddAssign<$alias<T>> for $name<T> {
+                fn add_assign(&mut self, rhs: $alias<T>) {
+                    $(
+                        self.$z += rhs.$z;
+                    )*
+                }
+            }
+
+            impl<T: SubAssign<T>> SubAssign<$alias<T>> for $name<T> {
+                fn sub_assign(&mut self, rhs: $alias<T>) {
+                    $(
+                        self.$z -= rhs.$z;
+                    )*
+                }
+            }
+
+            impl<T: MulAssign<T>> MulAssign<$alias<T>> for $name<T> {
+                fn mul_assign(&mut self, rhs: $alias<T>) {
+                    $(
+                        self.$z *= rhs.$z;
+                    )*
+                }
+            }
+
+            impl<T: DivAssign<T>> DivAssign<$alias<T>> for $name<T> {
+                fn div_assign(&mut self, rhs: $alias<T>) {
+                    $(
+                        self.$z /= rhs.$z;
+                    )*
                 }
             }
         )*
@@ -648,7 +696,8 @@ impl_mul_prim!(f32: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TN
                u16: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
                u32: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
                u64: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
-               u128: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3);
+               u128: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
+               Interval: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3);
 
 
 impl<T: NumericField + NumericNegative + NumericFloat> TVec3<T> {

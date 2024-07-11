@@ -1,4 +1,4 @@
-use crate::{gamma, interaction::{Interaction, SurfaceInteraction}, numeric::DifferenceOfProducts as _, reader::{paramdict::ParameterDictionary, target::FileLoc}, safe, spherical_direction, sqr, to_radians, transform::Transform, Bounds3f, DirectionCone, Float, Frame, Interval, Normal3f, NumericFloat, Point2f, Point3f, Point3fi, Ray, Vec3f, Vec3fi, PI, TAU};
+use crate::{gamma, interaction::{Interaction, SurfaceInteraction}, numeric::DifferenceOfProducts as _, reader::{paramdict::ParameterDictionary, target::FileLoc}, safe, sampling::sample_uniform_sphere, spherical_direction, sqr, to_radians, transform::Transform, Bounds3f, DirectionCone, Float, Frame, Interval, Normal3f, NumericFloat, Point2f, Point3f, Point3fi, Ray, Vec3f, Vec3fi, PI, TAU};
 
 use super::{QuadricIntersection, ShapeIntersection, ShapeLike, ShapeSample, ShapeSampleContext};
 
@@ -109,7 +109,7 @@ impl Sphere {
             }
         }
 
-        let mut p_hit: Point3f = Point3f::from(oi) + Float::from(t_shape_hit) * Vec3f::from(di).into();
+        let mut p_hit: Point3f = Point3f::from(oi) + Float::from(t_shape_hit) * Point3f::from(Vec3f::from(di));
         p_hit = p_hit * (self.radius / p_hit.distance(Point3f::ZERO));
 
         if p_hit.x == 0.0 && p_hit.y == 0.0 {
@@ -134,7 +134,7 @@ impl Sphere {
 
             t_shape_hit = t1;
 
-            p_hit = Point3f::from(oi) + Float::from(t_shape_hit) * Vec3f::from(di).into();
+            p_hit = Point3f::from(oi) + Float::from(t_shape_hit) * Point3f::from(Vec3f::from(di));
             p_hit = p_hit * (self.radius / p_hit.distance(Point3f::ZERO));
 
             if p_hit.x == 0.0 && p_hit.y == 0.0 {
@@ -284,7 +284,7 @@ impl ShapeLike for Sphere {
             if wi.length_squared() == 0.0 { return None };
             let wi = wi.normalize();
 
-            ss.pdf /= ss.intr.n.dot(-wi.into()).abs() / ctx.p().distance_squared(ss.intr.position());
+            ss.pdf /= ss.intr.n.dot(-Normal3f::from(wi)).abs() / ctx.p().distance_squared(ss.intr.position());
             if ss.pdf.is_infinite() { return None };
 
             return Some(ss);

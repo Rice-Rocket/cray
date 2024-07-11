@@ -14,3 +14,11 @@ pub fn sample_uniform_disk_concentric(u: Point2f) -> Point2f {
 
     Point2f::new(theta.cos(), theta.sin()) * r
 }
+
+pub fn sample_uniform_sphere(u: Point2f) -> Vec3f {
+    let z = 1.0 - 2.0 * u.x;
+    let r = safe::sqrt(1.0 - z * z);
+    let phi = TAU * u.y;
+
+    Vec3f::new(r * phi.cos(), r * phi.sin(), z)
+}
