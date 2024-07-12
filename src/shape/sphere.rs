@@ -359,3 +359,32 @@ impl ShapeLike for Sphere {
         1.0 / (TAU * one_minus_cos_theta_max)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{shape::{sphere::Sphere, ShapeLike as _}, transform::Transform, Float, Point3f, Ray, Vec3f};
+
+    #[test]
+    fn test_sphere_intersect() {
+        let sphere = Sphere::new(
+            Transform::default(),
+            Transform::default(),
+            false,
+            1.0,
+            -0.5,
+            0.5,
+            360.0,
+        );
+        let ray = Ray::new(Point3f::new(0.0, -2.0, 0.0), Vec3f::new(0.0, 1.0, 0.0));
+        assert!(sphere.intersect_predicate(ray, Float::INFINITY));
+
+        let ray = Ray::new(ray.origin, -ray.direction);
+        assert!(!sphere.intersect_predicate(ray, Float::INFINITY));
+
+        let ray = Ray::new(Point3f::new(0.0, 0.0, 0.5001), Vec3f::new(0.0, 1.0, 0.0));
+        assert!(!sphere.intersect_predicate(ray, Float::INFINITY));
+
+        let ray = Ray::new(Point3f::new(0.0, 0.0, -0.5001), Vec3f::new(0.0, 1.0, 0.0));
+        assert!(!sphere.intersect_predicate(ray, Float::INFINITY));
+    }
+}
