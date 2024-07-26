@@ -4,7 +4,7 @@ use tracing::warn;
 
 use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, media::Medium, options::Options, ray::RayLike, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::sample_uniform_disk_concentric, transform::Transform, AuxiliaryRays, Bounds2f, Normal3f, Point2f, Point3f, Ray, RayDifferential, Float, Vec3f};
 
-use super::{film::{Film, FilmLike as _}, filter::FilterLike as _, Camera, CameraBase, CameraBaseParameters, CameraRay, CameraRayDifferential, CameraSample, CameraTransform};
+use super::{film::{Film, FilmLike as _}, filter::FilterLike as _, CameraLike, CameraBase, CameraBaseParameters, CameraRay, CameraRayDifferential, CameraSample, CameraTransform};
 
 #[derive(Debug, Clone)]
 pub struct ProjectiveCamera {
@@ -159,7 +159,7 @@ impl OrthographicCamera {
     }
 }
 
-impl Camera for OrthographicCamera {
+impl CameraLike for OrthographicCamera {
     fn generate_ray(
         &self,
         sample: &CameraSample,
@@ -374,7 +374,7 @@ impl PerspectiveCamera {
     }
 }
 
-impl Camera for PerspectiveCamera {
+impl CameraLike for PerspectiveCamera {
     fn generate_ray(&self, sample: &CameraSample, _lambda: &SampledWavelengths) -> Option<CameraRay> {
         let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
         let p_camera = self.projective.camera_from_raster * p_film;

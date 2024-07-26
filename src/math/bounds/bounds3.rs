@@ -15,7 +15,7 @@ impl<T> TBounds3<T>
 where
     T: Numeric + PartialOrd + Clone + Copy + Add<T, Output = T> + Mul<T, Output = T> + Sub<T, Output = T> + Div<T, Output = T>
 {
-    /// Creates a new [`TBounds3`] with no points.
+    /// Creates a new [`TBounds3`] with from a minimum and maximum.
     #[inline]
     pub const fn new(min: TPoint3<T>, max: TPoint3<T>) -> Self {
         Self { min, max }
@@ -241,6 +241,7 @@ impl<T> Default for TBounds3<T>
 where
     T: Numeric + PartialOrd + Clone + Copy + Add<T, Output = T> + Mul<T, Output = T> + Sub<T, Output = T> + Div<T, Output = T>
 {
+    /// Creates a new [`TBounds3`] with no points.
     fn default() -> Self {
         Self::new(TPoint3::MAX, TPoint3::MIN)
     }

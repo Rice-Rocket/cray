@@ -63,6 +63,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
+name = "either"
+version = "1.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
+
+[[package]]
 name = "fast_polynomial"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -130,6 +136,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
+dependencies = [
+ "either",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.155"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -168,6 +183,12 @@ checksum = "a76df7075c7d4d01fdcb46c912dd17fba5b60c78ea480b475f2b6ab6f666584e"
 dependencies = [
  "num-traits",
 ]
+
+[[package]]
+name = "pdqselect"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7778906d9321dd56cde1d1ffa69a73e59dcf5fda6d366f62727adf2bd4193aee"
 
 [[package]]
 name = "pin-project-lite"
@@ -259,8 +280,10 @@ dependencies = [
  "float-cmp",
  "glam",
  "half",
+ "itertools",
  "once_cell",
  "ordered-float",
+ "pdqselect",
  "png",
  "rand",
  "rgb2spec",

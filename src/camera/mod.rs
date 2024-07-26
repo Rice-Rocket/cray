@@ -1,6 +1,7 @@
 use std::{ops::Mul, sync::Arc};
 
 use film::{Film, FilmLike as _};
+use projective::{OrthographicCamera, PerspectiveCamera};
 use tracing::warn;
 
 use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, math::*, media::Medium, options::{CameraRenderingSpace, Options}, ray::RayLike, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, AuxiliaryRays, Frame, Normal3f, Point2f, Point3f, Ray, RayDifferential, Float, Vec3f};
@@ -9,7 +10,7 @@ pub mod projective;
 pub mod film;
 pub mod filter;
 
-pub trait Camera {
+pub trait CameraLike {
     fn generate_ray(&self, sample: &CameraSample, lambda: &SampledWavelengths) -> Option<CameraRay>;
     fn generate_ray_differential(&self, sample: &CameraSample, lambda: &SampledWavelengths) -> Option<CameraRayDifferential>;
     fn get_film_mut(&mut self) -> &mut Arc<Film>;
@@ -18,6 +19,109 @@ pub trait Camera {
     fn init_metadata(&self, metadata: &mut ImageMetadata);
     fn get_camera_transform(&self) -> &CameraTransform;
     fn approximate_dp_dxy(&self, p: Point3f, n: Normal3f, time: Float, samples_per_pixel: i32, options: &Options) -> (Vec3f, Vec3f);
+}
+
+#[derive(Debug, Clone)]
+pub enum Camera {
+    Orthographic(OrthographicCamera),
+    Perspective(PerspectiveCamera),
+}
+
+impl Camera {
+    pub fn create(
+        name: &str,
+        parameters: &mut ParameterDictionary,
+        medium: Option<Medium>,
+        camera_transform: CameraTransform,
+        film: Arc<Film>,
+        options: &Options,
+        loc: &FileLoc,
+    ) -> Camera {
+        match name {
+            "perspective" => Camera::Perspective(PerspectiveCamera::create(
+                parameters,
+                camera_transform,
+                film,
+                medium,
+                options,
+                loc
+            )),
+            "orthographic" => Camera::Orthographic(OrthographicCamera::create(
+                parameters,
+                camera_transform,
+                film,
+                medium,
+                options,
+                loc
+            )),
+            _ => panic!("camera type '{}' unknown", name)
+        }
+    }
+}
+
+impl CameraLike for Camera {
+    fn generate_ray(&self, sample: &CameraSample, lambda: &SampledWavelengths) -> Option<CameraRay> {
+        match self {
+            Camera::Orthographic(c) => c.generate_ray(sample, lambda),
+            Camera::Perspective(c) => c.generate_ray(sample, lambda),
+        }
+    }
+
+    fn generate_ray_differential(&self, sample: &CameraSample, lambda: &SampledWavelengths) -> Option<CameraRayDifferential> {
+        match self {
+            Camera::Orthographic(c) => c.generate_ray_differential(sample, lambda),
+            Camera::Perspective(c) => c.generate_ray_differential(sample, lambda),
+        }
+    }
+
+    fn get_film(&self) -> &Arc<Film> {
+        match self {
+            Camera::Orthographic(c) => c.get_film(),
+            Camera::Perspective(c) => c.get_film(),
+        }
+    }
+
+    fn get_film_mut(&mut self) -> &mut Arc<Film> {
+        match self {
+            Camera::Orthographic(c) => c.get_film_mut(),
+            Camera::Perspective(c) => c.get_film_mut(),
+        }
+    }
+
+    fn sample_time(&self, u: Float) -> Float {
+        match self {
+            Camera::Orthographic(c) => c.sample_time(u),
+            Camera::Perspective(c) => c.sample_time(u),
+        }
+    }
+
+    fn init_metadata(&self, metadata: &mut ImageMetadata) {
+        match self {
+            Camera::Orthographic(c) => c.init_metadata(metadata),
+            Camera::Perspective(c) => c.init_metadata(metadata),
+        }
+    }
+
+    fn get_camera_transform(&self) -> &CameraTransform {
+        match self {
+            Camera::Orthographic(c) => c.get_camera_transform(),
+            Camera::Perspective(c) => c.get_camera_transform(),
+        }
+    }
+
+    fn approximate_dp_dxy(
+        &self,
+        p: Point3f,
+        n: Normal3f,
+        time: Float,
+        samples_per_pixel: i32,
+        options: &Options,
+    ) -> (Vec3f, Vec3f) {
+        match self {
+            Camera::Orthographic(c) => c.approximate_dp_dxy(p, n, time, samples_per_pixel, options),
+            Camera::Perspective(c) => c.approximate_dp_dxy(p, n, time, samples_per_pixel, options),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -119,7 +223,7 @@ impl CameraBase {
         lerp(self.shutter_open, self.shutter_close, u)
     }
 
-    pub fn generate_ray_differential<T: Camera>(
+    pub fn generate_ray_differential<T: CameraLike>(
         &self,
         camera: &T,
         sample: &CameraSample,
@@ -208,7 +312,7 @@ impl CameraBase {
         (dpdx.into(), dpdy.into())
     }
 
-    pub fn find_minimum_differentials<T: Camera>(&mut self, camera: &T) {
+    pub fn find_minimum_differentials<T: CameraLike>(&mut self, camera: &T) {
         self.min_pos_differential_x = Vec3f::splat(Float::INFINITY);
         self.min_pos_differential_y = Vec3f::splat(Float::INFINITY);
         self.min_dir_differential_x = Vec3f::splat(Float::INFINITY);

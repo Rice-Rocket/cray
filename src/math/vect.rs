@@ -433,7 +433,7 @@ create_vect!(TNormal3; x,y,z; TNormal3:TNormal3, TPoint3:TPoint3:x-y-z, TVec3:TV
 
 
 macro_rules! impl_index {
-    ($($ty:ident; $dim:expr; $($index:expr => $itoken:tt => $v:ident),*);* $(;)*) => {
+    ($($ty:ident; $dim:expr; $($index:tt / $axis:ident => $v:ident),*);* $(;)*) => {
         $(
             impl<T> Index<usize> for $ty<T> {
                 type Output = T;
@@ -452,6 +452,18 @@ macro_rules! impl_index {
                     match index {
                         $(
                             $index => &mut self.$v,
+                        )*
+                        _ => panic!("cannot index into {} with {}", stringify!($ty), index)
+                    }
+                }
+            }
+
+            impl<T> Index<Dimension> for $ty<T> {
+                type Output = T;
+                fn index(&self, index: Dimension) -> &Self::Output {
+                    match index {
+                        $(
+                            Dimension::$axis => &self.$v,
                         )*
                         _ => panic!("cannot index into {} with {}", stringify!($ty), index)
                     }
@@ -477,7 +489,7 @@ macro_rules! impl_index {
             impl<T> From<($(impl_index!($v),)*)> for $ty<T> {
                 fn from(value: ($(impl_index!($v),)*)) -> Self {
                     Self {$(
-                        $v: value.$itoken,
+                        $v: value.$index,
                     )*}
                 }
             }
@@ -494,14 +506,14 @@ macro_rules! impl_index {
 
 
 impl_index!(
-    TPoint2; 2; 0 => 0 => x, 1 => 1 => y;
-    TPoint3; 3; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z;
-    TPoint4; 4; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z, 3 => 3 => w;
-    TVec2; 2; 0 => 0 => x, 1 => 1 => y;
-    TVec3; 3; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z;
-    TVec4; 4; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z, 3 => 3 => w;
-    TNormal2; 2; 0 => 0 => x, 1 => 1 => y;
-    TNormal3; 3; 0 => 0 => x, 1 => 1 => y, 2 => 2 => z;
+    TPoint2; 2; 0 / X => x, 1 / Y => y;
+    TPoint3; 3; 0 / X => x, 1 / Y => y, 2 / Z => z;
+    TPoint4; 4; 0 / X => x, 1 / Y => y, 2 / Z => z, 3 / W => w;
+    TVec2; 2; 0 / X => x, 1 / Y => y;
+    TVec3; 3; 0 / X => x, 1 / Y => y, 2 / Z => z;
+    TVec4; 4; 0 / X => x, 1 / Y => y, 2 / Z => z, 3 / W => w;
+    TNormal2; 2; 0 / X => x, 1 / Y => y;
+    TNormal3; 3; 0 / X => x, 1 / Y => y, 2 / Z => z;
 );
 
 

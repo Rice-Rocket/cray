@@ -15,6 +15,9 @@ pub mod reader;
 pub mod texture;
 pub mod mipmap;
 pub mod shape;
+pub mod primitive;
+pub mod material;
+pub mod light;
 
 fn main() {
 }

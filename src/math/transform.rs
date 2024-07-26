@@ -199,6 +199,52 @@ impl Transform {
         let inv_tan_ang = 1.0 / Float::tan(to_radians(fov) / 2.0);
         Transform::from_scale(Vec3f::new(inv_tan_ang, inv_tan_ang, 1.0)) * Transform::new_with_inverse(per)
     }
+
+    pub fn mul_ray(self, ray: Ray, t_max: Option<&mut Float>) -> Ray {
+        let mut o = self * Point3fi::from(ray.origin);
+        let d = self * ray.direction;
+        
+        let length_sqr = d.length_squared();
+        let o = if length_sqr > 0.0 {
+            let o_error = Vec3f::new(
+                o.x.width() / 2.0,
+                o.y.width() / 2.0,
+                o.z.width() / 2.0,
+            );
+
+            let dt = d.abs().dot(o_error) / length_sqr;
+            if let Some(t_max) = t_max {
+                *t_max -= dt;
+            }
+
+            o + Point3fi::from(Point3f::from(d * dt))
+        } else {
+            o
+        };
+
+        Ray::new_with_medium_time(o.into(), d, ray.time, ray.medium)
+    }
+
+    pub fn mul_ray_differential(self, rd: RayDifferential, t_max: Option<&mut Float>) -> RayDifferential {
+        let tr = self.inverse().mul_ray(rd.ray, t_max);
+        let aux = if let Some(aux) = rd.aux {
+            let rx_origin = self.inverse() * aux.rx_origin;
+            let rx_direction = self.inverse() * aux.rx_direction;
+            let ry_origin = self.inverse() * aux.ry_origin;
+            let ry_direction = self.inverse() * aux.ry_direction;
+
+            Some(AuxiliaryRays::new(
+                rx_origin,
+                rx_direction,
+                ry_origin,
+                ry_direction,
+            ))
+        } else {
+            None
+        };
+
+        RayDifferential { ray: tr, aux }
+    }
 }
 
 impl Mul<Vec3f> for Transform {
@@ -404,18 +450,8 @@ impl Mul<Transform> for Transform {
 impl Mul<Ray> for Transform {
     type Output = Ray;
 
-    #[inline]
     fn mul(self, rhs: Ray) -> Self::Output {
-        let mut o = self * Point3fi::from(rhs.origin);
-        let d = self * rhs.direction;
-        
-        let length_sqr = d.length_squared();
-        if length_sqr > 0.0 {
-            let dt = d.abs().dot(o.error().into()) / length_sqr;
-            o = o + TVec3::from(d * dt);
-        }
-
-        Ray::new(o.into(), d)
+        self.mul_ray(rhs, None)
     }
 }
 
@@ -423,24 +459,7 @@ impl Mul<RayDifferential> for Transform {
     type Output = RayDifferential;
 
     fn mul(self, rhs: RayDifferential) -> Self::Output {
-        let tr = self * rhs.ray;
-
-        let aux: Option<AuxiliaryRays> = if let Some(aux) = &rhs.aux {
-            let rx_origin = self * aux.rx_origin;
-            let rx_direction = self * aux.rx_direction;
-            let ry_origin = self * aux.ry_origin;
-            let ry_direction = self * aux.ry_direction;
-            Some(AuxiliaryRays::new(
-                rx_origin,
-                rx_direction,
-                ry_origin,
-                ry_direction,
-            ))
-        } else {
-            None
-        };
-
-        RayDifferential { ray: tr, aux }
+        self.mul_ray_differential(rhs, None)
     }
 }
 

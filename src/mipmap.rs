@@ -109,7 +109,7 @@ impl MIPMap {
 
                 if shorter_vec_length * self.options.max_anisotropy.0 < longer_vec_length && shorter_vec_length > 0.0 {
                     let scale = longer_vec_length / (shorter_vec_length * self.options.max_anisotropy.0);
-                    dst1 = dst1 * scale;
+                    dst1 *= scale;
                     shorter_vec_length *= scale;
                 }
 
