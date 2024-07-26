@@ -4,7 +4,7 @@ use crate::{interaction::{Interaction, SurfaceInteraction}, Bounds3f, DirectionC
 
 pub mod sphere;
 
-pub trait ShapeLike {
+pub trait AbstractShape {
     /// Spatial extent of the shape
     fn bounds(&self) -> Bounds3f;
 
@@ -45,7 +45,7 @@ pub enum Shape {
     Sphere(Sphere),
 }
 
-impl ShapeLike for Shape {
+impl AbstractShape for Shape {
     fn bounds(&self) -> Bounds3f {
         match self {
             Shape::Sphere(s) => s.bounds(),

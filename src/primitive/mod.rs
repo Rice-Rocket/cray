@@ -10,7 +10,7 @@ pub mod transformed;
 pub mod geometric;
 pub mod bvh;
 
-pub trait PrimitiveLike {
+pub trait AbstractPrimitive {
     /// The bounding box of the primitive
     fn bounds(&self) -> Bounds3f;
 
@@ -29,7 +29,7 @@ pub enum Primitive {
     Geometric(GeometricPrimitive),
 }
 
-impl PrimitiveLike for Primitive {
+impl AbstractPrimitive for Primitive {
     fn bounds(&self) -> Bounds3f {
         match self {
             Primitive::Simple(p) => p.bounds(),

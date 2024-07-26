@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::{camera::{Camera, CameraLike}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, light::Light, material::Material, math::*, numeric::DifferenceOfProducts, options::Options};
+use crate::{camera::{Camera, AbstractCamera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, light::Light, material::Material, math::*, numeric::DifferenceOfProducts, options::Options};
 
 #[derive(Debug, Clone)]
 pub struct Interaction {

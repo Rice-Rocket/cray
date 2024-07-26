@@ -1,6 +1,6 @@
 use crate::{lerp, Point2f, Float, Vec2f};
 
-pub trait FilterLike {
+pub trait AbstractFilter {
     fn radius(&self) -> Vec2f;
 
     fn evaluate(&self, p: Point2f) -> Float;
@@ -24,7 +24,7 @@ impl Filter {
     }
 }
 
-impl FilterLike for Filter {
+impl AbstractFilter for Filter {
     fn radius(&self) -> Vec2f {
         match self {
             Filter::BoxFilter(f) => f.radius(),
@@ -72,7 +72,7 @@ impl BoxFilter {
     }
 }
 
-impl FilterLike for BoxFilter {
+impl AbstractFilter for BoxFilter {
     fn radius(&self) -> Vec2f {
         self.radius
     }

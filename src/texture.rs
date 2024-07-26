@@ -1,8 +1,8 @@
 use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex}};
 
-use crate::{color::{rgb_xyz::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, Rgb}, sampled::SampledSpectrum, spectrum::{ConstantSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum, SpectrumLike as _}, wavelengths::SampledWavelengths}, file::resolve_filename, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, reader::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::FileLoc}, spherical_theta, sqr, transform::Transform, Normal3f, Point2f, Point3f, Float, Vec2f, Vec3f, FRAC_1_PI, FRAC_1_TAU, PI};
+use crate::{color::{rgb_xyz::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, Rgb}, sampled::SampledSpectrum, spectrum::{ConstantSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum, AbstractSpectrum as _}, wavelengths::SampledWavelengths}, file::resolve_filename, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, reader::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::FileLoc}, spherical_theta, sqr, transform::Transform, Normal3f, Point2f, Point3f, Float, Vec2f, Vec3f, FRAC_1_PI, FRAC_1_TAU, PI};
 
-pub trait FloatTextureLike {
+pub trait AbstractFloatTexture {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float;
 }
 
@@ -120,7 +120,7 @@ impl FloatTexture {
     }
 }
 
-impl FloatTextureLike for FloatTexture {
+impl AbstractFloatTexture for FloatTexture {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         match self {
             FloatTexture::Constant(t) => t.evaluate(ctx),
@@ -153,7 +153,7 @@ impl FloatConstantTexture {
     }
 }
 
-impl FloatTextureLike for FloatConstantTexture {
+impl AbstractFloatTexture for FloatConstantTexture {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         self.value
     }
@@ -182,7 +182,7 @@ impl FloatScaledTexture {
     }
 }
 
-impl FloatTextureLike for FloatScaledTexture {
+impl AbstractFloatTexture for FloatScaledTexture {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         let sc = self.scale.evaluate(ctx);
         if sc == 0.0 {
@@ -218,7 +218,7 @@ impl FloatMixTexture {
     }
 }
 
-impl FloatTextureLike for FloatMixTexture {
+impl AbstractFloatTexture for FloatMixTexture {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         let amt = self.amount.evaluate(ctx);
         let mut t1 = 0.0;
@@ -260,7 +260,7 @@ impl FloatDirectionMixTexture {
     }
 }
 
-impl FloatTextureLike for FloatDirectionMixTexture {
+impl AbstractFloatTexture for FloatDirectionMixTexture {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         let amt = ctx.n.dot(self.dir.into());
         let mut t1 = 0.0;
@@ -358,7 +358,7 @@ impl FloatImageTexture {
     }
 }
 
-impl FloatTextureLike for FloatImageTexture {
+impl AbstractFloatTexture for FloatImageTexture {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
         let mut c = self.base.mapping.map(ctx);
         c.st[1] = 1.0 - c.st[1];
@@ -369,7 +369,7 @@ impl FloatTextureLike for FloatImageTexture {
 }
 
 
-pub trait SpectrumTextureLike {
+pub trait AbstractSpectrumTexture {
     fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum;
 }
 
@@ -450,7 +450,7 @@ impl SpectrumTexture {
     }
 }
 
-impl SpectrumTextureLike for SpectrumTexture {
+impl AbstractSpectrumTexture for SpectrumTexture {
     fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
         match self {
             SpectrumTexture::Constant(t) => t.evaluate(ctx, lambda),
@@ -487,7 +487,7 @@ impl SpectrumConstantTexture {
     }
 }
 
-impl SpectrumTextureLike for SpectrumConstantTexture {
+impl AbstractSpectrumTexture for SpectrumConstantTexture {
     fn evaluate(&self, _ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
         self.value.sample(lambda)
     }
@@ -527,7 +527,7 @@ impl SpectrumScaledTexture {
     }
 }
 
-impl SpectrumTextureLike for SpectrumScaledTexture {
+impl AbstractSpectrumTexture for SpectrumScaledTexture {
     fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
         let sc = self.scale.evaluate(ctx);
         if sc == 0.0 {
@@ -580,7 +580,7 @@ impl SpectrumMixTexture {
     }
 }
 
-impl SpectrumTextureLike for SpectrumMixTexture {
+impl AbstractSpectrumTexture for SpectrumMixTexture {
     fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
         let amt = self.amount.evaluate(ctx);
         let mut t1 = SampledSpectrum::from_const(0.0);
@@ -635,7 +635,7 @@ impl SpectrumDirectionMixTexture {
     }
 }
 
-impl SpectrumTextureLike for SpectrumDirectionMixTexture {
+impl AbstractSpectrumTexture for SpectrumDirectionMixTexture {
     fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
         let amt = ctx.n.dot(self.dir.into());
         let mut t1 = SampledSpectrum::from_const(0.0);
@@ -736,7 +736,7 @@ impl SpectrumImageTexture {
     }
 }
 
-impl SpectrumTextureLike for SpectrumImageTexture {
+impl AbstractSpectrumTexture for SpectrumImageTexture {
     fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
         let mut c = self.base.mapping.map(ctx);
         c.st[1] = 1.0 - c.st[1];
@@ -768,7 +768,7 @@ impl SpectrumTextureLike for SpectrumImageTexture {
 }
 
 
-pub trait TextureMapping2DLike {
+pub trait AbstractTextureMapping2D {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D;
 }
 
@@ -815,7 +815,7 @@ impl TextureMapping2D {
     }
 }
 
-impl TextureMapping2DLike for TextureMapping2D {
+impl AbstractTextureMapping2D for TextureMapping2D {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
         match self {
             TextureMapping2D::UV(m) => m.map(ctx),
@@ -845,7 +845,7 @@ impl Default for UVMapping {
     }
 }
 
-impl TextureMapping2DLike for UVMapping {
+impl AbstractTextureMapping2D for UVMapping {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
         let dsdx = self.su * ctx.dudx;
         let dsdy = self.su * ctx.dudy;
@@ -868,7 +868,7 @@ pub struct SphericalMapping {
     texture_from_render: Transform,
 }
 
-impl TextureMapping2DLike for SphericalMapping {
+impl AbstractTextureMapping2D for SphericalMapping {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
         let pt = self.texture_from_render * ctx.p;
         let x2y2 = sqr(pt.x) + sqr(pt.y);
@@ -907,7 +907,7 @@ pub struct CylindricalMapping {
     texture_from_render: Transform,
 }
 
-impl TextureMapping2DLike for CylindricalMapping {
+impl AbstractTextureMapping2D for CylindricalMapping {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
         let pt = self.texture_from_render * ctx.p;
         let x2y2 = sqr(pt.x) + sqr(pt.y);
@@ -944,7 +944,7 @@ pub struct PlanarMapping {
     dt: Float,
 }
 
-impl TextureMapping2DLike for PlanarMapping {
+impl AbstractTextureMapping2D for PlanarMapping {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
         let vec: Vec3f = (self.texture_from_render * ctx.p).into();
         let dpdx = self.texture_from_render * ctx.dpdx;

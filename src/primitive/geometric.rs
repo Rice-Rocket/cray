@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use crate::{light::Light, material::Material, shape::{Shape, ShapeIntersection, ShapeLike}, Bounds3f, Float, Ray};
+use crate::{light::Light, material::Material, shape::{Shape, ShapeIntersection, AbstractShape}, Bounds3f, Float, Ray};
 
-use super::PrimitiveLike;
+use super::AbstractPrimitive;
 
 pub struct GeometricPrimitive {
     pub shape: Arc<Shape>,
@@ -24,7 +24,7 @@ impl GeometricPrimitive {
     }
 }
 
-impl PrimitiveLike for GeometricPrimitive {
+impl AbstractPrimitive for GeometricPrimitive {
     fn bounds(&self) -> Bounds3f {
         self.shape.bounds()
     }

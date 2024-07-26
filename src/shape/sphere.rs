@@ -1,6 +1,6 @@
 use crate::{gamma, interaction::{Interaction, SurfaceInteraction}, numeric::DifferenceOfProducts as _, reader::{paramdict::ParameterDictionary, target::FileLoc}, safe, sampling::sample_uniform_sphere, spherical_direction, sqr, to_radians, transform::Transform, Bounds3f, DirectionCone, Float, Frame, Interval, Normal3f, NumericFloat, Point2f, Point3f, Point3fi, Ray, Vec3f, Vec3fi, PI, TAU};
 
-use super::{QuadricIntersection, ShapeIntersection, ShapeLike, ShapeSample, ShapeSampleContext};
+use super::{QuadricIntersection, ShapeIntersection, AbstractShape, ShapeSample, ShapeSampleContext};
 
 #[derive(Debug, Clone)]
 pub struct Sphere {
@@ -219,7 +219,7 @@ impl Sphere {
     }
 }
 
-impl ShapeLike for Sphere {
+impl AbstractShape for Sphere {
     fn bounds(&self) -> Bounds3f {
         self.render_from_object * Bounds3f::new(
             Point3f::new(-self.radius, -self.radius, self.z_min),
@@ -362,7 +362,7 @@ impl ShapeLike for Sphere {
 
 #[cfg(test)]
 mod tests {
-    use crate::{shape::{sphere::Sphere, ShapeLike as _}, transform::Transform, Float, Point3f, Ray, Vec3f};
+    use crate::{shape::{sphere::Sphere, AbstractShape as _}, transform::Transform, Float, Point3f, Ray, Vec3f};
 
     #[test]
     fn test_sphere_intersect() {

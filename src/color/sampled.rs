@@ -5,7 +5,7 @@ use numeric::HasNan as _;
 
 use crate::math::*;
 
-use super::{cie::{Cie, CIE_Y_INTEGRAL}, colorspace::RgbColorSpace, rgb_xyz::{Rgb, Xyz}, spectrum::{Spectrum, SpectrumLike as _}, wavelengths::SampledWavelengths};
+use super::{cie::{Cie, CIE_Y_INTEGRAL}, colorspace::RgbColorSpace, rgb_xyz::{Rgb, Xyz}, spectrum::{Spectrum, AbstractSpectrum as _}, wavelengths::SampledWavelengths};
 
 
 pub const NUM_SPECTRUM_SAMPLES: usize = 4;

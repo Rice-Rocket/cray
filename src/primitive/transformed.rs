@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use crate::{light::Light, material::Material, shape::{Shape, ShapeIntersection, ShapeLike}, transform::Transform, Bounds3f, Float, Ray};
+use crate::{light::Light, material::Material, shape::{Shape, ShapeIntersection, AbstractShape}, transform::Transform, Bounds3f, Float, Ray};
 
-use super::{Primitive, PrimitiveLike};
+use super::{Primitive, AbstractPrimitive};
 
 pub struct TransformedPrimitive {
     primitive: Arc<Primitive>,
@@ -21,7 +21,7 @@ impl TransformedPrimitive {
     }
 }
 
-impl PrimitiveLike for TransformedPrimitive {
+impl AbstractPrimitive for TransformedPrimitive {
     fn bounds(&self) -> Bounds3f {
         self.render_from_primitive * self.primitive.bounds()
     }

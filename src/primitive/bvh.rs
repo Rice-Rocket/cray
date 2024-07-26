@@ -1,8 +1,8 @@
 use std::{mem::MaybeUninit, sync::{atomic::{AtomicUsize, Ordering}, Arc}};
 
-use crate::{light::Light, material::Material, reader::paramdict::ParameterDictionary, shape::{Shape, ShapeIntersection, ShapeLike}, Bounds3f, Float, Point3f, Ray, Vec3f};
+use crate::{light::Light, material::Material, reader::paramdict::ParameterDictionary, shape::{Shape, ShapeIntersection, AbstractShape}, Bounds3f, Float, Point3f, Ray, Vec3f};
 
-use super::{Primitive, PrimitiveLike};
+use super::{Primitive, AbstractPrimitive};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum BvhSplitMethod {
@@ -327,7 +327,7 @@ impl BvhAggregate {
     }
 }
 
-impl PrimitiveLike for BvhAggregate {
+impl AbstractPrimitive for BvhAggregate {
     fn bounds(&self) -> Bounds3f {
         self.nodes[0].bounds
     }

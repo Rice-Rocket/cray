@@ -12,7 +12,7 @@ pub const LAMBDA_MIN: Float = 360.0;
 /// Maximum wavelength of visible light. Nanometers
 pub const LAMBDA_MAX: Float = 830.0;
 
-pub trait SpectrumLike {
+pub trait AbstractSpectrum {
     fn get(&self, lambda: Float) -> Float;
     fn max_value(&self) -> Float;
     fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum;
@@ -75,7 +75,7 @@ impl Spectrum {
     }
 }
 
-impl SpectrumLike for Spectrum {
+impl AbstractSpectrum for Spectrum {
     /// Gets the value of the spectral distributions at wavelength `lambda`.
     fn get(&self, lambda: Float) -> Float {
         match self {
@@ -127,7 +127,7 @@ impl ConstantSpectrum {
     }
 }
 
-impl SpectrumLike for ConstantSpectrum {
+impl AbstractSpectrum for ConstantSpectrum {
     fn get(&self, _lambda: Float) -> Float {
         self.c
     }
@@ -219,7 +219,7 @@ impl DenselySampledSpectrum {
     }
 }
 
-impl SpectrumLike for DenselySampledSpectrum {
+impl AbstractSpectrum for DenselySampledSpectrum {
     fn get(&self, lambda: Float) -> Float {
         let offset = lambda as i32 - self.lambda_min;
         if offset < 0 || offset >= self.values.len() as i32 {
@@ -363,7 +363,7 @@ impl PiecewiseLinearSpectrum {
     }
 }
 
-impl SpectrumLike for PiecewiseLinearSpectrum {
+impl AbstractSpectrum for PiecewiseLinearSpectrum {
     fn get(&self, lambda: Float) -> Float {
         if self.lambdas.is_empty()
         || lambda < *self.lambdas.first().unwrap()
@@ -430,7 +430,7 @@ impl BlackbodySpectrum {
     }
 }
 
-impl SpectrumLike for BlackbodySpectrum {
+impl AbstractSpectrum for BlackbodySpectrum {
     fn get(&self, lambda: Float) -> Float {
         BlackbodySpectrum::blackbody(lambda, self.t) * self.normalization_factor
     }
@@ -464,7 +464,7 @@ impl RgbAlbedoSpectrum {
     }
 }
 
-impl SpectrumLike for RgbAlbedoSpectrum {
+impl AbstractSpectrum for RgbAlbedoSpectrum {
     fn get(&self, lambda: Float) -> Float {
         self.rsp.get(lambda)
     }
@@ -501,7 +501,7 @@ impl RgbUnboundedSpectrum {
     }
 }
 
-impl SpectrumLike for RgbUnboundedSpectrum {
+impl AbstractSpectrum for RgbUnboundedSpectrum {
     fn get(&self, lambda: Float) -> Float {
         self.scale * self.rsp.get(lambda)
     }
@@ -539,7 +539,7 @@ impl RgbIlluminantSpectrum {
     }
 }
 
-impl SpectrumLike for RgbIlluminantSpectrum {
+impl AbstractSpectrum for RgbIlluminantSpectrum {
     fn get(&self, lambda: Float) -> Float {
         self.scale * self.rsp.get(lambda) * self.illuminant.get(lambda)
     }
@@ -558,7 +558,7 @@ impl SpectrumLike for RgbIlluminantSpectrum {
 }
 
 
-pub fn inner_product<T: SpectrumLike, U: SpectrumLike>(a: &T, b: &U) -> Float {
+pub fn inner_product<T: AbstractSpectrum, U: AbstractSpectrum>(a: &T, b: &U) -> Float {
     let mut integral = 0.0;
     for lambda in (LAMBDA_MIN as i32)..=(LAMBDA_MAX as i32) {
         integral += a.get(lambda as Float) * b.get(lambda as Float);

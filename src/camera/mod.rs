@@ -1,16 +1,16 @@
 use std::{ops::Mul, sync::Arc};
 
-use film::{Film, FilmLike as _};
+use film::{Film, AbstractFilm as _};
 use projective::{OrthographicCamera, PerspectiveCamera};
 use tracing::warn;
 
-use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, math::*, media::Medium, options::{CameraRenderingSpace, Options}, ray::RayLike, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, AuxiliaryRays, Frame, Normal3f, Point2f, Point3f, Ray, RayDifferential, Float, Vec3f};
+use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, math::*, media::Medium, options::{CameraRenderingSpace, Options}, ray::AbstractRay, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, AuxiliaryRays, Frame, Normal3f, Point2f, Point3f, Ray, RayDifferential, Float, Vec3f};
 
 pub mod projective;
 pub mod film;
 pub mod filter;
 
-pub trait CameraLike {
+pub trait AbstractCamera {
     fn generate_ray(&self, sample: &CameraSample, lambda: &SampledWavelengths) -> Option<CameraRay>;
     fn generate_ray_differential(&self, sample: &CameraSample, lambda: &SampledWavelengths) -> Option<CameraRayDifferential>;
     fn get_film_mut(&mut self) -> &mut Arc<Film>;
@@ -59,7 +59,7 @@ impl Camera {
     }
 }
 
-impl CameraLike for Camera {
+impl AbstractCamera for Camera {
     fn generate_ray(&self, sample: &CameraSample, lambda: &SampledWavelengths) -> Option<CameraRay> {
         match self {
             Camera::Orthographic(c) => c.generate_ray(sample, lambda),
@@ -223,7 +223,7 @@ impl CameraBase {
         lerp(self.shutter_open, self.shutter_close, u)
     }
 
-    pub fn generate_ray_differential<T: CameraLike>(
+    pub fn generate_ray_differential<T: AbstractCamera>(
         &self,
         camera: &T,
         sample: &CameraSample,
@@ -312,7 +312,7 @@ impl CameraBase {
         (dpdx.into(), dpdy.into())
     }
 
-    pub fn find_minimum_differentials<T: CameraLike>(&mut self, camera: &T) {
+    pub fn find_minimum_differentials<T: AbstractCamera>(&mut self, camera: &T) {
         self.min_pos_differential_x = Vec3f::splat(Float::INFINITY);
         self.min_pos_differential_y = Vec3f::splat(Float::INFINITY);
         self.min_dir_differential_x = Vec3f::splat(Float::INFINITY);

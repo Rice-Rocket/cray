@@ -7,7 +7,7 @@ use ordered_float::OrderedFloat;
 
 use crate::{mat::mul_mat_vec, math::safe, numeric::HasNan, Mat3, Point2f, Float};
 
-use super::{cie::{Cie, CIE_Y_INTEGRAL}, spectrum::{inner_product, Spectrum, SpectrumLike, LAMBDA_MAX, LAMBDA_MIN}};
+use super::{cie::{Cie, CIE_Y_INTEGRAL}, spectrum::{inner_product, Spectrum, AbstractSpectrum, LAMBDA_MAX, LAMBDA_MIN}};
 
 #[derive(Debug, PartialEq, PartialOrd, Default)]
 pub struct Xyz {
@@ -22,7 +22,7 @@ impl Xyz {
         Xyz { x, y, z }
     }
 
-    pub fn from_spectrum<T: SpectrumLike>(s: &T) -> Xyz {
+    pub fn from_spectrum<T: AbstractSpectrum>(s: &T) -> Xyz {
         Xyz::new(
             inner_product::<Spectrum, T>(Spectrum::get_cie(Cie::X), s),
             inner_product::<Spectrum, T>(Spectrum::get_cie(Cie::Y), s),
@@ -386,7 +386,7 @@ pub fn white_balance(src_white: &Point2f, target_white: &Point2f) -> Mat3 {
 }
 
 
-pub trait ColorEncodingLike {
+pub trait AbstractColorEncoding {
     fn to_linear(&self, vin: &[u8], vout: &mut [Float]);
     #[allow(clippy::wrong_self_convention)]
     fn from_linear(&self, vin: &[Float], vout: &mut [u8]);
@@ -470,7 +470,7 @@ impl ColorEncoding {
     }
 }
 
-impl ColorEncodingLike for ColorEncoding {
+impl AbstractColorEncoding for ColorEncoding {
     fn to_linear(&self, vin: &[u8], vout: &mut [Float]) {
         match self {
             ColorEncoding::Linear(e) => e.to_linear(vin, vout),
@@ -499,7 +499,7 @@ impl ColorEncodingLike for ColorEncoding {
 #[derive(Debug, Clone)]
 pub struct LinearColorEncoding;
 
-impl ColorEncodingLike for LinearColorEncoding {
+impl AbstractColorEncoding for LinearColorEncoding {
     fn to_linear(&self, vin: &[u8], vout: &mut [Float]) {
         debug_assert!(vin.len() == vout.len());
         for i in 0..vin.len() {
@@ -522,7 +522,7 @@ impl ColorEncodingLike for LinearColorEncoding {
 #[derive(Debug, Clone)]
 pub struct SRgbColorEncoding;
 
-impl ColorEncodingLike for SRgbColorEncoding {
+impl AbstractColorEncoding for SRgbColorEncoding {
     fn to_linear(&self, vin: &[u8], vout: &mut [Float]) {
         debug_assert!(vin.len() == vout.len());
         for i in 0..vin.len() {
@@ -570,7 +570,7 @@ impl GammaColorEncoding {
     }
 }
 
-impl ColorEncodingLike for GammaColorEncoding {
+impl AbstractColorEncoding for GammaColorEncoding {
     fn to_linear(&self, vin: &[u8], vout: &mut [Float]) {
         debug_assert!(vin.len() == vout.len());
         for i in 0..vin.len() {

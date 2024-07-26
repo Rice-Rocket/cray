@@ -3,7 +3,7 @@
 use crate::{math::*, media::Medium};
 
 
-pub trait RayLike {
+pub trait AbstractRay {
     fn at(&self, t: Float) -> Point3f;
 }
 
@@ -131,7 +131,7 @@ impl Ray {
 }
 
 
-impl RayLike for Ray {
+impl AbstractRay for Ray {
     /// Computes the point along this [`Ray`] at a given `t`.
     #[inline]
     fn at(&self, t: Float) -> Point3f {
@@ -164,7 +164,7 @@ impl RayDifferential {
     }
 }
 
-impl RayLike for RayDifferential {
+impl AbstractRay for RayDifferential {
     /// Computes the point along this [`Ray`] at a given `t`.
     #[inline]
     fn at(&self, t: Float) -> Point3f {

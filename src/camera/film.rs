@@ -4,11 +4,11 @@ use once_cell::sync::Lazy;
 use rgb2spec::{LAMBDA_MAX, LAMBDA_MIN};
 use tracing::{error, warn};
 
-use crate::{color::{cie::Cie, colorspace::{NamedColorSpace, RgbColorSpace}, named_spectrum::NamedSpectrum, rgb_xyz::{white_balance, Rgb, Xyz}, sampled::SampledSpectrum, spectrum::{inner_product, DenselySampledSpectrum, PiecewiseLinearSpectrum, Spectrum, SpectrumLike}, wavelengths::SampledWavelengths}, image::{Image, ImageMetadata, PixelFormat}, interaction::SurfaceInteraction, linear_least_squares_3, numeric::HasNan, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, vec2d::Vec2D, Bounds2f, Bounds2i, Mat3, Normal3f, Point2f, Point2i, Point3f, Float, Vec2f, Vec3f};
+use crate::{color::{cie::Cie, colorspace::{NamedColorSpace, RgbColorSpace}, named_spectrum::NamedSpectrum, rgb_xyz::{white_balance, Rgb, Xyz}, sampled::SampledSpectrum, spectrum::{inner_product, DenselySampledSpectrum, PiecewiseLinearSpectrum, Spectrum, AbstractSpectrum}, wavelengths::SampledWavelengths}, image::{Image, ImageMetadata, PixelFormat}, interaction::SurfaceInteraction, linear_least_squares_3, numeric::HasNan, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, vec2d::Vec2D, Bounds2f, Bounds2i, Mat3, Normal3f, Point2f, Point2i, Point3f, Float, Vec2f, Vec3f};
 
-use super::{filter::{Filter, FilterLike as _}, CameraTransform};
+use super::{filter::{Filter, AbstractFilter as _}, CameraTransform};
 
-pub trait FilmLike {
+pub trait AbstractFilm {
     fn add_sample(
         &mut self,
         p_film: Point2i,
@@ -76,7 +76,7 @@ impl Film {
     }
 }
 
-impl FilmLike for Film {
+impl AbstractFilm for Film {
     fn add_sample(
             &mut self,
             p_film: Point2i,
@@ -491,7 +491,7 @@ impl RgbFilm {
     }
 }
 
-impl FilmLike for RgbFilm {
+impl AbstractFilm for RgbFilm {
     fn add_sample(
             &mut self,
             p_film: Point2i,
