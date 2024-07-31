@@ -60,3 +60,12 @@ where
         self.extent
     }
 }
+
+impl<T> Default for Vec2D<T> {
+    fn default() -> Self {
+        Self {
+            data: Vec::new(),
+            extent: Bounds2i::default(),
+        }
+    }
+}

@@ -18,6 +18,7 @@ pub mod shape;
 pub mod primitive;
 pub mod material;
 pub mod light;
+pub mod sampler;
 
 fn main() {
 }

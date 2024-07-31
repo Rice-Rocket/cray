@@ -16,6 +16,7 @@ pub struct Options {
     pub force_diffuse: bool,
     pub wavefront: bool,
     pub rendering_space: CameraRenderingSpace,
+    pub pixel_samples: Option<i32>,
 
     pub disable_image_textures: bool,
 

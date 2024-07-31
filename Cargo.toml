@@ -23,6 +23,8 @@ png = "0.17.13"
 thiserror = "1.0.61"
 itertools = "0.13.0"
 pdqselect = "0.1.1"
+rand = { version = "0.8.5", features = [ "small_rng" ] }
+num = "0.4.3"
 
 [dev-dependencies]
 # For comparison

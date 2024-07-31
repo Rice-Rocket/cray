@@ -15,7 +15,7 @@ impl<T> TBounds2<T>
 where
     T: Numeric + PartialOrd + Clone + Copy + Add<T, Output = T> + Mul<T, Output = T> + Sub<T, Output = T> + Div<T, Output = T>
 {
-    /// Creates a new [`TBounds2`] with no points.
+    /// Creates a new [`TBounds2`] with the given `min` and `max`.
     #[inline]
     pub const fn new(min: TPoint2<T>, max: TPoint2<T>) -> Self {
         Self { min, max }
