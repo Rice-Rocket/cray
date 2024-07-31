@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex}};
 
-use crate::{color::{rgb_xyz::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, Rgb}, sampled::SampledSpectrum, spectrum::{ConstantSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum, AbstractSpectrum as _}, wavelengths::SampledWavelengths}, file::resolve_filename, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, reader::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::FileLoc}, spherical_theta, sqr, transform::Transform, Normal3f, Point2f, Point3f, Float, Vec2f, Vec3f, FRAC_1_PI, FRAC_1_TAU, PI};
+use crate::{color::{rgb_xyz::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, Rgb}, sampled::SampledSpectrum, spectrum::{AbstractSpectrum as _, ConstantSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}, wavelengths::SampledWavelengths}, file::resolve_filename, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, material::NormalBumpEvalContext, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, reader::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::FileLoc}, spherical_theta, sqr, transform::Transform, Float, Normal3f, Point2f, Point3f, Vec2f, Vec3f, FRAC_1_PI, FRAC_1_TAU, PI};
 
 pub trait AbstractFloatTexture {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float;
@@ -28,7 +28,6 @@ impl ImageTextureBase {
         options: &Options,
     ) -> ImageTextureBase
     {
-        // Get MIPMap from texture cache if present
         let tex_info = TexInfo {
             filename: filename.clone(),
             filter_options,
@@ -976,6 +975,61 @@ pub struct TexCoord2D {
     dtdy: Float,
 }
 
+
+pub trait AbstractTextureMapping3D {
+    fn map(&self, ctx: &TextureEvalContext) -> TexCoord3D;
+}
+
+#[derive(Debug)]
+pub enum TextureMapping3D {
+    PointTransform(PointTransformMapping),
+}
+
+impl TextureMapping3D {
+    pub fn create(
+        parameters: &mut ParameterDictionary,
+        render_from_texture: Transform,
+        _loc: &FileLoc,
+    ) -> TextureMapping3D {
+        TextureMapping3D::PointTransform(PointTransformMapping { texture_from_render: render_from_texture.inverse() })
+    }
+}
+
+impl AbstractTextureMapping3D for TextureMapping3D {
+    fn map(&self, ctx: &TextureEvalContext) -> TexCoord3D {
+        match self {
+            TextureMapping3D::PointTransform(m) => m.map(ctx),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PointTransformMapping {
+    texture_from_render: Transform,
+}
+
+impl PointTransformMapping {
+    pub fn new(texture_from_render: Transform) -> PointTransformMapping {
+        PointTransformMapping { texture_from_render }
+    }
+}
+
+impl AbstractTextureMapping3D for PointTransformMapping {
+    fn map(&self, ctx: &TextureEvalContext) -> TexCoord3D {
+        TexCoord3D {
+            p: self.texture_from_render * ctx.p,
+            dpdx: self.texture_from_render * ctx.dpdx,
+            dpdy: self.texture_from_render * ctx.dpdy,
+        }
+    }
+}
+
+pub struct TexCoord3D {
+    p: Point3f,
+    dpdx: Vec3f,
+    dpdy: Vec3f,
+}
+
 pub struct TextureEvalContext {
     p: Point3f,
     dpdx: Vec3f,
@@ -1046,21 +1100,21 @@ impl From<&SurfaceInteraction> for TextureEvalContext {
     }
 }
 
-// impl From<&NormalBumpEvalContext> for TextureEvalContext {
-//     fn from(value: &NormalBumpEvalContext) -> Self {
-//         Self {
-//             p: value.p,
-//             dpdx: value.dpdx,
-//             dpdy: value.dpdy,
-//             n: value.n,
-//             uv: value.uv,
-//             dudx: value.dudx,
-//             dudy: value.dudy,
-//             dvdx: value.dvdx,
-//             dvdy: value.dvdy,
-//         }
-//     }
-// }
+impl From<&NormalBumpEvalContext> for TextureEvalContext {
+    fn from(value: &NormalBumpEvalContext) -> Self {
+        Self {
+            p: value.p,
+            dpdx: value.dpdx,
+            dpdy: value.dpdy,
+            n: value.n,
+            uv: value.uv,
+            dudx: value.dudx,
+            dudy: value.dudy,
+            dvdx: value.dvdx,
+            dvdy: value.dvdy,
+        }
+    }
+}
 
 impl From<Interaction> for TextureEvalContext {
     fn from(value: Interaction) -> Self {

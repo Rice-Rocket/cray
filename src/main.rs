@@ -19,6 +19,9 @@ pub mod primitive;
 pub mod material;
 pub mod light;
 pub mod sampler;
+pub mod bxdf;
+pub mod bsdf;
 
 fn main() {
+
 }

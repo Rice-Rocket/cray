@@ -132,6 +132,11 @@ macro_rules! create_vect {
             }
 
             #[inline]
+            pub fn gram_schmidt(self, w: Self) -> Self {
+                self - Self::splat(self.dot(w)) * w
+            }
+
+            #[inline]
             pub fn length(self) -> T {
                 self.length_squared().nsqrt()
             }

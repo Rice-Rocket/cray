@@ -208,6 +208,16 @@ pub fn cos_d_phi(wa: Vec3f, wb: Vec3f) -> Float {
     ((wa.x * wb.x + wa.y * wb.y) / (waxy * wbxy).sqrt()).clamp(-1.0, 1.0)
 }
 
+#[inline]
+pub fn abs_cos_theta(w: Vec3f) -> Float {
+    Float::abs(w.z)
+}
+
+#[inline]
+pub fn same_hemisphere(w: Vec3f, wp: Vec3f) -> bool {
+    w.z * wp.z > 0.0
+}
+
 
 pub fn equal_area_square_to_sphere(p: Vec2f) -> Vec3f {
     let u = 2.0 * p.x - 1.0;

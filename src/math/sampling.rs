@@ -228,3 +228,26 @@ pub fn sample_tent(mut u: Float, r: Float) -> Float {
 
     r * sample_linear(u, 1.0, 0.0)
 }
+
+pub fn sample_uniform_hemisphere(u: Point2f) -> Vec3f {
+    let z = u.x;
+    let r = safe::sqrt(1.0 - z * z);
+    let phi = TAU * u.y;
+
+    Vec3f::new(r * Float::cos(phi), r * Float::sin(phi), z)
+}
+
+#[inline]
+pub fn uniform_hemisphere_pdf() -> Float {
+    FRAC_1_4PI
+}
+
+pub fn sample_cosine_hemisphere(u: Point2f) -> Vec3f {
+    let d = sample_uniform_disk_concentric(u);
+    let z = safe::sqrt(1.0 - sqr(d.x) - sqr(d.y));
+    Vec3f::new(d.x, d.y, z)
+}
+
+pub fn cosine_hemisphere_pdf(cos_theta: Float) -> Float {
+    cos_theta * FRAC_1_PI
+}

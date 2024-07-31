@@ -1,6 +1,6 @@
 use crate::{Bounds2i, Point2i};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Vec2D<T>
 where
     T: Default + Clone + Copy
@@ -58,14 +58,5 @@ where
 
     pub fn extent(&self) -> Bounds2i {
         self.extent
-    }
-}
-
-impl<T> Default for Vec2D<T> {
-    fn default() -> Self {
-        Self {
-            data: Vec::new(),
-            extent: Bounds2i::default(),
-        }
     }
 }

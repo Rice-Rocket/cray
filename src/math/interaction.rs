@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
-use crate::{camera::{Camera, AbstractCamera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, light::Light, material::Material, math::*, numeric::DifferenceOfProducts, options::Options};
+use rand::rngs::SmallRng;
+
+use crate::{bsdf::BSDF, bxdf::{diffuse::DiffuseBxDF, BxDF, BxDFFlags}, camera::{AbstractCamera, Camera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, light::Light, material::{self, AbstractMaterial, Material, MaterialEvalContext, UniversalTextureEvaluator}, math::*, numeric::DifferenceOfProducts, options::Options, sampler::{AbstractSampler as _, Sampler}};
 
 #[derive(Debug, Clone)]
 pub struct Interaction {
@@ -153,6 +155,84 @@ impl SurfaceInteraction {
         self.material = Some(material.clone());
     }
 
+    pub fn get_bsdf(
+        &mut self,
+        ray: RayDifferential,
+        lambda: &mut SampledWavelengths,
+        camera: &Camera,
+        sampler: &mut Sampler,
+        options: &Options,
+        rng: &mut SmallRng,
+    ) -> Option<BSDF> {
+        self.compute_differentials(ray, camera, sampler.samples_per_pixel(), options);
+
+        let mut material = self.material.as_ref().map(|m| m.clone())?;
+
+        let mut is_mixed = matches!(material.as_ref(), Material::Mix(_));
+
+        let mut material_eval_context = MaterialEvalContext::from(&*self);
+
+        while is_mixed {
+            match material.as_ref() {
+                Material::Mix(m) => {
+                    material = m.choose_material(&UniversalTextureEvaluator, &material_eval_context, rng);
+                },
+                _ => is_mixed = false,
+            };
+        }
+
+        let material = match material.as_ref() {
+            Material::Single(m) => m,
+            Material::Mix(m) => unreachable!(),
+        };
+
+        let displacement = material.get_displacement();
+        let normal_map = material.get_normal_map();
+        if displacement.is_some() || normal_map.is_some() {
+            let (dpdu, dpdv) = if let Some(displacement) = displacement {
+                material::bump_map(
+                    UniversalTextureEvaluator,
+                    displacement,
+                    &self.into(),
+                )
+            } else {
+                let normal_map = normal_map.unwrap();
+                material::normal_map(
+                    normal_map.as_ref(),
+                    &self.into(),
+                )
+            };
+
+            let ns = dpdu.cross(dpdv).normalize();
+            self.set_shading_geometry(ns.into(), dpdu, dpdv, self.shading.dndu, self.shading.dndv, false);
+            material_eval_context = MaterialEvalContext::from(&*self);
+        }
+
+        let bsdf = material.get_bsdf(
+            &UniversalTextureEvaluator,
+            &material_eval_context,
+            lambda,
+        );
+
+        let bsdf = if options.force_diffuse {
+            let r = bsdf.rho_hd(
+                self.interaction.wo,
+                &[sampler.get_1d()],
+                &[sampler.get_2d()],
+            );
+
+            BSDF::new(
+                self.shading.n,
+                self.shading.dpdu,
+                BxDF::Diffuse(DiffuseBxDF::new(r)),
+            )
+        } else {
+            bsdf
+        };
+
+        Some(bsdf)
+    }
+
     pub fn compute_differentials(
         &mut self,
         ray: RayDifferential,
@@ -291,6 +371,78 @@ impl SurfaceInteraction {
         };
 
         *ray = new_ray
+    }
+
+    pub fn spawn_ray_with_differentials(
+        &self,
+        ray_i: &RayDifferential,
+        wi: Vec3f,
+        flags: BxDFFlags,
+        eta: Float
+    ) -> RayDifferential {
+        let mut rd = self.interaction.spawn_ray(wi);
+        if let Some(aux) = &ray_i.aux {
+            let mut n = self.shading.n;
+            let mut dndx = self.shading.dndu * self.dudx + self.shading.dndv * self.dvdx;
+            let mut dndy = self.shading.dndu * self.dudy + self.shading.dndv * self.dvdy;
+            let dwodx = -aux.rx_direction - self.interaction.wo;
+            let dwody = -aux.ry_direction - self.interaction.wo;
+
+            rd.aux = if flags == BxDFFlags::SPECULAR_REFLECTION {
+                let rx_origin = self.interaction.position() + self.dpdx;
+                let ry_origin = self.interaction.position() + self.dpdy;
+
+                let dwo_dotn_dx = dwodx.dot(n.into()) + self.interaction.wo.dot(dndx.into());
+                let dwo_dotn_dy = dwody.dot(n.into()) + self.interaction.wo.dot(dndy.into());
+
+                let rx_direction = wi - dwodx + 2.0 * (self.interaction.wo.dot(n.into()) * dndx + dwo_dotn_dx * n);
+                let ry_direction = wi - dwody + 2.0 * (self.interaction.wo.dot(n.into()) * dndy + dwo_dotn_dy * n);
+
+                Some(AuxiliaryRays {
+                    rx_origin,
+                    rx_direction,
+                    ry_origin,
+                    ry_direction,
+                })
+            } else if flags == BxDFFlags::SPECULAR_TRANSMISSION {
+                let rx_origin = self.interaction.position() + self.dpdx;
+                let ry_origin = self.interaction.position() + self.dpdy;
+
+                if self.interaction.wo.dot(n.into()) < 0.0 {
+                    n = -n;
+                    dndx = -dndx;
+                    dndy = -dndy;
+                }
+
+                let dwo_dotn_dx = dwodx.dot(n.into()) + self.interaction.wo.dot(dndx.into());
+                let dwo_dotn_dy = dwody.dot(n.into()) + self.interaction.wo.dot(dndy.into());
+
+                let mu = self.interaction.wo.dot(n.into()) / eta - wi.dot(n.into()).abs();
+                let dmudx = dwo_dotn_dx * (1.0 / eta + 1.0 / sqr(eta) * self.interaction.wo.dot(n.into()) / wi.dot(n.into()));
+                let dmudy = dwo_dotn_dy * (1.0 / eta + 1.0 / sqr(eta) * self.interaction.wo.dot(n.into()) / wi.dot(n.into()));
+
+                let rx_direction = wi - eta * dwodx + Vec3f::from(mu * dndx + dmudx * n);
+                let ry_direction = wi - eta * dwody + Vec3f::from(mu * dndy + dmudy * n);
+
+                Some(AuxiliaryRays {
+                    rx_origin,
+                    rx_direction,
+                    ry_origin,
+                    ry_direction,
+                })
+            } else {
+                None
+            };
+        }
+
+        if rd.aux.as_ref().is_some_and(|aux| {
+            aux.rx_direction.length_squared() > 1e16 || aux.ry_direction.length_squared() > 1e16
+            || aux.rx_origin.length_squared() > 1e16 || aux.ry_origin.length_squared() > 1e16
+        }) {
+            rd.aux = None;
+        }
+
+        rd
     }
 }
 
