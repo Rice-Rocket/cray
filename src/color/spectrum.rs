@@ -18,7 +18,7 @@ pub trait AbstractSpectrum {
     fn sample(&self, lambda: &SampledWavelengths) -> SampledSpectrum;
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Spectrum {
     Constant(ConstantSpectrum),
     DenselySampled(DenselySampledSpectrum),
@@ -115,7 +115,7 @@ impl AbstractSpectrum for Spectrum {
 }
 
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ConstantSpectrum {
     c: Float,
 }
@@ -217,6 +217,12 @@ impl DenselySampledSpectrum {
 
         DenselySampledSpectrum::new(dpls)
     }
+
+    pub fn scale(&mut self, s: Float) {
+        for v in &mut self.values {
+            *v *= s;
+        }
+    }
 }
 
 impl AbstractSpectrum for DenselySampledSpectrum {
@@ -250,7 +256,7 @@ impl AbstractSpectrum for DenselySampledSpectrum {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct PiecewiseLinearSpectrum {
     lambdas: Vec<Float>,
     values: Vec<Float>,
@@ -399,7 +405,7 @@ impl AbstractSpectrum for PiecewiseLinearSpectrum {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BlackbodySpectrum {
     t: Float,
     normalization_factor: Float,
@@ -448,7 +454,7 @@ impl AbstractSpectrum for BlackbodySpectrum {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RgbAlbedoSpectrum {
     rsp: RgbSigmoidPolynomial,
 }
@@ -482,7 +488,7 @@ impl AbstractSpectrum for RgbAlbedoSpectrum {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct RgbUnboundedSpectrum {
     scale: Float,
     rsp: RgbSigmoidPolynomial,
@@ -519,7 +525,7 @@ impl AbstractSpectrum for RgbUnboundedSpectrum {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RgbIlluminantSpectrum {
     scale: Float,
     rsp: RgbSigmoidPolynomial,
@@ -564,4 +570,18 @@ pub fn inner_product<T: AbstractSpectrum, U: AbstractSpectrum>(a: &T, b: &U) -> 
         integral += a.get(lambda as Float) * b.get(lambda as Float);
     }
     integral
+}
+
+
+pub fn spectrum_to_photometric(mut s: &Spectrum) -> Float {
+    if let Spectrum::RgbIlluminant(illum) = s {
+        s = illum.illuminant.as_ref();
+    }
+
+    let mut y = 0.0;
+    for lambda in (LAMBDA_MIN as i32)..=(LAMBDA_MAX as i32) {
+        y = y + Spectrum::get_cie(Cie::Y).get(lambda as Float) * s.get(lambda as Float);
+    }
+
+    y
 }

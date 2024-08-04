@@ -43,36 +43,36 @@ impl Sampler {
 impl AbstractSampler for Sampler {
     fn samples_per_pixel(&self) -> i32 {
         match self {
-            Sampler::Independent(s) => self.samples_per_pixel(),
-            Sampler::Stratified(s) => self.samples_per_pixel(),
+            Sampler::Independent(s) => s.samples_per_pixel(),
+            Sampler::Stratified(s) => s.samples_per_pixel(),
         }
     }
 
     fn start_pixel_sample(&mut self, p: Point2i, sample_index: i32, dimension: i32) {
        match self {
-           Sampler::Independent(s) => self.start_pixel_sample(p, sample_index, dimension),
-           Sampler::Stratified(s) => self.start_pixel_sample(p, sample_index, dimension),
+           Sampler::Independent(s) => s.start_pixel_sample(p, sample_index, dimension),
+           Sampler::Stratified(s) => s.start_pixel_sample(p, sample_index, dimension),
        }
     }
 
     fn get_1d(&mut self) -> Float {
         match self {
-            Sampler::Independent(s) => self.get_1d(),
-            Sampler::Stratified(s) => self.get_1d(),
+            Sampler::Independent(s) => s.get_1d(),
+            Sampler::Stratified(s) => s.get_1d(),
         }
     }
 
     fn get_2d(&mut self) -> Point2f {
         match self {
-            Sampler::Independent(s) => self.get_2d(),
-            Sampler::Stratified(s) => self.get_2d(),
+            Sampler::Independent(s) => s.get_2d(),
+            Sampler::Stratified(s) => s.get_2d(),
         }
     }
 
     fn get_pixel_2d(&mut self) -> Point2f {
         match self {
-            Sampler::Independent(s) => self.get_pixel_2d(),
-            Sampler::Stratified(s) => self.get_pixel_2d(),
+            Sampler::Independent(s) => s.get_pixel_2d(),
+            Sampler::Stratified(s) => s.get_pixel_2d(),
         }
     }
 }

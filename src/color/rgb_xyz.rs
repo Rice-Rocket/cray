@@ -301,7 +301,7 @@ impl IndexMut<usize> for Rgb {
 }
 
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq, Default, Clone, Copy)]
 pub struct RgbSigmoidPolynomial {
     c0: Float,
     c1: Float,

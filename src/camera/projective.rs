@@ -89,7 +89,7 @@ impl OrthographicCamera {
         parameters: &mut ParameterDictionary,
         camera_transform: CameraTransform,
         film: Arc<Film>,
-        medium: Option<Medium>,
+        medium: Option<Arc<Medium>>,
         options: &Options,
         loc: &FileLoc
     ) -> OrthographicCamera {
@@ -172,7 +172,7 @@ impl AbstractCamera for OrthographicCamera {
             p_camera,
             Vec3f::new(0.0, 0.0, 1.0),
             self.projective.camera_base.sample_time(sample.time),
-            self.projective.camera_base.medium,
+            self.projective.camera_base.medium.clone(),
         );
 
         if self.projective.lens_radius > 0.0 {
@@ -199,7 +199,7 @@ impl AbstractCamera for OrthographicCamera {
             p_camera,
             Vec3f::new(0.0, 0.0, 1.0),
             self.projective.camera_base.sample_time(sample.time),
-            self.projective.camera_base.medium,
+            self.projective.camera_base.medium.clone(),
         );
 
         let p_lens = if self.projective.lens_radius > 0.0 {
@@ -279,7 +279,7 @@ impl PerspectiveCamera {
         parameters: &mut ParameterDictionary,
         camera_transform: CameraTransform,
         film: Arc<Film>,
-        medium: Option<Medium>,
+        medium: Option<Arc<Medium>>,
         options: &Options,
         loc: &FileLoc
     ) -> PerspectiveCamera {
@@ -383,7 +383,7 @@ impl AbstractCamera for PerspectiveCamera {
             Point3f::ZERO,
             Vec3f::from(p_camera).normalize(),
             self.sample_time(sample.time),
-            self.projective.camera_base.medium,
+            self.projective.camera_base.medium.clone(),
         );
 
         if self.projective.lens_radius > 0.0 {
@@ -410,7 +410,7 @@ impl AbstractCamera for PerspectiveCamera {
             Point3f::ZERO,
             dir,
             self.sample_time(sample.time),
-            self.projective.camera_base.medium,
+            self.projective.camera_base.medium.clone(),
         );
 
         let p_lens = if self.projective.lens_radius > 0.0 {

@@ -354,7 +354,7 @@ impl AbstractPrimitive for BvhAggregate {
             if node.bounds.intersect_p_cached(ray.origin, ray.direction, t_max, inv_dir, dir_is_neg) {
                 if node.n_primitives > 0 {
                     for i in 0..node.n_primitives {
-                        let prim_si = self.primitives[node.primitive_offset + i as usize].as_ref().intersect(ray, t_max);
+                        let prim_si = self.primitives[node.primitive_offset + i as usize].as_ref().intersect(ray.clone(), t_max);
                         if let Some(prim_si) = prim_si {
                             t_max = prim_si.t_hit;
                             si = Some(prim_si);
@@ -411,7 +411,7 @@ impl AbstractPrimitive for BvhAggregate {
             if node.bounds.intersect_p_cached(ray.origin, ray.direction, t_max, inv_dir, dir_is_neg) {
                 if node.n_primitives > 0 {
                     for i in 0..node.n_primitives {
-                        if self.primitives[node.primitive_offset + i as usize].as_ref().intersect_predicate(ray, t_max) {
+                        if self.primitives[node.primitive_offset + i as usize].as_ref().intersect_predicate(ray.clone(), t_max) {
                             return true;
                         }
                     }

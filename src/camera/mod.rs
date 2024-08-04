@@ -31,7 +31,7 @@ impl Camera {
     pub fn create(
         name: &str,
         parameters: &mut ParameterDictionary,
-        medium: Option<Medium>,
+        medium: Option<Arc<Medium>>,
         camera_transform: CameraTransform,
         film: Arc<Film>,
         options: &Options,
@@ -189,7 +189,7 @@ pub struct CameraBase {
     shutter_open: Float,
     shutter_close: Float,
     film: Arc<Film>,
-    medium: Option<Medium>,
+    medium: Option<Arc<Medium>>,
     min_pos_differential_x: Vec3f,
     min_pos_differential_y: Vec3f,
     min_dir_differential_x: Vec3f,
@@ -371,14 +371,14 @@ pub struct CameraBaseParameters {
     pub shutter_open: Float,
     pub shutter_close: Float,
     pub film: Arc<Film>,
-    pub medium: Option<Medium>,
+    pub medium: Option<Arc<Medium>>,
 }
 
 impl CameraBaseParameters {
     pub fn new(
         camera_transform: CameraTransform,
         film: Arc<Film>,
-        medium: Option<Medium>,
+        medium: Option<Arc<Medium>>,
         parameters: &mut ParameterDictionary,
         loc: &FileLoc,
     ) -> CameraBaseParameters {

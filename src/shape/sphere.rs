@@ -232,7 +232,7 @@ impl AbstractShape for Sphere {
     }
 
     fn intersect(&self, ray: Ray, t_max: Float) -> Option<ShapeIntersection> {
-        let isect = self.basic_intersect(ray, t_max)?;
+        let isect = self.basic_intersect(ray.clone(), t_max)?;
         let intr = self.interaction_from_intersection(&isect, -ray.direction, ray.time);
         Some(ShapeIntersection {
             intr,
@@ -376,7 +376,7 @@ mod tests {
             360.0,
         );
         let ray = Ray::new(Point3f::new(0.0, -2.0, 0.0), Vec3f::new(0.0, 1.0, 0.0));
-        assert!(sphere.intersect_predicate(ray, Float::INFINITY));
+        assert!(sphere.intersect_predicate(ray.clone(), Float::INFINITY));
 
         let ray = Ray::new(ray.origin, -ray.direction);
         assert!(!sphere.intersect_predicate(ray, Float::INFINITY));

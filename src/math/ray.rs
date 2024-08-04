@@ -1,5 +1,7 @@
 // Pbrt 3.6 Rays
 
+use std::sync::Arc;
+
 use crate::{math::*, media::Medium};
 
 
@@ -8,12 +10,12 @@ pub trait AbstractRay {
 }
 
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Ray {
     pub origin: Point3f,
     pub direction: Vec3f,
     pub time: Float,
-    pub medium: Option<Medium>,
+    pub medium: Option<Arc<Medium>>,
 }
 
 impl Default for Ray {
@@ -31,7 +33,7 @@ impl Ray {
     }
 
     #[inline]
-    pub fn new_with_medium(origin: Point3f, direction: Vec3f, medium: Option<Medium>) -> Self {
+    pub fn new_with_medium(origin: Point3f, direction: Vec3f, medium: Option<Arc<Medium>>) -> Self {
         Self { origin, direction, time: 0.0, medium }
     }
 
@@ -43,7 +45,7 @@ impl Ray {
     }
 
     #[inline]
-    pub fn new_with_medium_time(origin: Point3f, direction: Vec3f, time: Float, medium: Option<Medium>) -> Self {
+    pub fn new_with_medium_time(origin: Point3f, direction: Vec3f, time: Float, medium: Option<Arc<Medium>>) -> Self {
         debug_assert!(direction.is_normalized());
         Self { origin, direction, time, medium }
     }

@@ -48,7 +48,7 @@ impl BSDF {
         sample_flags: BxDFReflTransFlags,
     ) -> Option<BSDFSample> {
         let wo = self.render_to_local(wo_render);
-        if wo.z == 0.0 || !((self.bxdf.flags().bits() & sample_flags.bits()) != 0) {
+        if wo.z == 0.0 || (self.bxdf.flags().bits() & sample_flags.bits()) == 0 {
             return None;
         }
 

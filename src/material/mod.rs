@@ -3,12 +3,12 @@ use std::{collections::HashMap, sync::Arc};
 use diffuse::DiffuseMaterial;
 use rand::{rngs::SmallRng, Rng};
 
-use crate::{bsdf::BSDF, bxdf::BxDF, color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, image::{Image, WrapMode, WrapMode2D}, interaction::SurfaceInteraction, reader::{paramdict::{NamedTextures, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractFloatTexture, AbstractSpectrumTexture, FloatTexture, SpectrumTexture, TextureEvalContext}, Float, Frame, Normal3f, Point2f, Point3f, Vec2f, Vec3f};
+use crate::{bsdf::BSDF, bxdf::{AbstractBxDF, BxDF}, color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, image::{Image, WrapMode, WrapMode2D}, interaction::SurfaceInteraction, reader::{paramdict::{NamedTextures, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractFloatTexture, AbstractSpectrumTexture, FloatTexture, SpectrumTexture, TextureEvalContext}, Float, Frame, Normal3f, Point2f, Point3f, Vec2f, Vec3f};
 
 pub mod diffuse;
 
 pub trait AbstractMaterial {
-    type ConcreteBxDF;
+    type ConcreteBxDF: AbstractBxDF;
 
     fn get_bxdf<T: AbstractTextureEvaluator>(
         &self,

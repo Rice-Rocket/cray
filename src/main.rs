@@ -21,6 +21,7 @@ pub mod light;
 pub mod sampler;
 pub mod bxdf;
 pub mod bsdf;
+pub mod phase;
 
 fn main() {
 

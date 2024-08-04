@@ -24,6 +24,7 @@ struct Vec2fParam;
 struct Point3fParam;
 struct Vec3fParam;
 struct Normal3fParam;
+struct RgbParam;
 struct SpectrumParam;
 struct StringParam;
 struct TextureParam;
@@ -157,6 +158,23 @@ impl ParameterType for Normal3fParam {
 
     fn convert(v: &[Self::ConvertType], _loc: &FileLoc) -> Self::ReturnType {
         Normal3f::new(v[0], v[1], v[2])
+    }
+
+    fn get_values(param: &ParsedParameter) -> &Vec<Self::ConvertType> {
+        &param.floats
+    }
+}
+
+impl ParameterType for RgbParam {
+    const TYPE_NAME: &'static str = "rgb";
+
+    const N_PER_ITEM: i32 = 3;
+
+    type ConvertType = Float;
+    type ReturnType = Rgb;
+
+    fn convert(v: &[Self::ConvertType], loc: &FileLoc) -> Self::ReturnType {
+        Rgb::new(v[0], v[1], v[2])
     }
 
     fn get_values(param: &ParsedParameter) -> &Vec<Self::ConvertType> {
@@ -504,6 +522,10 @@ impl ParameterDictionary {
         self.lookup_single::<Normal3fParam>(name, default_value)
     }
 
+    pub fn get_one_rgb(&mut self, name: &str, default_value: Rgb) -> Rgb {
+        self.lookup_single::<RgbParam>(name, default_value)
+    }
+
     pub fn get_one_string(&mut self, name: &str, default_value: &str) -> String {
         self.lookup_single::<StringParam>(name, default_value.to_owned())
     }
@@ -762,6 +784,10 @@ impl ParameterDictionary {
     pub fn get_normal3f_array(&mut self, name: &str) -> Vec<Normal3f> {
         self.lookup_array::<Normal3fParam>(name)
     }
+
+    pub fn get_rgb_array(&mut self, name: &str) -> Vec<Rgb> {
+        self.lookup_array::<RgbParam>(name)
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -813,6 +839,10 @@ impl TextureParameterDictionary {
         self.dict.get_one_normal3f(name, default_value)
     }
 
+    pub fn get_one_rgb(&mut self, name: &str, default_value: Rgb) -> Rgb {
+        self.dict.get_one_rgb(name, default_value)
+    }
+
     pub fn get_one_spectrum(
         &mut self,
         name: &str,
@@ -858,6 +888,10 @@ impl TextureParameterDictionary {
 
     pub fn get_normal3f_array(&mut self, name: &str) -> Vec<Normal3f> {
         self.dict.get_normal3f_array(name)
+    }
+
+    pub fn get_rgb_array(&mut self, name: &str) -> Vec<Rgb> {
+        self.dict.get_rgb_array(name)
     }
 
     pub fn get_spectrum_array(
@@ -1041,6 +1075,7 @@ mod sealed {
     impl Sealed for super::Point3fParam {}
     impl Sealed for super::Vec3fParam {}
     impl Sealed for super::Normal3fParam {}
+    impl Sealed for super::RgbParam {}
     impl Sealed for super::SpectrumParam {}
     impl Sealed for super::StringParam {}
     impl Sealed for super::TextureParam {}

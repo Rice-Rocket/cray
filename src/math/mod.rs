@@ -15,6 +15,7 @@ pub mod frame;
 pub mod sampling;
 pub mod tile;
 pub mod vec2d;
+pub mod scattering;
 
 pub use mat::{TMat2, TMat3, TMat4};
 pub use vect::{TVec2, TVec3, TVec4, TPoint2, TPoint3, TPoint4, TNormal2, TNormal3};
