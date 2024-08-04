@@ -580,7 +580,7 @@ pub fn spectrum_to_photometric(mut s: &Spectrum) -> Float {
 
     let mut y = 0.0;
     for lambda in (LAMBDA_MIN as i32)..=(LAMBDA_MAX as i32) {
-        y = y + Spectrum::get_cie(Cie::Y).get(lambda as Float) * s.get(lambda as Float);
+        y += Spectrum::get_cie(Cie::Y).get(lambda as Float) * s.get(lambda as Float);
     }
 
     y

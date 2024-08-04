@@ -142,7 +142,7 @@ impl Iterator for DDAMajorantIterator<'_> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MajorantGrid {
     pub bounds: Bounds3f,
     pub voxels: Vec<Float>,

@@ -15,8 +15,8 @@ impl AbstractPrimitive for SimplePrimitive {
     }
 
     fn intersect(&self, ray: Ray, t_max: Float) -> Option<ShapeIntersection> {
-        let mut si = self.shape.intersect(ray, t_max)?;
-        si.intr.set_intersection_properties(&self.material, &None);
+        let mut si = self.shape.intersect(ray.clone(), t_max)?;
+        si.intr.set_intersection_properties(&self.material, &None, &None, &ray.medium);
         Some(si)
     }
 

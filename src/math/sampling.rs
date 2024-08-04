@@ -146,7 +146,7 @@ impl PiecewiseConstant2D {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SampledGrid<T> {
     values: Vec<T>,
     n: Vec3i,

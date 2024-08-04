@@ -6,7 +6,7 @@ use crate::{color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric
 
 use super::{iterator::HomogeneousMajorantIterator, preset::get_medium_scattering_properties, AbstractMedium, MediumProperties, RayMajorantSegment};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct HomogeneousMedium {
     sigma_a_spec: DenselySampledSpectrum,
     sigma_s_spec: DenselySampledSpectrum,
@@ -23,7 +23,7 @@ impl HomogeneousMedium {
         let (mut sig_a, mut sig_s) = (None, None);
         let preset = parameters.get_one_string("preset", "");
 
-        if preset != "" {
+        if !preset.is_empty() {
             if let Some((sa, ss)) = get_medium_scattering_properties(&preset) {
                 sig_a = Some(sa);
                 sig_s = Some(ss);

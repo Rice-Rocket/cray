@@ -490,7 +490,9 @@ impl Mul<SurfaceInteraction> for Transform {
                 time: rhs.interaction.time,
                 wo: (t * rhs.interaction.wo).normalize(),
                 n,
-                uv: rhs.interaction.uv
+                uv: rhs.interaction.uv,
+                medium: rhs.interaction.medium,
+                medium_interface: rhs.interaction.medium_interface,
             },
             dpdu: t * rhs.dpdu,
             dpdv: t * rhs.dpdv,

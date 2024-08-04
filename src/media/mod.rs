@@ -23,7 +23,7 @@ pub trait AbstractMedium {
     fn sample_ray(self, ray: Ray, t_max: Float, lambda: &SampledWavelengths) -> Option<Self::MajorantIterator>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Medium {
     Homogeneous(HomogeneousMedium),
     Grid(GridMedium),
@@ -72,6 +72,22 @@ impl<'a> AbstractMedium for &'a Medium {
             Medium::Grid(m) => Some(RayMajorantIterator::DDA(m.sample_ray(ray, t_max, lambda)?)),
             Medium::RgbGrid(m) => Some(RayMajorantIterator::DDA(m.sample_ray(ray, t_max, lambda)?)),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MediumInterface {
+    pub inside: Medium,
+    pub outside: Medium,
+}
+
+impl MediumInterface {
+    pub fn new(inside: Medium, outside: Medium) -> MediumInterface {
+        MediumInterface { inside, outside }
+    }
+
+    pub fn is_transition(&self) -> bool {
+        self.inside != self.outside
     }
 }
 

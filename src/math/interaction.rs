@@ -4,20 +4,22 @@ use std::sync::Arc;
 
 use rand::rngs::SmallRng;
 
-use crate::{bsdf::BSDF, bxdf::{diffuse::DiffuseBxDF, BxDF, BxDFFlags}, camera::{AbstractCamera, Camera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, light::Light, material::{self, AbstractMaterial, Material, MaterialEvalContext, UniversalTextureEvaluator}, math::*, numeric::DifferenceOfProducts, options::Options, sampler::{AbstractSampler as _, Sampler}};
+use crate::{bsdf::BSDF, bxdf::{diffuse::DiffuseBxDF, BxDF, BxDFFlags}, camera::{AbstractCamera, Camera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, light::Light, material::{self, AbstractMaterial, Material, MaterialEvalContext, UniversalTextureEvaluator}, math::*, media::{Medium, MediumInterface}, numeric::DifferenceOfProducts, options::Options, phase::PhaseFunction, sampler::{AbstractSampler as _, Sampler}};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Interaction {
     pub pi: Point3fi,
     pub time: Float,
     pub wo: Vec3f,
     pub n: Normal3f,
     pub uv: Point2f,
+    pub medium: Option<Arc<Medium>>,
+    pub medium_interface: Option<Arc<MediumInterface>>,
 }
 
 impl Interaction {
     pub fn new(pi: Point3fi, n: Normal3f, uv: Point2f, wo: Vec3f, time: Float) -> Self {
-        Self { pi, time, wo, n, uv }
+        Self { pi, time, wo, n, uv, medium: None, medium_interface: None }
     }
 
     pub fn position(&self) -> Point3f {
@@ -150,9 +152,21 @@ impl SurfaceInteraction {
         self.interaction.position()
     }
 
-    pub fn set_intersection_properties(&mut self, material: &Arc<Material>, area_light: &Option<Arc<Light>>) {
+    pub fn set_intersection_properties(
+        &mut self,
+        material: &Arc<Material>,
+        area_light: &Option<Arc<Light>>,
+        prim_medium_interface: &Option<Arc<MediumInterface>>,
+        ray_medium: &Option<Arc<Medium>>,
+    ) {
         self.area_light.clone_from(area_light);
         self.material = Some(material.clone());
+
+        if prim_medium_interface.as_ref().is_some_and(|m| m.is_transition()) {
+            self.interaction.medium_interface.clone_from(prim_medium_interface);
+        } else {
+            self.interaction.medium.clone_from(ray_medium)
+        }
     }
 
     pub fn get_bsdf(
@@ -446,10 +460,7 @@ impl SurfaceInteraction {
     }
 }
 
-
-/* 
 pub struct MediumInteraction {
     pub interaction: Interaction,
     pub phase: PhaseFunction,
 }
-*/

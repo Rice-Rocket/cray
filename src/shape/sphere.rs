@@ -328,6 +328,8 @@ impl AbstractShape for Sphere {
                 wo: Vec3f::default(),
                 n,
                 uv,
+                medium: None,
+                medium_interface: None,
             },
             pdf: 1.0 / (TAU * one_minus_cos_theta_max),
         })

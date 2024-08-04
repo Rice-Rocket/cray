@@ -6,7 +6,7 @@ use crate::{color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric
 
 use super::{iterator::{DDAMajorantIterator, MajorantGrid}, AbstractMedium, MediumProperties};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GridMedium {
     bounds: Bounds3f,
     render_from_medium: Transform,
