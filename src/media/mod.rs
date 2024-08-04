@@ -1,8 +1,11 @@
+use std::{collections::HashMap, sync::Arc};
+
 use grid::GridMedium;
 use homogeneous::HomogeneousMedium;
 use iterator::{HomogeneousMajorantIterator, RayMajorantIterator};
+use rgb::RgbGridMedium;
 
-use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, phase::PhaseFunction, Float, Point3f, Ray};
+use crate::{color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, phase::PhaseFunction, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, Float, Point3f, Ray};
 
 pub mod iterator;
 pub mod homogeneous;
@@ -24,6 +27,24 @@ pub trait AbstractMedium {
 pub enum Medium {
     Homogeneous(HomogeneousMedium),
     Grid(GridMedium),
+    RgbGrid(RgbGridMedium),
+}
+
+impl Medium {
+    pub fn create(
+        name: &str,
+        parameters: &mut ParameterDictionary,
+        render_from_medium: Transform,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        loc: &FileLoc,
+    ) -> Medium {
+        match name {
+            "homogeneous" => Medium::Homogeneous(HomogeneousMedium::create(parameters, cached_spectra, loc)),
+            "uniformgrid" => Medium::Grid(GridMedium::create(parameters, render_from_medium, cached_spectra, loc)),
+            "rgbgrid" => Medium::RgbGrid(RgbGridMedium::create(parameters, render_from_medium, cached_spectra, loc)),
+            _ => panic!("{}: Unknown medium {}", loc, name),
+        }
+    }
 }
 
 impl<'a> AbstractMedium for &'a Medium {
@@ -33,6 +54,7 @@ impl<'a> AbstractMedium for &'a Medium {
         match self {
             Medium::Homogeneous(m) => m.is_emissive(),
             Medium::Grid(m) => m.is_emissive(),
+            Medium::RgbGrid(m) => m.is_emissive(),
         }
     }
 
@@ -40,6 +62,7 @@ impl<'a> AbstractMedium for &'a Medium {
         match self {
             Medium::Homogeneous(m) => m.sample_point(p, lambda),
             Medium::Grid(m) => m.sample_point(p, lambda),
+            Medium::RgbGrid(m) => m.sample_point(p, lambda),
         }
     }
 
@@ -47,6 +70,7 @@ impl<'a> AbstractMedium for &'a Medium {
         match self {
             Medium::Homogeneous(m) => Some(RayMajorantIterator::Homogeneous(m.sample_ray(ray, t_max, lambda)?)),
             Medium::Grid(m) => Some(RayMajorantIterator::DDA(m.sample_ray(ray, t_max, lambda)?)),
+            Medium::RgbGrid(m) => Some(RayMajorantIterator::DDA(m.sample_ray(ray, t_max, lambda)?)),
         }
     }
 }

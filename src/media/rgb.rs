@@ -6,6 +6,7 @@ use crate::{color::{sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIl
 
 use super::{iterator::{DDAMajorantIterator, MajorantGrid}, AbstractMedium, MediumProperties};
 
+#[derive(Debug, Clone)]
 pub struct RgbGridMedium {
     bounds: Bounds3f,
     render_from_medium: Transform,
