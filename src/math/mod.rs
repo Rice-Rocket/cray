@@ -109,6 +109,7 @@ pub fn sinc(x: Float) -> Float {
 }
 
 /// Get the bits of a floating point number.
+#[cfg(not(use_f64))]
 #[inline]
 pub fn float_to_bits(f: Float) -> FloatAsBits {
     let rui: FloatAsBits;
@@ -120,6 +121,7 @@ pub fn float_to_bits(f: Float) -> FloatAsBits {
 }
 
 /// Convert the bit representation of a float back into the value.
+#[cfg(not(use_f64))]
 #[inline]
 pub fn bits_to_float(ui: FloatAsBits) -> Float {
     let rf: Float;
@@ -344,14 +346,14 @@ pub mod safe {
     }
 }
 
-#[cfg(not(feature = "use_f64"))]
+#[cfg(not(use_f64))]
 pub type Float = f32;
-#[cfg(not(feature = "use_f64"))]
+#[cfg(not(use_f64))]
 pub type FloatAsBits = u32;
 
-#[cfg(feature = "use_f64")]
+#[cfg(use_f64)]
 pub type Float = f64;
-#[cfg(feature = "use_f64")]
+#[cfg(use_f64)]
 pub type FloatAsBits = u64;
 
 pub type Mat2 = TMat2<Float>;
@@ -402,8 +404,8 @@ mod tests {
 
     #[test]
     fn test_erf() {
-        assert!((erf(0.0)).abs() < f32::EPSILON);
-        assert!((erf(-0.5) + 0.5205).abs() < f32::EPSILON);
-        assert!((erf(0.5) - 0.5205).abs() < f32::EPSILON);
+        assert!((erf(0.0)).abs() < Float::EPSILON);
+        assert!((erf(-0.5) + 0.5205).abs() < Float::EPSILON);
+        assert!((erf(0.5) - 0.5205).abs() < Float::EPSILON);
     }
 }

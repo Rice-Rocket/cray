@@ -1,6 +1,6 @@
 use std::{mem::MaybeUninit, sync::{atomic::{AtomicUsize, Ordering}, Arc}};
 
-use crate::{bounds::Union, light::Light, material::Material, reader::paramdict::ParameterDictionary, shape::{AbstractShape, Shape, ShapeIntersection}, Bounds3f, Float, Point3f, Ray, Vec3f};
+use crate::{bounds::Union, light::Light, material::Material, reader::paramdict::ParameterDictionary, shape::{AbstractShape, Shape, ShapeIntersection}, Bounds3, Bounds3f, Float, Point3f, Ray, Vec3f};
 
 use super::{Primitive, AbstractPrimitive};
 
@@ -115,7 +115,7 @@ impl BvhAggregate {
 
         total_nodes.fetch_add(1, Ordering::SeqCst);
         
-        let bounds = bvh_primitives.iter().fold(Bounds3f::default(), |acc, p| -> crate::Bounds3<f32> {
+        let bounds = bvh_primitives.iter().fold(Bounds3f::default(), |acc, p| -> Bounds3<Float> {
             acc.union(p.bounds)
         });
 

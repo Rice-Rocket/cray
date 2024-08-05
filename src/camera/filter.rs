@@ -124,14 +124,14 @@ pub fn get_camera_sample<T: AbstractSampler>(
     let filter_sample = filter.sample(sampler.get_pixel_2d());
     if options.disable_pixel_jitter {
         CameraSample {
-            p_film: Point2f::new(p_pixel.x as f32, p_pixel.y as f32) + Point2f::new(0.5, 0.5),
+            p_film: Point2f::new(p_pixel.x as Float, p_pixel.y as Float) + Point2f::new(0.5, 0.5),
             p_lens: Point2f::new(0.5, 0.5),
             time: 0.5,
             filter_weight: 1.0,
         }
     } else {
         CameraSample {
-            p_film: Point2f::new(p_pixel.x as f32, p_pixel.y as f32) + Point2f::from(filter_sample.p) + Point2f::new(0.5, 0.5),
+            p_film: Point2f::new(p_pixel.x as Float, p_pixel.y as Float) + Point2f::from(filter_sample.p) + Point2f::new(0.5, 0.5),
             p_lens: sampler.get_2d(),
             time: sampler.get_1d(),
             filter_weight: filter_sample.weight,

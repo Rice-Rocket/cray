@@ -402,8 +402,8 @@ impl FilmBase {
         let radius = self.filter.radius();
         let min = self.pixel_bounds.min;
         let max = self.pixel_bounds.max;
-        let min = Point2f::new(min.x as f32, min.y as f32);
-        let max = Point2f::new(max.x as f32, max.y as f32);
+        let min = Point2f::new(min.x as Float, min.y as Float);
+        let max = Point2f::new(max.x as Float, max.y as Float);
 
         Bounds2f::new(min - radius + Vec2f::new(0.5, 0.5), max + radius - Vec2f::new(0.5, 0.5))
     }
@@ -544,7 +544,7 @@ impl AbstractFilm for RgbFilm {
             for y in splat_bounds.min.y..splat_bounds.max.y {
                 let pi = Point2i::new(x, y);
                 let wt = self.base.filter.evaluate(Point2f::from(
-                    p - Point2f::new(pi.x as f32, pi.y as f32) - Vec2f::new(0.5, 0.5)
+                    p - Point2f::new(pi.x as Float, pi.y as Float) - Vec2f::new(0.5, 0.5)
                 ));
 
                 if wt != 0.0 {

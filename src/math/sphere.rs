@@ -261,7 +261,7 @@ impl OctahedralVec3 {
 
     /// Converts this [`OctahedralVec3`] back into a normalized Vec3.
     pub fn to_vec3(self) -> Vec3f {
-        let mut v = Vec3f::new(-1.0 + 2.0 * (self.x as f32 / 65535.0), -1.0 + 2.0 * (self.y as f32 / 65535.0), 0.0);
+        let mut v = Vec3f::new(-1.0 + 2.0 * (self.x as Float / 65535.0), -1.0 + 2.0 * (self.y as Float / 65535.0), 0.0);
         v.z = 1.0 - (v.x.abs() + v.y.abs());
 
         if v.z < 0.0 {

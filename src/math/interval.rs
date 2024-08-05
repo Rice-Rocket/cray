@@ -300,7 +300,7 @@ impl HasNan for Interval {
 
 impl NumericFloat for Interval {
     const EPSILON: Self = Interval::from_val(Float::EPSILON);
-    const BIG_EPSILON: Self = Interval::from_val(2e-4f32);
+    const BIG_EPSILON: Self = Interval::from_val(2e-4 as Float);
     const HALF: Self = Interval::from_val(0.5);
 
     fn nsqrt(self) -> Interval {

@@ -415,10 +415,23 @@ impl Image {
                     let count = self.n_channels() * (extent.max.x - extent.min.x) as usize;
                     for y in extent.min.y..extent.max.y {
                         let offset = self.pixel_offset(Point2i::new(extent.min.x, y));
-                        self.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.from_linear(
-                            &buf[buf_offset..buf_offset + count],
-                            &mut self.data.as_u8_mut()[offset..offset + count]
-                        );
+                        #[cfg(use_f64)]
+                        {
+                            for i in 0..count {
+                                self.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.from_linear(
+                                    &buf[buf_offset..buf_offset + 1],
+                                    &mut self.data.as_u8_mut()[offset + i..offset + i + 1],
+                                );
+                                buf_offset += 1;
+                            }
+                        }
+                        #[cfg(not(use_f64))]
+                        {
+                            self.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.from_linear(
+                                &buf[buf_offset..buf_offset + count],
+                                &mut self.data.as_u8_mut()[offset..offset + count]
+                            );
+                        }
                         buf_offset += count;
                     }
                 } else {
@@ -456,11 +469,24 @@ impl Image {
                     let count = self.n_channels() * (extent.max.x - extent.min.x) as usize;
                     for y in extent.min.y..extent.max.y {
                         let offset = self.pixel_offset(Point2i::new(extent.min.x, y));
-                        self.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.to_linear(
-                            &self.data.as_u8()[offset..offset + count],
-                            &mut buf[buf_offset..buf_offset + count],
-                        );
-                        buf_offset += count;
+                        #[cfg(use_f64)]
+                        {
+                            for i in 0..count {
+                                self.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.to_linear(
+                                    &self.data.as_u8()[offset + i..offset + i + 1],
+                                    &mut buf[buf_offset..buf_offset + 1],
+                                );
+                                buf_offset += 1;
+                            }
+                        }
+                        #[cfg(not(use_f64))]
+                        {
+                            self.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.to_linear(
+                                &self.data.as_u8()[offset..offset + count],
+                                &mut buf[buf_offset..buf_offset + count],
+                                );
+                            buf_offset += count;
+                        }
                     }
                 } else {
                     self.for_extent(extent, wrap_mode, |image, offset: usize| {

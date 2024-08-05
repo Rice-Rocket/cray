@@ -1,6 +1,8 @@
 use once_cell::sync::Lazy;
 use rgb2spec::RGB2Spec;
 
+use crate::Float;
+
 use super::rgb_xyz::Rgb;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -13,7 +15,7 @@ pub enum Gamut {
     Rec2020,
 }
 
-pub fn get_rgb_to_spec(gamut: &Gamut, rgb: &Rgb) -> [f32; 3] {
+pub fn get_rgb_to_spec(gamut: &Gamut, rgb: &Rgb) -> [Float; 3] {
     match gamut {
         Gamut::SRgb => Lazy::force(&SRGB_RGB2SPEC).fetch(<[f32; 3]>::from(rgb)),
         Gamut::Xyz => Lazy::force(&XYZ_RGB2SPEC).fetch(<[f32; 3]>::from(rgb)),

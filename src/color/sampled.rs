@@ -28,7 +28,7 @@ impl SampledSpectrum {
     }
 
     pub fn is_zero(&self) -> bool {
-        self.values.iter().all(|x: &Float| *x == f32::ZERO)
+        self.values.iter().all(|x: &Float| *x == Float::ZERO)
     }
 
     pub fn safe_div(&self, other: &SampledSpectrum) -> SampledSpectrum {

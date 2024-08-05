@@ -471,9 +471,9 @@ mod tests {
 
     #[test]
     fn rotate_axis() {
-        let theta = 1.214f32;
+        let theta = 1.214 as Float;
         let m = Mat4::from_rotation_x(theta.sin(), theta.cos());
-        let gm = glam::Mat4::from_rotation_x(theta);
+        let gm = glam::Mat4::from_rotation_x(theta as f32);
 
         let p = Point4f::new(0.0, 1.0, 0.0, 1.0);
         let gp = glam::Vec4::new(0.0, 1.0, 0.0, 1.0);
@@ -481,11 +481,11 @@ mod tests {
         let p1 = (m * p).xyz();
         let gp1 = (gm * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()));
+        assert_abs_diff_eq!(p1, Point3f::new(gp1.x as Float, gp1.y as Float, gp1.z as Float));
 
-        let theta = 2.3542f32;
+        let theta = 2.3542 as Float;
         let m = Mat4::from_rotation_y(theta.sin(), theta.cos());
-        let gm = glam::Mat4::from_rotation_y(theta);
+        let gm = glam::Mat4::from_rotation_y(theta as f32);
 
         let p = Point4f::new(0.3, 7.1, 3.4, 1.0);
         let gp = glam::Vec4::new(0.3, 7.1, 3.4, 1.0);
@@ -493,11 +493,11 @@ mod tests {
         let p1 = (m * p).xyz();
         let gp1 = (gm * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()));
+        assert_abs_diff_eq!(p1, Point3f::new(gp1.x as Float, gp1.y as Float, gp1.z as Float));
 
-        let theta = 0.761f32;
+        let theta = 0.761 as Float;
         let m = Mat4::from_rotation_x(theta.sin(), theta.cos());
-        let gm = glam::Mat4::from_rotation_x(theta);
+        let gm = glam::Mat4::from_rotation_x(theta as f32);
 
         let p = Point4f::new(0.146, 3.0135, 7.0541, 1.0);
         let gp = glam::Vec4::new(0.146, 3.0135, 7.0541, 1.0);
@@ -505,15 +505,15 @@ mod tests {
         let p1 = (m * p).xyz();
         let gp1 = (gm * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()));
+        assert_abs_diff_eq!(p1, Point3f::new(gp1.x as Float, gp1.y as Float, gp1.z as Float));
     }
 
     #[test]
     fn rotate() {
-        let theta = 1.431f32;
+        let theta = 1.431 as Float;
 
         let m = Mat4::from_rotation(theta.sin(), theta.cos(), Vec3f::new(3.0, 1.0, 2.0).normalize());
-        let gm = glam::Mat4::from_axis_angle(glam::Vec3::new(3.0, 1.0, 2.0).normalize(), theta);
+        let gm = glam::Mat4::from_axis_angle(glam::Vec3::new(3.0, 1.0, 2.0).normalize(), theta as f32);
 
         let p = Point4f::new(0.413, 4.21, 3.73, 1.0);
         let gp = glam::Vec4::new(0.413, 4.21, 3.73, 1.0);
@@ -521,7 +521,7 @@ mod tests {
         let p1 = (m * p).xyz();
         let gp1 = (gm * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()))
+        assert_abs_diff_eq!(p1, Point3f::new(gp1.x as Float, gp1.y as Float, gp1.z as Float))
     }
 
     #[test]
@@ -535,21 +535,21 @@ mod tests {
         let p1 = (m * p).xyz();
         let gp1 = (gm * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()))
+        assert_abs_diff_eq!(p1, Point3f::new(gp1.x as Float, gp1.y as Float, gp1.z as Float))
     }
 
     #[test]
     fn concat() {
-        let theta = 0.712f32;
+        let theta = 0.712 as Float;
         let mut m = Mat4::from_rotation(theta.sin(), theta.cos(), Vec3f::new(4.0, 2.0, 5.0).normalize());
-        let mut gm = glam::Mat4::from_axis_angle(glam::Vec3::new(4.0, 2.0, 5.0).normalize(), theta);
+        let mut gm = glam::Mat4::from_axis_angle(glam::Vec3::new(4.0, 2.0, 5.0).normalize(), theta as f32);
 
         m = m * Mat4::from_translation(Point3f::new(3.02, 2.43, 0.42));
         gm = gm.mul_mat4(&glam::Mat4::from_translation(glam::Vec3::new(3.02, 2.43, 0.42)));
 
-        let theta = -1.245f32;
+        let theta = -1.245 as Float;
         m = m * Mat4::from_rotation(theta.sin(), theta.cos(), Vec3f::new(-2.0, -3.0, 4.0).normalize());
-        gm = gm.mul_mat4(&glam::Mat4::from_axis_angle(glam::Vec3::new(-2.0, -3.0, 4.0).normalize(), theta));
+        gm = gm.mul_mat4(&glam::Mat4::from_axis_angle(glam::Vec3::new(-2.0, -3.0, 4.0).normalize(), theta as f32));
 
         m = m * Mat4::from_scale(Vec3f::new(1.43, 0.53, 2.34));
         gm = gm.mul_mat4(&glam::Mat4::from_scale(glam::Vec3::new(1.43, 0.53, 2.34)));
@@ -560,7 +560,7 @@ mod tests {
         let p1 = (m * p).xyz();
         let gp1 = (gm * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()), epsilon = 2e-6f32);
+        assert_abs_diff_eq!(p1, Point3f::new(gp1.x as Float, gp1.y as Float, gp1.z as Float), epsilon = 2e-6 as Float);
     }
 
     #[test]
@@ -571,11 +571,11 @@ mod tests {
 
     #[test]
     fn inverse() {
-        let theta = -0.834f32;
+        let theta = -0.834 as Float;
         let m = Mat4::from_rotation(theta.sin(), theta.cos(), Vec3f::new(2.0, 5.0, 7.0).normalize())
             * Mat4::from_translation(Point3f::new(0.9, 0.3, 0.6))
             * Mat4::from_scale(Vec3f::new(0.8, 1.2, 2.3));
-        let gm = glam::Mat4::from_axis_angle(glam::Vec3::new(2.0, 5.0, 7.0).normalize(), theta)
+        let gm = glam::Mat4::from_axis_angle(glam::Vec3::new(2.0, 5.0, 7.0).normalize(), theta as f32)
             * glam::Mat4::from_translation(glam::Vec3::new(0.9, 0.3, 0.6))
             * glam::Mat4::from_scale(glam::Vec3::new(0.8, 1.2, 2.3));
         
@@ -585,7 +585,7 @@ mod tests {
         let p1 = (m.inverse() * p).xyz();
         let gp1 = (gm.inverse() * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3f::from(gp1.to_array()));
+        assert_abs_diff_eq!(p1, Point3f::new(gp1.x as Float, gp1.y as Float, gp1.z as Float));
     }
 
     #[test]
