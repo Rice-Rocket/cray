@@ -14,13 +14,13 @@ impl AbstractPrimitive for SimplePrimitive {
         self.shape.bounds()
     }
 
-    fn intersect(&self, ray: Ray, t_max: Float) -> Option<ShapeIntersection> {
-        let mut si = self.shape.intersect(ray.clone(), t_max)?;
+    fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection> {
+        let mut si = self.shape.intersect(ray, t_max)?;
         si.intr.set_intersection_properties(&self.material, &None, &None, &ray.medium);
         Some(si)
     }
 
-    fn intersect_predicate(&self, ray: Ray, t_max: Float) -> bool {
+    fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
         self.shape.intersect_predicate(ray, t_max)
     }
 }

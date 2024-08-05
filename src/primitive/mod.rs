@@ -16,10 +16,10 @@ pub trait AbstractPrimitive {
 
     /// Intersects a ray with the primitive, returning [`None`] if there was no intersection. 
     /// Otherwise, returns a [`ShapeIntersection`] with information about the intersection.
-    fn intersect(&self, ray: Ray, t_max: Float) -> Option<ShapeIntersection>;
+    fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection>;
 
     /// Determines *if* the ray would intersect with the primitive.
-    fn intersect_predicate(&self, ray: Ray, t_max: Float) -> bool;
+    fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool;
 }
 
 pub enum Primitive {
@@ -39,7 +39,7 @@ impl AbstractPrimitive for Primitive {
         }
     }
 
-    fn intersect(&self, ray: Ray, t_max: Float) -> Option<ShapeIntersection> {
+    fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection> {
         match self {
             Primitive::Simple(p) => p.intersect(ray, t_max),
             Primitive::Transformed(p) => p.intersect(ray, t_max),
@@ -48,7 +48,7 @@ impl AbstractPrimitive for Primitive {
         }
     }
 
-    fn intersect_predicate(&self, ray: Ray, t_max: Float) -> bool {
+    fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
         match self {
             Primitive::Simple(p) => p.intersect_predicate(ray, t_max),
             Primitive::Transformed(p) => p.intersect_predicate(ray, t_max),

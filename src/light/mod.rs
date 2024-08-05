@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use point::PointLight;
 
-use crate::{camera::CameraTransform, color::{sampled::SampledSpectrum, spectrum::{DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, interaction::{Interaction, SurfaceInteraction}, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
+use crate::{bounds::Union, camera::CameraTransform, color::{sampled::SampledSpectrum, spectrum::{DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, interaction::{Interaction, SurfaceInteraction}, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
 
 pub mod point;
 
@@ -308,7 +308,7 @@ impl LightBounds {
         let cos_theta_e = self.cos_theta_e.min(other.cos_theta_e);
 
         LightBounds {
-            bounds: self.bounds.union_box(other.bounds),
+            bounds: self.bounds.union(other.bounds),
             phi: self.phi + other.phi,
             w: cone.w,
             cos_theta_o,

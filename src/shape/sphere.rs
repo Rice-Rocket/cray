@@ -1,4 +1,4 @@
-use crate::{gamma, interaction::{Interaction, SurfaceInteraction}, numeric::DifferenceOfProducts as _, reader::{paramdict::ParameterDictionary, target::FileLoc}, safe, sampling::sample_uniform_sphere, spherical_direction, sqr, to_radians, transform::Transform, Bounds3f, DirectionCone, Float, Frame, Interval, Normal3f, NumericFloat, Point2f, Point3f, Point3fi, Ray, Vec3f, Vec3fi, PI, TAU};
+use crate::{gamma, interaction::{Interaction, SurfaceInteraction}, numeric::DifferenceOfProducts as _, reader::{paramdict::ParameterDictionary, target::FileLoc}, safe, sampling::sample_uniform_sphere, spherical_direction, sqr, to_radians, transform::{ApplyTransform, Transform}, Bounds3f, DirectionCone, Dot, Float, Frame, Interval, Normal3f, NumericFloat, Point2f, Point3f, Point3fi, Ray, Vec3f, Vec3fi, PI, TAU};
 
 use super::{QuadricIntersection, ShapeIntersection, AbstractShape, ShapeSample, ShapeSampleContext};
 
@@ -65,9 +65,9 @@ impl Sphere {
 }
 
 impl Sphere {
-    pub fn basic_intersect(&self, ray: Ray, t_max: Float) -> Option<QuadricIntersection> {
-        let oi = self.object_from_render * Point3fi::from(ray.origin);
-        let di = self.object_from_render * Vec3fi::from(ray.direction);
+    pub fn basic_intersect(&self, ray: &Ray, t_max: Float) -> Option<QuadricIntersection> {
+        let oi = self.object_from_render.apply(Point3fi::from(ray.origin));
+        let di = self.object_from_render.apply(Vec3fi::from(ray.direction));
 
         let a = di.x.sqr() + di.y.sqr() + di.z.sqr();
         let b = 2.0 * (di.x * oi.x + di.y * oi.y + di.z * oi.z);
@@ -201,7 +201,7 @@ impl Sphere {
         let p_error = gamma(5) * Vec3f::from(p_hit).abs();
 
         let flip_normal = self.reverse_orientation ^ self.transform_swaps_handedness;
-        let wo_object = self.object_from_render * wo;
+        let wo_object = self.object_from_render.apply(wo);
 
         let si = SurfaceInteraction::new(
             Point3fi::from_errors(p_hit, p_error.into()),
@@ -215,24 +215,24 @@ impl Sphere {
             flip_normal,
         );
 
-        self.render_from_object * si
+        self.render_from_object.apply(si)
     }
 }
 
 impl AbstractShape for Sphere {
     fn bounds(&self) -> Bounds3f {
-        self.render_from_object * Bounds3f::new(
+        self.render_from_object.apply(Bounds3f::new(
             Point3f::new(-self.radius, -self.radius, self.z_min),
             Point3f::new(self.radius, self.radius, self.z_max),
-        )
+        ))
     }
 
     fn normal_bounds(&self) -> DirectionCone {
         DirectionCone::entire_sphere()
     }
 
-    fn intersect(&self, ray: Ray, t_max: Float) -> Option<ShapeIntersection> {
-        let isect = self.basic_intersect(ray.clone(), t_max)?;
+    fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection> {
+        let isect = self.basic_intersect(ray, t_max)?;
         let intr = self.interaction_from_intersection(&isect, -ray.direction, ray.time);
         Some(ShapeIntersection {
             intr,
@@ -240,7 +240,7 @@ impl AbstractShape for Sphere {
         })
     }
 
-    fn intersect_predicate(&self, ray: Ray, t_max: Float) -> bool {
+    fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
         self.basic_intersect(ray, t_max).is_some()
     }
 
@@ -254,14 +254,14 @@ impl AbstractShape for Sphere {
         let p_obj_err = gamma(5) * Vec3f::from(p_obj).abs();
 
         let n_obj = Normal3f::from(p_obj);
-        let n = (self.render_from_object * n_obj).normalize() * if self.reverse_orientation { -1.0 } else { 1.0 };
+        let n = (self.render_from_object.apply(n_obj)).normalize() * if self.reverse_orientation { -1.0 } else { 1.0 };
 
         let theta = safe::acos(p_obj.z / self.radius);
         let mut phi = Float::atan2(p_obj.y, p_obj.x);
         if phi < 0.0 { phi += TAU };
         let uv = Point2f::new(phi / self.phi_max, (theta - self.theta_z_min) / (self.theta_z_max - self.theta_z_min));
 
-        let pi = self.render_from_object * Point3fi::from_errors(p_obj, p_obj_err.into());
+        let pi = self.render_from_object.apply(Point3fi::from_errors(p_obj, p_obj_err.into()));
 
         Some(ShapeSample {
             intr: Interaction::new(pi, n, uv, Vec3f::default(), 0.0),
@@ -274,7 +274,7 @@ impl AbstractShape for Sphere {
     }
 
     fn sample_with_context(&self, ctx: &ShapeSampleContext, u: Point2f) -> Option<ShapeSample> {
-        let p_center = self.render_from_object * Point3f::ZERO;
+        let p_center = self.render_from_object.apply(Point3f::ZERO);
         let p_origin = ctx.offset_ray_origin_pt(p_center);
 
         if p_origin.distance_squared(p_center) <= sqr(self.radius) {
@@ -314,7 +314,7 @@ impl AbstractShape for Sphere {
 
         let p_err = gamma(5) * Vec3f::from(p).abs();
 
-        let p_obj = self.object_from_render * p;
+        let p_obj = self.object_from_render.apply(p);
         let theta = safe::acos(p_obj.z / self.radius);
         let mut sphere_phi = Float::atan2(p_obj.y, p_obj.x);
         if sphere_phi < 0.0 { sphere_phi += TAU };
@@ -336,11 +336,11 @@ impl AbstractShape for Sphere {
     }
 
     fn pdf_with_context(&self, ctx: &ShapeSampleContext, wi: Vec3f) -> Float {
-        let p_center = self.render_from_object * Point3f::ZERO;
+        let p_center = self.render_from_object.apply(Point3f::ZERO);
         let p_origin = ctx.offset_ray_origin(p_center.into());
         if p_origin.distance_squared(p_center) <= sqr(self.radius) {
             let ray = ctx.spawn_ray(wi);
-            let Some(isect) = self.intersect(ray, Float::INFINITY) else { return 0.0 };
+            let Some(isect) = self.intersect(&ray, Float::INFINITY) else { return 0.0 };
 
             let pdf = (1.0 / self.area()) / isect.intr.interaction.n.dot(-Normal3f::from(wi)).abs() 
                 / ctx.p().distance_squared(isect.intr.position());
@@ -378,15 +378,15 @@ mod tests {
             360.0,
         );
         let ray = Ray::new(Point3f::new(0.0, -2.0, 0.0), Vec3f::new(0.0, 1.0, 0.0));
-        assert!(sphere.intersect_predicate(ray.clone(), Float::INFINITY));
+        assert!(sphere.intersect_predicate(&ray, Float::INFINITY));
 
         let ray = Ray::new(ray.origin, -ray.direction);
-        assert!(!sphere.intersect_predicate(ray, Float::INFINITY));
+        assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
 
         let ray = Ray::new(Point3f::new(0.0, 0.0, 0.5001), Vec3f::new(0.0, 1.0, 0.0));
-        assert!(!sphere.intersect_predicate(ray, Float::INFINITY));
+        assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
 
         let ray = Ray::new(Point3f::new(0.0, 0.0, -0.5001), Vec3f::new(0.0, 1.0, 0.0));
-        assert!(!sphere.intersect_predicate(ray, Float::INFINITY));
+        assert!(!sphere.intersect_predicate(&ray, Float::INFINITY));
     }
 }

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{color::{colorspace::RgbColorSpace, sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, interaction::Interaction, media::{Medium, MediumInterface}, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, transform::Transform, Bounds3f, Float, Normal3f, Point2f, Point3f, Ray, Vec3f, PI};
+use crate::{color::{colorspace::RgbColorSpace, sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, interaction::Interaction, media::{Medium, MediumInterface}, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, transform::{ApplyTransform, Transform}, Bounds3f, Float, Normal3f, Point2f, Point3f, Ray, Vec3f, PI};
 
 use super::{AbstractLight, LightBase, LightBounds, LightLiSample, LightSampleContext, LightType};
 
@@ -52,7 +52,7 @@ impl PointLight {
 
         let from = parameters.get_one_point3f("from", Point3f::ZERO);
         let tf = Transform::from_translation(from);
-        let final_render_from_light = render_from_light * tf;
+        let final_render_from_light = render_from_light.apply(tf);
 
         PointLight::new(final_render_from_light, medium, i, sc)
     }
@@ -74,7 +74,7 @@ impl AbstractLight for PointLight {
         lambda: &SampledWavelengths,
         allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample> {
-        let p = self.base.render_from_light * Point3f::ZERO;
+        let p = self.base.render_from_light.apply(Point3f::ZERO);
         let wi = (p - ctx.p()).normalize();
         let li = self.scale * self.i.sample(lambda) / p.distance_squared(ctx.p());
 
@@ -114,7 +114,7 @@ impl AbstractLight for PointLight {
     }
 
     fn bounds(&self) -> Option<LightBounds> {
-        let p = self.base.render_from_light * Point3f::ZERO;
+        let p = self.base.render_from_light.apply(Point3f::ZERO);
         let phi = 4.0 * PI * self.scale * self.i.max_value();
 
         Some(LightBounds::new_with_phi(

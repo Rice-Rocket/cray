@@ -2,6 +2,7 @@
 
 use std::ops::Mul;
 
+use bounds::Union;
 use interaction::{Interaction, SurfaceInteraction, SurfaceInteractionShading};
 
 use crate::math::*;
@@ -165,9 +166,9 @@ impl Transform {
 
     #[inline]
     pub fn has_scale(self, epsilon: Float) -> bool {
-        let la2 = (self * Point3f::new(1.0, 0.0, 0.0)).length_squared();
-        let lb2 = (self * Point3f::new(0.0, 1.0, 0.0)).length_squared();
-        let lc2 = (self * Point3f::new(0.0, 0.0, 1.0)).length_squared();
+        let la2 = (self.apply(Point3f::new(1.0, 0.0, 0.0))).length_squared();
+        let lb2 = (self.apply(Point3f::new(0.0, 1.0, 0.0))).length_squared();
+        let lc2 = (self.apply(Point3f::new(0.0, 0.0, 1.0))).length_squared();
         (la2 - 1.0).abs() > epsilon || (lb2 - 1.0).abs() > epsilon || (lc2 - 1.0).abs() > epsilon
     }
 
@@ -184,7 +185,7 @@ impl Transform {
     #[inline]
     pub fn orthographic(z_near: Float, z_far: Float) -> Transform {
         Transform::from_scale(Vec3f::new(1.0, 1.0, 1.0 / (z_far - z_near)))
-            * Transform::from_translation(Point3f::new(0.0, 0.0, -z_near))
+            .apply(Transform::from_translation(Point3f::new(0.0, 0.0, -z_near)))
     }
 
     #[inline]
@@ -197,95 +198,51 @@ impl Transform {
         );
 
         let inv_tan_ang = 1.0 / Float::tan(to_radians(fov) / 2.0);
-        Transform::from_scale(Vec3f::new(inv_tan_ang, inv_tan_ang, 1.0)) * Transform::new_with_inverse(per)
-    }
-
-    pub fn mul_ray(self, ray: Ray, t_max: Option<&mut Float>) -> Ray {
-        let mut o = self * Point3fi::from(ray.origin);
-        let d = self * ray.direction;
-        
-        let length_sqr = d.length_squared();
-        let o = if length_sqr > 0.0 {
-            let o_error = Vec3f::new(
-                o.x.width() / 2.0,
-                o.y.width() / 2.0,
-                o.z.width() / 2.0,
-            );
-
-            let dt = d.abs().dot(o_error) / length_sqr;
-            if let Some(t_max) = t_max {
-                *t_max -= dt;
-            }
-
-            o + Point3fi::from(Point3f::from(d * dt))
-        } else {
-            o
-        };
-
-        Ray::new_with_medium_time(o.into(), d, ray.time, ray.medium)
-    }
-
-    pub fn mul_ray_differential(self, rd: RayDifferential, t_max: Option<&mut Float>) -> RayDifferential {
-        let tr = self.inverse().mul_ray(rd.ray, t_max);
-        let aux = if let Some(aux) = rd.aux {
-            let rx_origin = self.inverse() * aux.rx_origin;
-            let rx_direction = self.inverse() * aux.rx_direction;
-            let ry_origin = self.inverse() * aux.ry_origin;
-            let ry_direction = self.inverse() * aux.ry_direction;
-
-            Some(AuxiliaryRays::new(
-                rx_origin,
-                rx_direction,
-                ry_origin,
-                ry_direction,
-            ))
-        } else {
-            None
-        };
-
-        RayDifferential { ray: tr, aux }
+        Transform::from_scale(Vec3f::new(inv_tan_ang, inv_tan_ang, 1.0)).apply(Transform::new_with_inverse(per))
     }
 }
 
-impl Mul<Vec3f> for Transform {
-    type Output = Vec3f;
+pub trait ApplyTransform<T> {
+    fn apply(&self, rhs: T) -> T;
+}
 
-    #[inline]
-    fn mul(self, rhs: Vec3f) -> Self::Output {
-        Vec3f::new(
-            self.m[(0, 0)] * rhs.x + self.m[(0, 1)] * rhs.y + self.m[(0, 2)] * rhs.z,
-            self.m[(1, 0)] * rhs.x + self.m[(1, 1)] * rhs.y + self.m[(1, 2)] * rhs.z,
-            self.m[(2, 0)] * rhs.x + self.m[(2, 1)] * rhs.y + self.m[(2, 2)] * rhs.z,
-        )
+pub trait ApplyRayTransform<T> {
+    fn apply_ray(&self, ray: &T, t_max: Option<&mut Float>) -> T;
+}
+
+pub trait ApplyInverseTransform<T> {
+    fn apply_inverse(&self, rhs: T) -> T;
+}
+
+pub trait ApplyRayInverseTransform<T> {
+    fn apply_ray_inverse(&self, ray: &T, t_max: Option<&mut Float>) -> T;
+}
+
+impl ApplyTransform<Point3f> for Transform {
+    fn apply(&self, rhs: Point3f) -> Point3f {
+        apply_point(&self.m, &rhs)
     }
 }
 
-impl Mul<Point3f> for Transform {
-    type Output = Point3f;
-
-    #[inline]
-    fn mul(self, rhs: Point3f) -> Self::Output {
-        let p = self.m * Point4f::new(rhs.x, rhs.y, rhs.z, 1.0);
-        p.xyz() / p.w
+impl ApplyTransform<Vec3f> for Transform {
+    fn apply(&self, rhs: Vec3f) -> Vec3f {
+        apply_vector(&self.m, &rhs)
     }
 }
 
-impl Mul<Point4f> for Transform {
-    type Output = Point4f;
-
-    fn mul(self, rhs: Point4f) -> Self::Output {
-        self.m * rhs
+impl ApplyTransform<Normal3f> for Transform {
+    fn apply(&self, rhs: Normal3f) -> Normal3f {
+        // Normals are transformed by the inverse
+        apply_normal(&self.m_inv, &rhs)
     }
 }
 
-impl Mul<Point3fi> for Transform {
-    type Output = Point3fi;
-
-    fn mul(self, rhs: Point3fi) -> Self::Output {
+impl ApplyTransform<Point3fi> for Transform {
+    fn apply(&self, rhs: Point3fi) -> Point3fi {
         let x: Float = rhs.x.into();
         let y: Float = rhs.y.into();
         let z: Float = rhs.z.into();
-        // Compute transformed coordinates
+
         let xp: Float = (self.m[(0, 0)] * x + self.m[(0, 1)] * y)
             + (self.m[(0, 2)] * z + self.m[(0, 3)]);
         let yp: Float = (self.m[(1, 0)] * x + self.m[(1, 1)] * y)
@@ -295,9 +252,7 @@ impl Mul<Point3fi> for Transform {
         let wp: Float = (self.m[(3, 0)] * x + self.m[(3, 1)] * y)
             + (self.m[(3, 2)] * z + self.m[(3, 3)]);
 
-        // Compute absolute error for transformed point
         let p_error: Vec3f = if rhs.is_exact() {
-            // Compute error for transformed exact _p_
             let err_x = gamma(3)
                 * (Float::abs(self.m[(0, 0)] * x)
                     + Float::abs(self.m[(0, 1)] * y)
@@ -315,7 +270,6 @@ impl Mul<Point3fi> for Transform {
                     + Float::abs(self.m[(2, 3)]));
             Vec3f::new(err_x, err_y, err_z)
         } else {
-            // Compute error for transformed approximate _p_
             let p_in_error = rhs.error();
             let err_x = (gamma(3) + 1.0)
                 * (Float::abs(self.m[(0, 0)]) * p_in_error.x
@@ -354,10 +308,8 @@ impl Mul<Point3fi> for Transform {
     }
 }
 
-impl Mul<Vec3fi> for Transform {
-    type Output = Vec3fi;
-
-    fn mul(self, rhs: Vec3fi) -> Self::Output {
+impl ApplyTransform<Vec3fi> for Transform {
+    fn apply(&self, rhs: Vec3fi) -> Vec3fi {
         let x: Float = rhs.x.into();
         let y: Float = rhs.y.into();
         let z: Float = rhs.z.into();
@@ -412,34 +364,235 @@ impl Mul<Vec3fi> for Transform {
     }
 }
 
-impl Mul<Point4fi> for Transform {
-    type Output = Point4fi;
-
-    #[inline]
-    fn mul(self, rhs: Point4fi) -> Self::Output {
-        Mat4i::from(self.m) * rhs
+impl ApplyRayTransform<Ray> for Transform {
+    fn apply_ray(&self, ray: &Ray, t_max: Option<&mut Float>) -> Ray {
+        let o: Point3fi = self.apply(ray.origin).into();
+        let d: Vec3f = self.apply(ray.direction);
+        let length_squared = d.length_squared();
+        let o: Point3fi = if length_squared > 0.0 {
+            let dt = d.abs().dot(o.error()) / length_squared;
+            if let Some(t_max) = t_max {
+                *t_max -= dt;
+            }
+            o + Vec3fi::from(d * dt)
+        } else {
+            o
+        };
+        Ray::new_with_medium_time(o.into(), d, ray.time, ray.medium.clone())
     }
 }
 
-impl Mul<Normal3f> for Transform {
-    type Output = Normal3f;
-
-    #[inline]
-    fn mul(self, rhs: Normal3f) -> Self::Output {
-        let m = self.m_inv;
-        Normal3f::new(
-            m[(0, 0)] * rhs.x + m[(1, 0)] * rhs.y + m[(2, 0)] * rhs.z,
-            m[(0, 1)] * rhs.x + m[(1, 1)] * rhs.y + m[(2, 1)] * rhs.z,
-            m[(0, 2)] * rhs.x + m[(1, 2)] * rhs.y + m[(2, 2)] * rhs.z,
-        )
+impl ApplyRayTransform<RayDifferential> for Transform {
+    fn apply_ray(&self, ray: &RayDifferential, t_max: Option<&mut Float>) -> RayDifferential {
+        let tr = self.apply_ray(&ray.ray, t_max);
+        let aux: Option<AuxiliaryRays> = if let Some(aux) = &ray.aux {
+            let rx_origin = self.apply(aux.rx_origin);
+            let rx_direction = self.apply(aux.rx_direction);
+            let ry_origin = self.apply(aux.ry_origin);
+            let ry_direction = self.apply(aux.ry_direction);
+            Some(AuxiliaryRays::new(
+                rx_origin,
+                rx_direction,
+                ry_origin,
+                ry_direction,
+            ))
+        } else {
+            None
+        };
+        RayDifferential { ray: tr, aux }
     }
 }
 
-impl Mul<Transform> for Transform {
-    type Output = Transform;
+impl ApplyTransform<Bounds3f> for Transform {
+    fn apply(&self, rhs: Bounds3f) -> Bounds3f {
+        let mut out = Bounds3f::new(
+            self.apply(rhs.corner(0)),
+            self.apply(rhs.corner(1)),
+        );
 
-    #[inline]
-    fn mul(self, rhs: Transform) -> Self::Output {
+        for i in 2..8 {
+            out = out.union(self.apply(rhs.corner(i)));
+        }
+
+        out
+    }
+}
+
+impl ApplyTransform<SurfaceInteraction> for Transform {
+    fn apply(&self, rhs: SurfaceInteraction) -> SurfaceInteraction {
+        let t = self.inverse();
+
+        let n = t.apply(rhs.interaction.n).normalize();
+
+        SurfaceInteraction {
+            interaction: Interaction {
+                pi: self.apply(rhs.interaction.pi),
+                time: rhs.interaction.time,
+                wo: t.apply(rhs.interaction.wo).normalize(),
+                n,
+                uv: rhs.interaction.uv,
+                medium: rhs.interaction.medium,
+                medium_interface: rhs.interaction.medium_interface,
+            },
+            dpdu: t.apply(rhs.dpdu),
+            dpdv: t.apply(rhs.dpdv),
+            dndu: t.apply(rhs.dndu),
+            dndv: t.apply(rhs.dndv),
+            shading: SurfaceInteractionShading {
+                n: t.apply(rhs.shading.n).normalize().facing(n),
+                dpdu: t.apply(rhs.shading.dpdu),
+                dpdv: t.apply(rhs.shading.dpdv),
+                dndu: t.apply(rhs.shading.dndu),
+                dndv: t.apply(rhs.shading.dndv),
+            },
+            face_index: rhs.face_index,
+            material: rhs.material.clone(),
+            area_light: rhs.area_light.clone(),
+            dpdx: t.apply(rhs.dpdx),
+            dpdy: t.apply(rhs.dpdy),
+            dudx: rhs.dudx,
+            dvdx: rhs.dvdx,
+            dudy: rhs.dudy,
+            dvdy: rhs.dvdy,
+        }
+    }
+}
+
+impl ApplyInverseTransform<Point3f> for Transform {
+    fn apply_inverse(&self, rhs: Point3f) -> Point3f {
+        apply_point(&self.m_inv, &rhs)
+    }
+}
+
+impl ApplyInverseTransform<Vec3f> for Transform {
+    fn apply_inverse(&self, rhs: Vec3f) -> Vec3f {
+        apply_vector(&self.m_inv, &rhs)
+    }
+}
+
+impl ApplyInverseTransform<Normal3f> for Transform {
+    fn apply_inverse(&self, rhs: Normal3f) -> Normal3f {
+        // Normals are transformed by the inverse
+        apply_normal(&self.m, &rhs)
+    }
+}
+
+impl ApplyInverseTransform<Point3fi> for Transform {
+    fn apply_inverse(&self, rhs: Point3fi) -> Point3fi {
+        let x: Float = rhs.x.into();
+        let y: Float = rhs.y.into();
+        let z: Float = rhs.z.into();
+
+        let xp: Float = (self.m_inv[(0, 0)] * x + self.m_inv[(0, 1)] * y)
+            + (self.m_inv[(0, 2)] * z + self.m_inv[(0, 3)]);
+        let yp: Float = (self.m_inv[(1, 0)] * x + self.m_inv[(1, 1)] * y)
+            + (self.m_inv[(1, 2)] * z + self.m_inv[(1, 3)]);
+        let zp: Float = (self.m_inv[(2, 0)] * x + self.m_inv[(2, 1)] * y)
+            + (self.m_inv[(2, 2)] * z + self.m_inv[(2, 3)]);
+        let wp: Float = (self.m_inv[(3, 0)] * x + self.m_inv[(3, 1)] * y)
+            + (self.m_inv[(3, 2)] * z + self.m_inv[(3, 3)]);
+
+        let p_out_error = if rhs.is_exact() {
+            let x_err = gamma(3)
+                * (Float::abs(self.m_inv[(0, 0)] * x)
+                    + Float::abs(self.m_inv[(0, 1)] * y)
+                    + Float::abs(self.m_inv[(0, 2)] * z));
+            let y_err = gamma(3)
+                * (Float::abs(self.m_inv[(1, 0)] * x)
+                    + Float::abs(self.m_inv[(1, 1)] * y)
+                    + Float::abs(self.m_inv[(1, 2)] * z));
+            let z_err = gamma(3)
+                * (Float::abs(self.m_inv[(2, 0)] * x)
+                    + Float::abs(self.m_inv[(2, 1)] * y)
+                    + Float::abs(self.m_inv[(2, 2)] * z));
+            Vec3f::new(x_err, y_err, z_err)
+        } else {
+            let p_in_err = rhs.error();
+            let x_err = (gamma(3) + 1.0)
+                * (Float::abs(self.m_inv[(0, 0)]) * p_in_err.x
+                    + Float::abs(self.m_inv[(0, 1)]) * p_in_err.y
+                    + Float::abs(self.m_inv[(0, 2)]) * p_in_err.z)
+                + gamma(3)
+                    * (Float::abs(self.m_inv[(0, 0)] * x)
+                        + Float::abs(self.m_inv[(0, 1)] * y)
+                        + Float::abs(self.m_inv[(0, 2)] * z)
+                        + Float::abs(self.m_inv[(0, 3)]));
+            let y_err = (gamma(3) + 1.0)
+                * (Float::abs(self.m_inv[(1, 0)]) * p_in_err.x
+                    + Float::abs(self.m_inv[(1, 1)]) * p_in_err.y
+                    + Float::abs(self.m_inv[(1, 2)]) * p_in_err.z)
+                + gamma(3)
+                    * (Float::abs(self.m_inv[(1, 0)] * x)
+                        + Float::abs(self.m_inv[(1, 1)] * y)
+                        + Float::abs(self.m_inv[(1, 2)] * z)
+                        + Float::abs(self.m_inv[(1, 3)]));
+            let z_err = (gamma(3) + 1.0)
+                * (Float::abs(self.m_inv[(2, 0)]) * p_in_err.x
+                    + Float::abs(self.m_inv[(2, 1)]) * p_in_err.y
+                    + Float::abs(self.m_inv[(2, 2)]) * p_in_err.z)
+                + gamma(3)
+                    * (Float::abs(self.m_inv[(2, 0)] * x)
+                        + Float::abs(self.m_inv[(2, 1)] * y)
+                        + Float::abs(self.m_inv[(2, 2)] * z)
+                        + Float::abs(self.m_inv[(2, 3)]));
+            Vec3f::new(x_err, y_err, z_err)
+        };
+
+        if wp == 1.0 {
+            Point3fi::from_errors(Point3f::new(xp, yp, zp), p_out_error.into())
+        } else {
+            Point3fi::from_errors(Point3f::new(xp, yp, zp), p_out_error.into()) / Interval::from(wp)
+        }
+    }
+}
+
+impl ApplyRayInverseTransform<Ray> for Transform {
+    fn apply_ray_inverse(&self, ray: &Ray, t_max: Option<&mut Float>) -> Ray {
+        let o: Point3fi = self.apply_inverse(Point3fi::from(ray.origin));
+        let d: Vec3f = self.apply_inverse(ray.direction);
+        let length_squared = d.length_squared();
+        let o = if length_squared > 0.0 {
+            let o_error = Vec3f::new(
+                o.x.width() / 2.0,
+                o.y.width() / 2.0,
+                o.z.width() / 2.0,
+            );
+            let dt = d.abs().dot(o_error) / length_squared;
+            if let Some(t_max) = t_max {
+                *t_max -= dt;
+            }
+            o + Vec3fi::from(d * dt)
+        } else {
+            o
+        };
+        Ray::new_with_medium_time(Point3f::from(o), d, ray.time, ray.medium.clone())
+    }
+}
+
+impl ApplyRayInverseTransform<RayDifferential> for Transform {
+    fn apply_ray_inverse(&self, ray: &RayDifferential, t_max: Option<&mut Float>) -> RayDifferential {
+        let tr = self.apply_ray_inverse(&ray.ray, t_max);
+
+        let aux: Option<AuxiliaryRays> = if let Some(aux) = &ray.aux {
+            let rx_origin = self.apply_inverse(aux.rx_origin);
+            let rx_direction = self.apply_inverse(aux.rx_direction);
+            let ry_origin = self.apply_inverse(aux.ry_origin);
+            let ry_direction = self.apply_inverse(aux.ry_direction);
+            Some(AuxiliaryRays::new(
+                rx_origin,
+                rx_direction,
+                ry_origin,
+                ry_direction,
+            ))
+        } else {
+            None
+        };
+        RayDifferential { ray: tr, aux }
+    }
+}
+
+impl ApplyTransform<Transform> for Transform {
+    fn apply(&self, rhs: Transform) -> Transform {
         Transform {
             m: self.m * rhs.m,
             m_inv: self.m_inv * rhs.m_inv,
@@ -447,75 +600,32 @@ impl Mul<Transform> for Transform {
     }
 }
 
-impl Mul<Ray> for Transform {
-    type Output = Ray;
-
-    fn mul(self, rhs: Ray) -> Self::Output {
-        self.mul_ray(rhs, None)
+fn apply_point(m: &Mat4, p: &Point3f) -> Point3f {
+    let xp = m[(0, 0)] * p.x + m[(0, 1)] * p.y + m[(0, 2)] * p.z + m[(0, 3)];
+    let yp = m[(1, 0)] * p.x + m[(1, 1)] * p.y + m[(1, 2)] * p.z + m[(1, 3)];
+    let zp = m[(2, 0)] * p.x + m[(2, 1)] * p.y + m[(2, 2)] * p.z + m[(2, 3)];
+    let wp = m[(3, 0)] * p.x + m[(3, 1)] * p.y + m[(3, 2)] * p.z + m[(3, 3)];
+    if wp == 1.0 {
+        Point3f::new(xp, yp, zp)
+    } else {
+        Point3f::new(xp, yp, zp) / wp
     }
 }
 
-impl Mul<RayDifferential> for Transform {
-    type Output = RayDifferential;
-
-    fn mul(self, rhs: RayDifferential) -> Self::Output {
-        self.mul_ray_differential(rhs, None)
-    }
+fn apply_vector(m: &Mat4, v: &Vec3f) -> Vec3f {
+    Vec3f::new(
+        m[(0, 0)] * v.x + m[(0, 1)] * v.y + m[(0, 2)] * v.z,
+        m[(1, 0)] * v.x + m[(1, 1)] * v.y + m[(1, 2)] * v.z,
+        m[(2, 0)] * v.x + m[(2, 1)] * v.y + m[(2, 2)] * v.z,
+    )
 }
 
-impl Mul<Bounds3f> for Transform {
-    type Output = Bounds3f;
-
-    #[inline]
-    fn mul(self, rhs: Bounds3f) -> Self::Output {
-        let mut b = Bounds3f::default();
-        for i in 0..8 {
-            b |= self * rhs.corner(i);
-        }
-        b
-    }
-}
-
-impl Mul<SurfaceInteraction> for Transform {
-    type Output = SurfaceInteraction;
-
-    fn mul(self, rhs: SurfaceInteraction) -> Self::Output {
-        let t = self.inverse();
-
-        let n = (t * rhs.interaction.n).normalize();
-
-        SurfaceInteraction {
-            interaction: Interaction {
-                pi: self * rhs.interaction.pi,
-                time: rhs.interaction.time,
-                wo: (t * rhs.interaction.wo).normalize(),
-                n,
-                uv: rhs.interaction.uv,
-                medium: rhs.interaction.medium,
-                medium_interface: rhs.interaction.medium_interface,
-            },
-            dpdu: t * rhs.dpdu,
-            dpdv: t * rhs.dpdv,
-            dndu: t * rhs.dndu,
-            dndv: t * rhs.dndv,
-            shading: SurfaceInteractionShading {
-                n: (t * rhs.shading.n).normalize().facing(n),
-                dpdu: t * rhs.shading.dpdu,
-                dpdv: t * rhs.shading.dpdv,
-                dndu: t * rhs.shading.dndu,
-                dndv: t * rhs.shading.dndv,
-            },
-            face_index: rhs.face_index,
-            material: rhs.material.clone(),
-            area_light: rhs.area_light.clone(),
-            dpdx: t * rhs.dpdx,
-            dpdy: t * rhs.dpdy,
-            dudx: rhs.dudx,
-            dvdx: rhs.dvdx,
-            dudy: rhs.dudy,
-            dvdy: rhs.dvdy,
-        }
-    }
+fn apply_normal(m: &Mat4, n: &Normal3f) -> Normal3f {
+    Normal3f::new(
+        m[(0, 0)] * n.x + m[(1, 0)] * n.y + m[(2, 0)] * n.z,
+        m[(0, 1)] * n.x + m[(1, 1)] * n.y + m[(2, 1)] * n.z,
+        m[(0, 2)] * n.x + m[(1, 2)] * n.y + m[(2, 2)] * n.z,
+    )
 }
 
 impl PartialEq for Transform {
@@ -536,16 +646,16 @@ mod tests {
     fn scale_normal() {
         let p = Normal3f::new(1.0, 2.0, 3.0);
         let scale = Transform::from_scale(Vec3f::new(2.0, 3.0, 4.0));
-        let scaled = scale * p;
+        let scaled = scale.apply(p);
         assert_eq!(Normal3f::new(0.5, 0.6666667, 0.75), scaled);
-        let back_again = scale.inverse() * scaled;
+        let back_again = scale.apply_inverse(scaled);
         assert_eq!(p, back_again);
 
         let p = Normal3f::new(1.0, 2.0, 3.0);
         let scale = Transform::from_scale(Vec3f::new(2.0, 2.0, 2.0));
-        let scaled = scale * p;
+        let scaled = scale.apply(p);
         assert_eq!(Normal3f::new(0.5, 1.0, 1.5), scaled);
-        let back_again = scale.inverse() * scaled;
+        let back_again = scale.apply_inverse(scaled);
         assert_eq!(p, back_again);
     }
 
@@ -553,7 +663,7 @@ mod tests {
     fn bb_transform() {
         let b = Bounds3f::from_points(vec![Point3f::ZERO, Point3f::ONE]);
         let m = Transform::from_translation(Point3f::ONE);
-        assert_eq!(Bounds3f::from_points(vec![Point3f::ONE, Point3f::ONE * 2.0]), m * b);
+        assert_eq!(Bounds3f::from_points(vec![Point3f::ONE, Point3f::ONE * 2.0]), m.apply(b));
     }
 
     #[test]
@@ -561,11 +671,11 @@ mod tests {
         let from = Vec3f::new(2.0, 4.0, 1.0).normalize();
         let to = Vec3f::new(3.0, 1.0, 4.0).normalize();
         let r = Transform::from_rotation_delta(from, to);
-        assert_abs_diff_eq!(to, r * from, epsilon = 2e-6);
+        assert_abs_diff_eq!(to, r.apply(from), epsilon = 2e-6);
 
         let from = Vec3f::new(-1.0, -5.0, 3.0).normalize();
         let to = Vec3f::new(3.0, 1.0, -2.0).normalize();
         let r = Transform::from_rotation_delta(from, to);
-        assert_abs_diff_eq!(to, r * from, epsilon = 2e-6);
+        assert_abs_diff_eq!(to, r.apply(from), epsilon = 2e-6);
     }
 }

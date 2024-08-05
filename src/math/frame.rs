@@ -1,3 +1,5 @@
+use vect::Dot;
+
 use crate::math::*;
 
 #[derive(Debug, Clone, Copy)]

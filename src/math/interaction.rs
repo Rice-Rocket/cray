@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use rand::rngs::SmallRng;
+use vect::Dot;
 
 use crate::{bsdf::BSDF, bxdf::{diffuse::DiffuseBxDF, BxDF, BxDFFlags}, camera::{AbstractCamera, Camera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, light::Light, material::{self, AbstractMaterial, Material, MaterialEvalContext, UniversalTextureEvaluator}, math::*, media::{Medium, MediumInterface}, numeric::DifferenceOfProducts, options::Options, phase::PhaseFunction, sampler::{AbstractSampler as _, Sampler}};
 
@@ -171,7 +172,7 @@ impl SurfaceInteraction {
 
     pub fn get_bsdf(
         &mut self,
-        ray: RayDifferential,
+        ray: &RayDifferential,
         lambda: &mut SampledWavelengths,
         camera: &Camera,
         sampler: &mut Sampler,
@@ -249,7 +250,7 @@ impl SurfaceInteraction {
 
     pub fn compute_differentials(
         &mut self,
-        ray: RayDifferential,
+        ray: &RayDifferential,
         camera: &Camera,
         samples_per_pixel: i32,
         options: &Options,
@@ -265,18 +266,18 @@ impl SurfaceInteraction {
         }
 
         if ray.aux.as_ref().is_some_and(|aux| {
-            self.interaction.n.dot(aux.rx_direction.into()) != 0.0
-                && self.interaction.n.dot(aux.ry_direction.into()) != 0.0
+            self.interaction.n.dot(aux.rx_direction) != 0.0
+                && self.interaction.n.dot(aux.ry_direction) != 0.0
         }) {
             let aux = ray.aux.as_ref().unwrap();
-            let d = -self.interaction.n.dot(self.position().into());
-            let tx = (-self.interaction.n.dot(aux.rx_origin.into()) - d)
-                / self.interaction.n.dot(aux.rx_direction.into());
+            let d = -self.interaction.n.dot(self.position());
+            let tx = (-self.interaction.n.dot(aux.rx_origin) - d)
+                / self.interaction.n.dot(aux.rx_direction);
             debug_assert!(tx.is_finite() && !tx.is_nan());
             let px = aux.rx_origin + tx * aux.rx_direction;
 
-            let ty = (-self.interaction.n.dot(aux.ry_origin.into()) - d)
-                / self.interaction.n.dot(aux.ry_direction.into());
+            let ty = (-self.interaction.n.dot(aux.ry_origin) - d)
+                / self.interaction.n.dot(aux.ry_direction);
             debug_assert!(ty.is_finite() && !ty.is_nan());
             let py = aux.ry_origin + ty * aux.ry_direction;
 
@@ -406,11 +407,11 @@ impl SurfaceInteraction {
                 let rx_origin = self.interaction.position() + self.dpdx;
                 let ry_origin = self.interaction.position() + self.dpdy;
 
-                let dwo_dotn_dx = dwodx.dot(n.into()) + self.interaction.wo.dot(dndx.into());
-                let dwo_dotn_dy = dwody.dot(n.into()) + self.interaction.wo.dot(dndy.into());
+                let dwo_dotn_dx = dwodx.dot(n) + self.interaction.wo.dot(dndx);
+                let dwo_dotn_dy = dwody.dot(n) + self.interaction.wo.dot(dndy);
 
-                let rx_direction = wi - dwodx + 2.0 * (self.interaction.wo.dot(n.into()) * dndx + dwo_dotn_dx * n);
-                let ry_direction = wi - dwody + 2.0 * (self.interaction.wo.dot(n.into()) * dndy + dwo_dotn_dy * n);
+                let rx_direction = wi - dwodx + 2.0 * (self.interaction.wo.dot(n) * dndx + dwo_dotn_dx * n);
+                let ry_direction = wi - dwody + 2.0 * (self.interaction.wo.dot(n) * dndy + dwo_dotn_dy * n);
 
                 Some(AuxiliaryRays {
                     rx_origin,
@@ -422,18 +423,18 @@ impl SurfaceInteraction {
                 let rx_origin = self.interaction.position() + self.dpdx;
                 let ry_origin = self.interaction.position() + self.dpdy;
 
-                if self.interaction.wo.dot(n.into()) < 0.0 {
+                if self.interaction.wo.dot(n) < 0.0 {
                     n = -n;
                     dndx = -dndx;
                     dndy = -dndy;
                 }
 
-                let dwo_dotn_dx = dwodx.dot(n.into()) + self.interaction.wo.dot(dndx.into());
-                let dwo_dotn_dy = dwody.dot(n.into()) + self.interaction.wo.dot(dndy.into());
+                let dwo_dotn_dx = dwodx.dot(n) + self.interaction.wo.dot(dndx);
+                let dwo_dotn_dy = dwody.dot(n) + self.interaction.wo.dot(dndy);
 
-                let mu = self.interaction.wo.dot(n.into()) / eta - wi.dot(n.into()).abs();
-                let dmudx = dwo_dotn_dx * (1.0 / eta + 1.0 / sqr(eta) * self.interaction.wo.dot(n.into()) / wi.dot(n.into()));
-                let dmudy = dwo_dotn_dy * (1.0 / eta + 1.0 / sqr(eta) * self.interaction.wo.dot(n.into()) / wi.dot(n.into()));
+                let mu = self.interaction.wo.dot(n) / eta - wi.dot(n).abs();
+                let dmudx = dwo_dotn_dx * (1.0 / eta + 1.0 / sqr(eta) * self.interaction.wo.dot(n) / wi.dot(n));
+                let dmudy = dwo_dotn_dy * (1.0 / eta + 1.0 / sqr(eta) * self.interaction.wo.dot(n) / wi.dot(n));
 
                 let rx_direction = wi - eta * dwodx + Vec3f::from(mu * dndx + dmudx * n);
                 let ry_direction = wi - eta * dwody + Vec3f::from(mu * dndy + dmudy * n);

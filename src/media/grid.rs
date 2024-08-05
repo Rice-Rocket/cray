@@ -2,7 +2,7 @@ use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 use tracing::error;
 
-use crate::{color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, BlackbodySpectrum, ConstantSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, phase::{HGPhaseFunction, PhaseFunction}, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, sampling::SampledGrid, transform::Transform, Bounds3f, Float, Point3f, Point3i, Ray};
+use crate::{color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, BlackbodySpectrum, ConstantSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, phase::{HGPhaseFunction, PhaseFunction}, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, sampling::SampledGrid, transform::{ApplyInverseTransform, ApplyRayInverseTransform, Transform}, Bounds3f, Float, Point3f, Point3i, Ray};
 
 use super::{iterator::{DDAMajorantIterator, MajorantGrid}, AbstractMedium, MediumProperties};
 
@@ -183,7 +183,7 @@ impl<'a> AbstractMedium for &'a GridMedium {
         let mut sigma_a = self.sigma_a_spec.sample(lambda);
         let mut sigma_s = self.sigma_s_spec.sample(lambda);
 
-        p = self.render_from_medium.inverse() * p;
+        p = self.render_from_medium.apply_inverse(p);
         p = self.bounds.offset(p);
 
         let d = self.density_grid.lookup(p).unwrap_or(0.0);
@@ -210,8 +210,8 @@ impl<'a> AbstractMedium for &'a GridMedium {
         MediumProperties { sigma_a, sigma_s, phase: PhaseFunction::HenyeyGreenstein(self.phase), le }
     }
 
-    fn sample_ray(self, mut ray: Ray, mut t_max: Float, lambda: &SampledWavelengths) -> Option<Self::MajorantIterator> {
-        ray = self.render_from_medium.inverse().mul_ray(ray, Some(&mut t_max));
+    fn sample_ray(self, mut ray: &Ray, mut t_max: Float, lambda: &SampledWavelengths) -> Option<Self::MajorantIterator> {
+        let ray = self.render_from_medium.apply_ray_inverse(ray, Some(&mut t_max));
 
         let hits = self.bounds.intersect_p(ray.origin, ray.direction, t_max)?;
 

@@ -105,7 +105,7 @@ impl AbstractMedium for &HomogeneousMedium {
         MediumProperties { sigma_a, sigma_s, phase: PhaseFunction::HenyeyGreenstein(self.phase), le }
     }
 
-    fn sample_ray(self, ray: Ray, t_max: Float, lambda: &SampledWavelengths) -> Option<Self::MajorantIterator> {
+    fn sample_ray(self, ray: &Ray, t_max: Float, lambda: &SampledWavelengths) -> Option<Self::MajorantIterator> {
         let sigma_a = self.sigma_a_spec.sample(lambda);
         let sigma_s = self.sigma_s_spec.sample(lambda);
 

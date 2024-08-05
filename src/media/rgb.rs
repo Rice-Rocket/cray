@@ -2,7 +2,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use tracing::error;
 
-use crate::{color::{sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}, wavelengths::SampledWavelengths}, phase::{HGPhaseFunction, PhaseFunction}, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::SampledGrid, transform::Transform, Bounds3f, Float, Point3f, Point3i, Ray};
+use crate::{color::{sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}, wavelengths::SampledWavelengths}, phase::{HGPhaseFunction, PhaseFunction}, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::SampledGrid, transform::{ApplyInverseTransform, ApplyRayInverseTransform, Transform}, Bounds3f, Float, Point3f, Point3i, Ray};
 
 use super::{iterator::{DDAMajorantIterator, MajorantGrid}, AbstractMedium, MediumProperties};
 
@@ -167,7 +167,7 @@ impl<'a> AbstractMedium for &'a RgbGridMedium {
     }
 
     fn sample_point(self, mut p: Point3f, lambda: &SampledWavelengths) -> MediumProperties {
-        p = self.render_from_medium.inverse() * p;
+        p = self.render_from_medium.apply_inverse(p);
         p = self.bounds.offset(p);
 
         let convert = |s: &RgbUnboundedSpectrum| { s.sample(lambda) };
@@ -187,8 +187,8 @@ impl<'a> AbstractMedium for &'a RgbGridMedium {
         MediumProperties { sigma_a, sigma_s, phase: PhaseFunction::HenyeyGreenstein(self.phase), le }
     }
 
-    fn sample_ray(self, mut ray: Ray, mut t_max: Float, lambda: &SampledWavelengths) -> Option<Self::MajorantIterator> {
-        ray = self.render_from_medium.inverse().mul_ray(ray, Some(&mut t_max));
+    fn sample_ray(self, mut ray: &Ray, mut t_max: Float, lambda: &SampledWavelengths) -> Option<Self::MajorantIterator> {
+        let ray = self.render_from_medium.apply_ray_inverse(ray, Some(&mut t_max));
         
         let hits = self.bounds.intersect_p(ray.origin, ray.direction, t_max)?;
 

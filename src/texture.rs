@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex}};
 
-use crate::{color::{rgb_xyz::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, Rgb}, sampled::SampledSpectrum, spectrum::{AbstractSpectrum as _, ConstantSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}, wavelengths::SampledWavelengths}, file::resolve_filename, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, material::NormalBumpEvalContext, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, reader::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::FileLoc}, spherical_theta, sqr, transform::Transform, Float, Normal3f, Point2f, Point3f, Vec2f, Vec3f, FRAC_1_PI, FRAC_1_TAU, PI};
+use crate::{color::{rgb_xyz::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, Rgb}, sampled::SampledSpectrum, spectrum::{AbstractSpectrum as _, ConstantSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}, wavelengths::SampledWavelengths}, file::resolve_filename, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, material::NormalBumpEvalContext, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, reader::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::FileLoc}, spherical_theta, sqr, transform::{ApplyTransform, Transform}, Dot, Float, Normal3f, Point2f, Point3f, Vec2f, Vec3f, FRAC_1_PI, FRAC_1_TAU, PI};
 
 pub trait AbstractFloatTexture {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float;
@@ -261,7 +261,7 @@ impl FloatDirectionMixTexture {
 
 impl AbstractFloatTexture for FloatDirectionMixTexture {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float {
-        let amt = ctx.n.dot(self.dir.into());
+        let amt = ctx.n.dot(self.dir);
         let mut t1 = 0.0;
         let mut t2 = 0.0;
         if amt != 0.0 {
@@ -636,7 +636,7 @@ impl SpectrumDirectionMixTexture {
 
 impl AbstractSpectrumTexture for SpectrumDirectionMixTexture {
     fn evaluate(&self, ctx: &TextureEvalContext, lambda: &SampledWavelengths) -> SampledSpectrum {
-        let amt = ctx.n.dot(self.dir.into());
+        let amt = ctx.n.dot(self.dir);
         let mut t1 = SampledSpectrum::from_const(0.0);
         let mut t2 = SampledSpectrum::from_const(0.0);
         if amt != 0.0 
@@ -869,7 +869,7 @@ pub struct SphericalMapping {
 
 impl AbstractTextureMapping2D for SphericalMapping {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
-        let pt = self.texture_from_render * ctx.p;
+        let pt = self.texture_from_render.apply(ctx.p);
         let x2y2 = sqr(pt.x) + sqr(pt.y);
         let sqrtx2y2 = x2y2.sqrt();
         let dsdp = Vec3f::new(-pt.y, pt.x, 0.0) / (2.0 * PI * x2y2);
@@ -877,8 +877,8 @@ impl AbstractTextureMapping2D for SphericalMapping {
             (1.0 / (PI * (x2y2 + sqr(pt.z))));
             
         
-        let dpdx = self.texture_from_render * ctx.dpdx;
-        let dpdy = self.texture_from_render * ctx.dpdy;
+        let dpdx = self.texture_from_render.apply(ctx.dpdx);
+        let dpdy = self.texture_from_render.apply(ctx.dpdy);
 
         let dsdx = dsdp.dot(dpdx);
         let dsdy = dsdp.dot(dpdy);
@@ -908,12 +908,12 @@ pub struct CylindricalMapping {
 
 impl AbstractTextureMapping2D for CylindricalMapping {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
-        let pt = self.texture_from_render * ctx.p;
+        let pt = self.texture_from_render.apply(ctx.p);
         let x2y2 = sqr(pt.x) + sqr(pt.y);
         let dsdp = Vec3f::new(-pt.y, pt.x, 0.0) / (2.0 * PI * x2y2);
         let dtdp = Vec3f::new(0.0, 0.0, 1.0);
-        let dpdx = self.texture_from_render * ctx.dpdx;
-        let dpdy = self.texture_from_render * ctx.dpdy;
+        let dpdx = self.texture_from_render.apply(ctx.dpdx);
+        let dpdy = self.texture_from_render.apply(ctx.dpdy);
         let dsdx = dsdp.dot(dpdx);
         let dsdy = dsdp.dot(dpdy);
         let dtdx = dtdp.dot(dpdx);
@@ -945,9 +945,9 @@ pub struct PlanarMapping {
 
 impl AbstractTextureMapping2D for PlanarMapping {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
-        let vec: Vec3f = (self.texture_from_render * ctx.p).into();
-        let dpdx = self.texture_from_render * ctx.dpdx;
-        let dpdy = self.texture_from_render * ctx.dpdy;
+        let vec: Vec3f = (self.texture_from_render.apply(ctx.p)).into();
+        let dpdx = self.texture_from_render.apply(ctx.dpdx);
+        let dpdy = self.texture_from_render.apply(ctx.dpdy);
         let dsdx = self.vs.dot(dpdx);
         let dsdy = self.vs.dot(dpdy);
         let dtdx = self.vt.dot(dpdx);
@@ -1017,9 +1017,9 @@ impl PointTransformMapping {
 impl AbstractTextureMapping3D for PointTransformMapping {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord3D {
         TexCoord3D {
-            p: self.texture_from_render * ctx.p,
-            dpdx: self.texture_from_render * ctx.dpdx,
-            dpdy: self.texture_from_render * ctx.dpdy,
+            p: self.texture_from_render.apply(ctx.p),
+            dpdx: self.texture_from_render.apply(ctx.dpdx),
+            dpdy: self.texture_from_render.apply(ctx.dpdy),
         }
     }
 }

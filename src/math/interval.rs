@@ -259,7 +259,7 @@ impl NumericNegative for Interval {
     const NEG_ONE: Self = Interval::from_val(-1.0);
     const NEG_TWO: Self = Interval::from_val(-2.0);
 
-    fn nabs(self) -> Self {
+    fn abs(self) -> Self {
         if self.low >= 0.0 {
             // The entire interval is greater than zero, so we're set
             self
@@ -275,7 +275,7 @@ impl NumericNegative for Interval {
         }
     }
 
-    fn nsign(self) -> Self {
+    fn sign(self) -> Self {
         if self.low >= 0.0 {
             Interval::from_val(1.0)
         } else if self.high <= 0.0 {
@@ -343,13 +343,15 @@ impl NumericFloat for Interval {
     }
 }
 
-impl Numeric for Interval {
+impl NumericConsts for Interval {
     const MIN: Self = Interval::from_val(Float::MIN);
     const MAX: Self = Interval::from_val(Float::MAX);
     const ZERO: Self = Interval::from_val(0.0);
     const ONE: Self = Interval::from_val(1.0);
     const TWO: Self = Interval::from_val(2.0);
+}
 
+impl NumericOrd for Interval {
     fn nmin(self, rhs: Interval) -> Self {
         Float::min(self.low, rhs.low).into()
     }

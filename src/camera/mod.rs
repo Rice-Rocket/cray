@@ -3,6 +3,8 @@ use std::{ops::Mul, sync::Arc};
 use film::{Film, AbstractFilm as _};
 use projective::{OrthographicCamera, PerspectiveCamera};
 use tracing::warn;
+use transform::{ApplyInverseTransform, ApplyRayInverseTransform, ApplyRayTransform, ApplyTransform};
+use vect::Dot;
 
 use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, math::*, media::Medium, options::{CameraRenderingSpace, Options}, ray::AbstractRay, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, AuxiliaryRays, Frame, Normal3f, Point2f, Point3f, Ray, RayDifferential, Float, Vec3f};
 
@@ -136,30 +138,40 @@ impl CameraTransform {
         let world_from_render = match options.rendering_space {
             CameraRenderingSpace::Camera => world_from_camera,
             CameraRenderingSpace::CameraWorld => {
-                let p_camera = world_from_camera * Point3f::ZERO;
+                let p_camera = world_from_camera.apply(Point3f::ZERO);
                 Transform::from_translation(p_camera)
             },
             CameraRenderingSpace::World => Transform::default(),
         };
 
         let render_from_world = world_from_render.inverse();
-        let render_from_camera = render_from_world * world_from_camera;
+        let render_from_camera = render_from_world.apply(world_from_camera);
 
         CameraTransform { render_from_camera, world_from_render }
     }
 
     pub fn render_from_camera<T>(&self, v: T) -> T 
-    where Transform: Mul<T, Output = T> {
-        self.render_from_camera * v
+    where Transform: ApplyTransform<T> {
+        self.render_from_camera.apply(v)
     }
 
     pub fn camera_from_render<T>(&self, v: T, _time: Float) -> T
-    where Transform: Mul<T, Output = T> {
-        self.render_from_camera.inverse() * v
+    where Transform: ApplyInverseTransform<T> {
+        self.render_from_camera.apply_inverse(v)
+    }
+
+    pub fn render_from_camera_ray<T>(&self, v: &T) -> T
+    where Transform: ApplyRayTransform<T> {
+        self.render_from_camera.apply_ray(v, None)
+    }
+
+    pub fn camera_from_render_ray<T>(&self, v: &T) -> T
+    where Transform: ApplyRayInverseTransform<T> {
+        self.render_from_camera.apply_ray_inverse(v, None)
     }
 
     pub fn render_from_world_p(&self, p: Point3f) -> Point3f {
-        self.world_from_render.inverse() * p
+        self.world_from_render.apply_inverse(p)
     }
 
     pub fn render_from_world(&self) -> Transform {
@@ -171,7 +183,7 @@ impl CameraTransform {
     }
 
     pub fn camera_from_world(&self, _time: Float) -> Transform {
-        (self.world_from_render * self.render_from_camera).inverse()
+        (self.world_from_render.apply(self.render_from_camera)).inverse()
     }
 
     pub fn render_from_camera_mat(&self) -> Transform {
@@ -210,13 +222,23 @@ impl CameraBase {
     }
 
     pub fn render_from_camera<T>(&self, v: T) -> T
-    where Transform: Mul<T, Output = T> {
+    where Transform: ApplyTransform<T> {
         self.camera_transform.render_from_camera(v)
     }
 
     pub fn camera_from_render<T>(&self, v: T, time: Float) -> T
-    where Transform: Mul<T, Output = T> {
+    where Transform: ApplyInverseTransform<T> {
         self.camera_transform.camera_from_render(v, time)
+    }
+
+    pub fn render_from_camera_ray<T>(&self, v: &T) -> T
+    where Transform: ApplyRayTransform<T> {
+        self.camera_transform.render_from_camera_ray(v)
+    }
+
+    pub fn camera_from_render_ray<T>(&self, v: &T) -> T
+    where Transform: ApplyRayInverseTransform<T> {
+        self.camera_transform.camera_from_render_ray(v)
     }
 
     pub fn sample_time(&self, u: Float) -> Float {
@@ -283,21 +305,22 @@ impl CameraBase {
     ) -> (Vec3f, Vec3f) {
         let p_camera = self.camera_from_render(p, time);
         let down_z_from_camera = Transform::from_rotation_delta(p_camera.normalize().into(), Vec3f::new(0.0, 0.0, 1.0));
-        let p_down_z = down_z_from_camera * p_camera;
-        let n_down_z = down_z_from_camera * self.camera_from_render(n, time);
+        let p_down_z = down_z_from_camera.apply(p_camera);
+        let n_down_z = down_z_from_camera.apply(self.camera_from_render(n, time));
         let d = n_down_z.z * p_down_z.z;
 
         let x_ray = Ray::new(
             Point3f::ZERO + self.min_pos_differential_x,
             Vec3f::new(0.0, 0.0, 1.0) + self.min_dir_differential_x,
         );
-        let tx = -(n_down_z.dot(x_ray.origin.into()) - d) / n_down_z.dot(x_ray.direction.into());
+        let tx = -(n_down_z.dot(x_ray.origin) - d) / n_down_z.dot(x_ray.direction);
         
         let y_ray = Ray::new(
             Point3f::ZERO + self.min_pos_differential_y,
             Vec3f::new(0.0, 0.0, 1.0) + self.min_dir_differential_y,
         );
-        let ty = -(n_down_z.dot(y_ray.origin.into()) - d) / n_down_z.dot(y_ray.direction.into());
+
+        let ty = -(n_down_z.dot(y_ray.origin) - d) / n_down_z.dot(y_ray.direction);
 
         let px = x_ray.at(tx);
         let py = y_ray.at(ty);
@@ -306,8 +329,8 @@ impl CameraBase {
             Float::max(0.125, 1.0 / (samples_per_pixel as Float).sqrt())
         };
 
-        let dpdx = self.render_from_camera(down_z_from_camera.inverse() * (px - p_down_z)) * spp_scale;
-        let dpdy = self.render_from_camera(down_z_from_camera.inverse() * (py - p_down_z)) * spp_scale;
+        let dpdx = self.render_from_camera(down_z_from_camera.inverse().apply(px - p_down_z)) * spp_scale;
+        let dpdy = self.render_from_camera(down_z_from_camera.inverse().apply(py - p_down_z)) * spp_scale;
 
         (dpdx.into(), dpdy.into())
     }

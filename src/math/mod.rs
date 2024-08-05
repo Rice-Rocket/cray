@@ -18,15 +18,15 @@ pub mod vec2d;
 pub mod scattering;
 
 pub use mat::{TMat2, TMat3, TMat4};
-pub use vect::{TVec2, TVec3, TVec4, TPoint2, TPoint3, TPoint4, TNormal2, TNormal3};
-pub use bounds::{direction::DirectionCone, Bounds2f, Bounds3f, Bounds2i, Bounds3i, Bounds2u, Bounds3u, TBounds2, TBounds3};
+pub use vect::{Vec2, Vec3, Vec4, Point2, Point3, Point4, Normal2, Normal3, Dot};
+pub use bounds::{direction::DirectionCone, Bounds2f, Bounds3f, Bounds2i, Bounds3i, Bounds2u, Bounds3u, Bounds2, Bounds3};
 
 pub use frame::Frame;
 pub use sphere::OctahedralVec3;
 pub use dim::Dimension;
 pub use interval::{Interval, FloatInterval};
 
-pub use numeric::{Numeric, NumericNegative, NumericFloat, NumericField};
+pub use numeric::{NumericConsts, NumericNegative, NumericFloat, NumericField, NumericOrd};
 pub use ray::{Ray, RayDifferential, AuxiliaryRays};
 
 
@@ -95,7 +95,7 @@ pub fn to_degrees(rad: Float) -> Float {
 
 /// Computes the square of a number.
 #[inline]
-pub fn sqr<T: Numeric + Clone + Copy + Mul<T, Output = T>>(x: T) -> T {
+pub fn sqr<T: Copy + Mul<T, Output = T>>(x: T) -> T {
     x * x
 }
 
@@ -326,10 +326,10 @@ pub fn gamma(n: i32) -> Float {
 }
 
 pub mod safe {
-    use crate::{math::{Numeric, Float}, NumericFloat};
+    use crate::{math::{NumericConsts, Float}, NumericFloat, NumericOrd};
 
     #[inline]
-    pub fn sqrt<T: Numeric + NumericFloat>(x: T) -> T {
+    pub fn sqrt<T: NumericConsts + NumericFloat + NumericOrd>(x: T) -> T {
         (x.nmax(T::ZERO)).nsqrt()
     }
 
@@ -356,38 +356,38 @@ pub type Mat2i = TMat2<Interval>;
 pub type Mat3i = TMat3<Interval>;
 pub type Mat4i = TMat4<Interval>;
 
-pub type Point2f = TPoint2<Float>;
-pub type Point3f = TPoint3<Float>;
-pub type Point4f = TPoint4<Float>;
-pub type Point2fi = TPoint2<Interval>;
-pub type Point3fi = TPoint3<Interval>;
-pub type Point4fi = TPoint4<Interval>;
+pub type Point2f = Point2<Float>;
+pub type Point3f = Point3<Float>;
+pub type Point4f = Point4<Float>;
+pub type Point2fi = Point2<Interval>;
+pub type Point3fi = Point3<Interval>;
+pub type Point4fi = Point4<Interval>;
 
-pub type Point2i = TPoint2<i32>;
-pub type Point3i = TPoint3<i32>;
-pub type Point4i = TPoint4<i32>;
-pub type Point2u = TPoint2<u32>;
-pub type Point3u = TPoint3<u32>;
-pub type Point4u = TPoint4<u32>;
+pub type Point2i = Point2<i32>;
+pub type Point3i = Point3<i32>;
+pub type Point4i = Point4<i32>;
+pub type Point2u = Point2<u32>;
+pub type Point3u = Point3<u32>;
+pub type Point4u = Point4<u32>;
 
-pub type Vec2f = TVec2<Float>;
-pub type Vec3f = TVec3<Float>;
-pub type Vec4f = TVec4<Float>;
-pub type Vec2fi = TVec2<Interval>;
-pub type Vec3fi = TVec3<Interval>;
-pub type Vec4fi = TVec4<Interval>;
+pub type Vec2f = Vec2<Float>;
+pub type Vec3f = Vec3<Float>;
+pub type Vec4f = Vec4<Float>;
+pub type Vec2fi = Vec2<Interval>;
+pub type Vec3fi = Vec3<Interval>;
+pub type Vec4fi = Vec4<Interval>;
 
-pub type Vec2i = TVec2<i32>;
-pub type Vec3i = TVec3<i32>;
-pub type Vec4i = TVec4<i32>;
-pub type Vec2u = TVec2<u32>;
-pub type Vec3u = TVec3<u32>;
-pub type Vec4u = TVec4<u32>;
+pub type Vec2i = Vec2<i32>;
+pub type Vec3i = Vec3<i32>;
+pub type Vec4i = Vec4<i32>;
+pub type Vec2u = Vec2<u32>;
+pub type Vec3u = Vec3<u32>;
+pub type Vec4u = Vec4<u32>;
 
-pub type Normal2f = TNormal2<Float>;
-pub type Normal3f = TNormal3<Float>;
-pub type Normal2fi = TNormal2<Interval>;
-pub type Normal3fi = TNormal3<Interval>;
+pub type Normal2f = Normal2<Float>;
+pub type Normal3f = Normal3<Float>;
+pub type Normal2fi = Normal2<Interval>;
+pub type Normal3fi = Normal3<Interval>;
 
 
 #[cfg(test)]

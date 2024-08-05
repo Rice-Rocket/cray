@@ -1,4 +1,4 @@
-use crate::{scattering::{henyey_greenstein, sample_henyey_greenstein}, Float, Point2f, Vec3f};
+use crate::{scattering::{henyey_greenstein, sample_henyey_greenstein}, Dot, Float, Point2f, Vec3f};
 
 pub trait AbstractPhaseFunction {
     fn p(&self, wo: Vec3f, wi: Vec3f) -> Float;

@@ -20,7 +20,7 @@ pub trait AbstractMedium {
 
     fn sample_point(self, p: Point3f, lambda: &SampledWavelengths) -> MediumProperties;
 
-    fn sample_ray(self, ray: Ray, t_max: Float, lambda: &SampledWavelengths) -> Option<Self::MajorantIterator>;
+    fn sample_ray(self, ray: &Ray, t_max: Float, lambda: &SampledWavelengths) -> Option<Self::MajorantIterator>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -66,7 +66,7 @@ impl<'a> AbstractMedium for &'a Medium {
         }
     }
 
-    fn sample_ray(self, ray: Ray, t_max: Float, lambda: &SampledWavelengths) -> Option<Self::MajorantIterator> {
+    fn sample_ray(self, ray: &Ray, t_max: Float, lambda: &SampledWavelengths) -> Option<Self::MajorantIterator> {
         match self {
             Medium::Homogeneous(m) => Some(RayMajorantIterator::Homogeneous(m.sample_ray(ray, t_max, lambda)?)),
             Medium::Grid(m) => Some(RayMajorantIterator::DDA(m.sample_ray(ray, t_max, lambda)?)),

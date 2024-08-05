@@ -1,5 +1,7 @@
 // Pbrt 3.8.4 Spherical Geometry: Bounding Directions
 
+use vect::Dot;
+
 use crate::math::*;
 
 #[derive(Clone, Copy)]

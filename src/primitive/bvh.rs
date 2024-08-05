@@ -1,6 +1,6 @@
 use std::{mem::MaybeUninit, sync::{atomic::{AtomicUsize, Ordering}, Arc}};
 
-use crate::{light::Light, material::Material, reader::paramdict::ParameterDictionary, shape::{Shape, ShapeIntersection, AbstractShape}, Bounds3f, Float, Point3f, Ray, Vec3f};
+use crate::{bounds::Union, light::Light, material::Material, reader::paramdict::ParameterDictionary, shape::{AbstractShape, Shape, ShapeIntersection}, Bounds3f, Float, Point3f, Ray, Vec3f};
 
 use super::{Primitive, AbstractPrimitive};
 
@@ -115,8 +115,8 @@ impl BvhAggregate {
 
         total_nodes.fetch_add(1, Ordering::SeqCst);
         
-        let bounds = bvh_primitives.iter().fold(Bounds3f::default(), |acc, p| {
-            acc.union_box(p.bounds)
+        let bounds = bvh_primitives.iter().fold(Bounds3f::default(), |acc, p| -> crate::Bounds3<f32> {
+            acc.union(p.bounds)
         });
 
         if bounds.surface_area() == 0.0 || bvh_primitives.len() == 1 {
@@ -132,7 +132,7 @@ impl BvhAggregate {
         }
 
         {
-            let centroid_bounds = bvh_primitives.iter().fold(Bounds3f::default(), |acc, p| acc.union_vect(p.centroid()));
+            let centroid_bounds = bvh_primitives.iter().fold(Bounds3f::default(), |acc, p| acc.union(p.centroid()));
             let dim = centroid_bounds.max_dim();
             
             if centroid_bounds.max[dim] == centroid_bounds.min[dim] {
@@ -164,7 +164,7 @@ impl BvhAggregate {
                                 let mut b = (N_BUCKETS as Float * centroid_bounds.offset(prim.centroid())[dim]) as usize;
                                 if b == N_BUCKETS { b = N_BUCKETS - 1 };
                                 buckets[b].count += 1;
-                                buckets[b].bounds = buckets[b].bounds.union_box(prim.bounds);
+                                buckets[b].bounds = buckets[b].bounds.union(prim.bounds);
                             }
 
                             const N_SPLITS: usize = N_BUCKETS - 1;
@@ -173,7 +173,7 @@ impl BvhAggregate {
                             let mut count_below = 0;
                             let mut bounds_below = Bounds3f::default();
                             for i in 0..N_SPLITS {
-                                bounds_below = bounds_below.union_box(buckets[i].bounds);
+                                bounds_below = bounds_below.union(buckets[i].bounds);
                                 count_below += buckets[i].count;
                                 costs[i] += count_below as Float * bounds_below.surface_area();
                             }
@@ -181,7 +181,7 @@ impl BvhAggregate {
                             let mut count_above = 0;
                             let mut bounds_above = Bounds3f::default();
                             for i in (1..=N_SPLITS).rev() {
-                                bounds_above = bounds_above.union_box(buckets[i].bounds);
+                                bounds_above = bounds_above.union(buckets[i].bounds);
                                 count_above += buckets[i].count;
                                 costs[i - 1] += count_above as Float * bounds_above.surface_area();
                             }
@@ -332,7 +332,7 @@ impl AbstractPrimitive for BvhAggregate {
         self.nodes[0].bounds
     }
 
-    fn intersect(&self, ray: Ray, mut t_max: Float) -> Option<ShapeIntersection> {
+    fn intersect(&self, ray: &Ray, mut t_max: Float) -> Option<ShapeIntersection> {
         if self.nodes.is_empty() {
             return None;
         }
@@ -354,7 +354,7 @@ impl AbstractPrimitive for BvhAggregate {
             if node.bounds.intersect_p_cached(ray.origin, ray.direction, t_max, inv_dir, dir_is_neg) {
                 if node.n_primitives > 0 {
                     for i in 0..node.n_primitives {
-                        let prim_si = self.primitives[node.primitive_offset + i as usize].as_ref().intersect(ray.clone(), t_max);
+                        let prim_si = self.primitives[node.primitive_offset + i as usize].as_ref().intersect(ray, t_max);
                         if let Some(prim_si) = prim_si {
                             t_max = prim_si.t_hit;
                             si = Some(prim_si);
@@ -389,7 +389,7 @@ impl AbstractPrimitive for BvhAggregate {
         si
     }
 
-    fn intersect_predicate(&self, ray: Ray, t_max: Float) -> bool {
+    fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
         if self.nodes.is_empty() {
             return false;
         }
@@ -411,7 +411,7 @@ impl AbstractPrimitive for BvhAggregate {
             if node.bounds.intersect_p_cached(ray.origin, ray.direction, t_max, inv_dir, dir_is_neg) {
                 if node.n_primitives > 0 {
                     for i in 0..node.n_primitives {
-                        if self.primitives[node.primitive_offset + i as usize].as_ref().intersect_predicate(ray.clone(), t_max) {
+                        if self.primitives[node.primitive_offset + i as usize].as_ref().intersect_predicate(ray, t_max) {
                             return true;
                         }
                     }
@@ -489,7 +489,7 @@ impl BvhBuildNode {
 
     pub fn init_interior(&mut self, split_axis: u8, left: Box<BvhBuildNode>, right: Option<Box<BvhBuildNode>>) {
         let bounds = if let Some(ref right) = right {
-            left.bounds.union_box(right.bounds)
+            left.bounds.union(right.bounds)
         } else {
             left.bounds
         };

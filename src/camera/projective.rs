@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tracing::warn;
 
-use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, media::Medium, options::Options, ray::AbstractRay, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::sample_uniform_disk_concentric, transform::Transform, AuxiliaryRays, Bounds2f, Normal3f, Point2f, Point3f, Ray, RayDifferential, Float, Vec3f};
+use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, media::Medium, options::Options, ray::AbstractRay, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::sample_uniform_disk_concentric, transform::{ApplyTransform, Transform}, AuxiliaryRays, Bounds2f, Float, Normal3f, Point2f, Point3f, Ray, RayDifferential, Vec3f};
 
 use super::{film::{Film, AbstractFilm as _}, filter::AbstractFilter as _, AbstractCamera, CameraBase, CameraBaseParameters, CameraRay, CameraRayDifferential, CameraSample, CameraTransform};
 
@@ -41,7 +41,7 @@ impl ProjectiveCamera {
             1.0 / (screen_window.max.x - screen_window.min.x),
             1.0 / (screen_window.max.y - screen_window.min.y),
             1.0
-        )) * Transform::from_translation(Point3f::new(-screen_window.min.x, -screen_window.max.y, 0.0));
+        )).apply(Transform::from_translation(Point3f::new(-screen_window.min.x, -screen_window.max.y, 0.0)));
 
         let raster_from_ndc = Transform::from_scale(Vec3f::new(
             camera_base.film.full_resolution().x as Float,
@@ -49,9 +49,9 @@ impl ProjectiveCamera {
             1.0
         ));
 
-        let raster_from_screen = raster_from_ndc * ndc_from_screen;
+        let raster_from_screen = raster_from_ndc.apply(ndc_from_screen);
         let screen_from_raster = raster_from_screen.inverse();
-        let camera_from_raster = screen_from_camera.inverse() * screen_from_raster;
+        let camera_from_raster = screen_from_camera.inverse().apply(screen_from_raster);
 
         ProjectiveCamera {
             camera_base,
@@ -143,8 +143,8 @@ impl OrthographicCamera {
             screen_window
         );
 
-        let dx_camera = projective.camera_from_raster * Vec3f::new(1.0, 0.0, 0.0);
-        let dy_camera = projective.camera_from_raster * Vec3f::new(0.0, 1.0, 0.0);
+        let dx_camera = projective.camera_from_raster.apply(Vec3f::new(1.0, 0.0, 0.0));
+        let dy_camera = projective.camera_from_raster.apply(Vec3f::new(0.0, 1.0, 0.0));
 
         projective.camera_base.min_dir_differential_x = Vec3f::ZERO;
         projective.camera_base.min_dir_differential_y = Vec3f::ZERO;
@@ -166,7 +166,7 @@ impl AbstractCamera for OrthographicCamera {
         _lambda: &SampledWavelengths,
     ) -> Option<CameraRay> {
         let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
-        let p_camera = self.projective.camera_from_raster * p_film;
+        let p_camera = self.projective.camera_from_raster.apply(p_film);
 
         let mut ray = Ray::new_with_medium_time(
             p_camera,
@@ -184,7 +184,7 @@ impl AbstractCamera for OrthographicCamera {
             ray.direction = (p_focus - ray.origin).normalize().into();
         }
 
-        Some(CameraRay::new(self.projective.camera_base.render_from_camera(ray)))
+        Some(CameraRay::new(self.projective.camera_base.render_from_camera_ray(&ray)))
     }
 
     fn generate_ray_differential(
@@ -193,7 +193,7 @@ impl AbstractCamera for OrthographicCamera {
         _lambda: &SampledWavelengths,
     ) -> Option<CameraRayDifferential> {
         let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
-        let p_camera = self.projective.camera_from_raster * p_film;
+        let p_camera = self.projective.camera_from_raster.apply(p_film);
 
         let mut ray = Ray::new_with_medium_time(
             p_camera,
@@ -335,19 +335,19 @@ impl PerspectiveCamera {
             screen_window,
         );
 
-        let dx_camera = projective.camera_from_raster * Vec3f::new(1.0, 0.0, 0.0)
-            - projective.camera_from_raster * Vec3f::ZERO;
-        let dy_camera = projective.camera_from_raster * Vec3f::new(0.0, 1.0, 0.0)
-            - projective.camera_from_raster * Vec3f::ZERO;
+        let dx_camera = projective.camera_from_raster.apply(Vec3f::new(1.0, 0.0, 0.0))
+            - projective.camera_from_raster.apply(Vec3f::ZERO);
+        let dy_camera = projective.camera_from_raster.apply(Vec3f::new(0.0, 1.0, 0.0))
+            - projective.camera_from_raster.apply(Vec3f::ZERO);
 
         let radius = Point2f::from(projective.camera_base.film.get_filter().radius());
         let p_corner = Point3f::new(-radius.x, -radius.y, 0.0);
-        let w_corner_camera = Vec3f::from((projective.camera_from_raster * p_corner).normalize());
+        let w_corner_camera = Vec3f::from((projective.camera_from_raster.apply(p_corner)).normalize());
         let cos_total_width = w_corner_camera.z;
 
         let res = projective.camera_base.film.full_resolution();
-        let mut p_min = projective.camera_from_raster * Point3f::ZERO;
-        let mut p_max = projective.camera_from_raster * Point3f::new(res.x as Float, res.y as Float, 0.0);
+        let mut p_min = projective.camera_from_raster.apply(Point3f::ZERO);
+        let mut p_max = projective.camera_from_raster.apply(Point3f::new(res.x as Float, res.y as Float, 0.0));
 
         p_min = p_min / p_min.z;
         p_max = p_max / p_max.z;
@@ -377,7 +377,7 @@ impl PerspectiveCamera {
 impl AbstractCamera for PerspectiveCamera {
     fn generate_ray(&self, sample: &CameraSample, _lambda: &SampledWavelengths) -> Option<CameraRay> {
         let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
-        let p_camera = self.projective.camera_from_raster * p_film;
+        let p_camera = self.projective.camera_from_raster.apply(p_film);
 
         let mut ray = Ray::new_with_medium_time(
             Point3f::ZERO,
@@ -396,14 +396,14 @@ impl AbstractCamera for PerspectiveCamera {
         }
 
         Some(CameraRay {
-            ray: self.projective.camera_base.render_from_camera(ray),
+            ray: self.projective.camera_base.render_from_camera_ray(&ray),
             weight: SampledSpectrum::from_const(1.0),
         })
     }
 
     fn generate_ray_differential(&self, sample: &CameraSample, _lambda: &SampledWavelengths) -> Option<CameraRayDifferential> {
         let p_film = Point3f::new(sample.p_film.x, sample.p_film.y, 0.0);
-        let p_camera = self.projective.camera_from_raster * p_film;
+        let p_camera = self.projective.camera_from_raster.apply(p_film);
 
         let dir = Vec3f::from(p_camera).normalize();
         let mut ray = Ray::new_with_medium_time(
@@ -448,7 +448,7 @@ impl AbstractCamera for PerspectiveCamera {
         };
 
         Some(CameraRayDifferential::new(
-            self.projective.camera_base.render_from_camera(RayDifferential { ray, aux: Some(aux) })
+            self.projective.camera_base.render_from_camera_ray(&RayDifferential { ray, aux: Some(aux) })
         ))
     }
 

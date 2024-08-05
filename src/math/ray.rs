@@ -2,6 +2,8 @@
 
 use std::sync::Arc;
 
+use vect::Dot;
+
 use crate::{math::*, media::Medium};
 
 
@@ -102,7 +104,7 @@ impl Ray {
         let d = Point3f::from(n).abs().dot(pi.error());
         let mut offset = Vec3f::from(n) * d;
 
-        if w.dot(n.into()) < 0.0 {
+        if w.dot(n) < 0.0 {
             offset = -offset;
         }
         let po = Point3f::from(pi) + offset;

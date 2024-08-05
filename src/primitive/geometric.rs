@@ -32,15 +32,15 @@ impl AbstractPrimitive for GeometricPrimitive {
         self.shape.bounds()
     }
 
-    fn intersect(&self, ray: Ray, t_max: Float) -> Option<ShapeIntersection> {
-        let mut si = self.shape.intersect(ray.clone(), t_max)?;
+    fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection> {
+        let mut si = self.shape.intersect(ray, t_max)?;
         debug_assert!(si.t_hit < 1.001 * t_max);
 
         si.intr.set_intersection_properties(&self.material, &self.area_light, &self.medium_interface, &ray.medium);
         Some(si)
     }
 
-    fn intersect_predicate(&self, ray: Ray, t_max: Float) -> bool {
+    fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
         self.intersect(ray, t_max).is_some()
     }
 }

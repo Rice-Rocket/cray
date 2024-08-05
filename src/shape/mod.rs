@@ -15,11 +15,11 @@ pub trait AbstractShape {
     /// intersection. The rays are passed in rendering space, so shapes are responsible for transforming them to
     /// object space if needed for intersection tests. The intersection information returned should
     /// be in rendering space.
-    fn intersect(&self, ray: Ray, t_max: Float) -> Option<ShapeIntersection>;
+    fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection>;
 
     /// Detects if an intersection occurred, but does not return information about the
     /// intersection.
-    fn intersect_predicate(&self, ray: Ray, t_max: Float) -> bool;
+    fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool;
 
     /// Surface area of the shape in rendering space
     fn area(&self) -> Float;
@@ -58,13 +58,13 @@ impl AbstractShape for Shape {
         }
     }
 
-    fn intersect(&self, ray: Ray, t_max: Float) -> Option<ShapeIntersection> {
+    fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection> {
         match self {
             Shape::Sphere(s) => s.intersect(ray, t_max),
         }
     }
 
-    fn intersect_predicate(&self, ray: Ray, t_max: Float) -> bool {
+    fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
         match self {
             Shape::Sphere(s) => s.intersect_predicate(ray, t_max),
         }

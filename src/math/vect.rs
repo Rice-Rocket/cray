@@ -3,7 +3,6 @@ use approx::{AbsDiffEq, RelativeEq, UlpsEq};
 
 use crate::math::*;
 
-
 macro_rules! decl_vect {
     ($name:ident; $($v:ident),*) => {
         #[derive(Clone, Copy)]
@@ -13,29 +12,54 @@ macro_rules! decl_vect {
     }
 }
 
+decl_vect!(Point2; x,y);
+decl_vect!(Point3; x,y,z);
+decl_vect!(Point4; x,y,z,w);
+decl_vect!(Vec2; x,y);
+decl_vect!(Vec3; x,y,z);
+decl_vect!(Vec4; x,y,z,w);
+decl_vect!(Normal2; x,y);
+decl_vect!(Normal3; x,y,z);
 
-macro_rules! create_vect {
-    ($name:ident; $a:ident, $($b:ident),*; $alias0:ident:$out0:ident, $($alias:ident:$out:ident:$x:ident-$($y:ident)-*),*) => {
-        create_vect!($name; $a, $($b),*; $a; $($b),*; $alias0:$out0:$a-$($b)-*, $($alias:$out:$x-$($y)-*),*; $($alias:$x-$($y)-*),*);
-    };
-    ($name:ident; $($v:ident),*; $x:ident; $($y:ident),*; $($alias:ident:$out:ident:$($z:ident)-*),*; $($alias0:ident:$($z0:ident)-*),*) => {
-        impl<T: Clone + Copy> $name<T> {
+macro_rules! impl_new {
+    ($name:ident; $($v:ident),*) => {
+        impl<T> $name<T> {
             #[inline]
             pub const fn new($($v: T,)*) -> Self {
                 Self {$(
                     $v,
                 )*}
             }
+        }
 
+        impl<T: Copy> $name<T> {
             #[inline]
             pub const fn splat(v: T) -> Self {
                 Self {$(
                     $v: v,
                 )*}
             }
+        }
+    }
+}
 
+impl_new!(Point2; x,y);
+impl_new!(Point3; x,y,z);
+impl_new!(Point4; x,y,z,w);
+impl_new!(Vec2; x,y);
+impl_new!(Vec3; x,y,z);
+impl_new!(Vec4; x,y,z,w);
+impl_new!(Normal2; x,y);
+impl_new!(Normal3; x,y,z);
+
+macro_rules! impl_map_zip {
+    ($name:ident; $($v:ident),*) => {
+        impl<T> $name<T> {
             #[inline]
-            pub fn map<U, F: Fn(T) -> U>(self, f: F) -> $name<U> {
+            pub fn map<F, U>(self, f: F) -> $name<U>
+            where
+                F: Fn(T) -> U
+            {
                 $name::<U> {$(
                     $v: f(self.$v),
                 )*}
@@ -48,27 +72,189 @@ macro_rules! create_vect {
                 )*}
             }
         }
+    }
+}
 
-        impl<T: Clone + Copy + Numeric + PartialOrd> $name<T> {
-            pub const MIN: Self = Self::splat(T::MIN);
-            pub const MAX: Self = Self::splat(T::MAX);
-            pub const ZERO: Self = Self::splat(T::ZERO);
-            pub const ONE: Self = Self::splat(T::ONE);
+impl_map_zip!(Point2; x,y);
+impl_map_zip!(Point3; x,y,z);
+impl_map_zip!(Point4; x,y,z,w);
+impl_map_zip!(Vec2; x,y);
+impl_map_zip!(Vec3; x,y,z);
+impl_map_zip!(Vec4; x,y,z,w);
+impl_map_zip!(Normal2; x,y);
+impl_map_zip!(Normal3; x,y,z);
 
+macro_rules! impl_consts {
+    ($name2:ident, $name3:ident) => {
+        impl<T: NumericConsts> $name2<T> {
+            pub const MIN: Self = Self::new(T::MIN, T::MIN);
+            pub const MAX: Self = Self::new(T::MAX, T::MAX);
+            pub const ZERO: Self = Self::new(T::ZERO, T::ZERO);
+            pub const ONE: Self = Self::new(T::ONE, T::ONE);
+        }
+
+        impl<T: NumericConsts> $name3<T> {
+            pub const MIN: Self = Self::new(T::MIN, T::MIN, T::MIN);
+            pub const MAX: Self = Self::new(T::MAX, T::MAX, T::MAX);
+            pub const ZERO: Self = Self::new(T::ZERO, T::ZERO, T::ZERO);
+            pub const ONE: Self = Self::new(T::ONE, T::ONE, T::ONE);
+        }
+    }
+}
+
+macro_rules! impl_consts_4 {
+    ($name:ident) => {
+        impl<T: NumericConsts> $name<T> {
+            pub const MIN: Self = Self::new(T::MIN, T::MIN, T::MIN, T::MIN);
+            pub const MAX: Self = Self::new(T::MAX, T::MAX, T::MAX, T::MAX);
+            pub const ZERO: Self = Self::new(T::ZERO, T::ZERO, T::ZERO, T::ZERO);
+            pub const ONE: Self = Self::new(T::ONE, T::ONE, T::ONE, T::ONE);
+        }
+    }
+}
+
+impl_consts!(Point2, Point3);
+impl_consts!(Vec2, Vec3);
+impl_consts!(Normal2, Normal3);
+impl_consts_4!(Point4);
+impl_consts_4!(Vec4);
+
+pub trait Dot<Rhs> {
+    type Output;
+
+    fn dot(self, rhs: Rhs) -> Self::Output;
+}
+
+macro_rules! impl_binop {
+    ($trait_name:ident, $fn_name:ident, [$self:ident: $ta:ident, $rhs:ident: $tb:ident] -> { $f:expr } where $($where_clause:tt)*) => {
+        impl<T> $trait_name<$tb<T>> for $ta<T>
+        where
+            $($where_clause)*
+        {
+            type Output = T;
+
+            fn $fn_name($self, $rhs: $tb<T>) -> Self::Output {
+                $f
+            }
+        }
+    };
+    ($trait_name:ident, $fn_name:ident, [$self:ident: $ta:ident, $rhs:ident: $tb:ident] -> $output:ident { $f:expr } where $($where_clause:tt)*) => {
+        impl<T> $trait_name<$tb<T>> for $ta<T>
+        where
+            $($where_clause)*
+        {
+            type Output = $output<T>;
+
+            fn $fn_name($self, $rhs: $tb<T>) -> Self::Output {
+                $f
+            }
+        }
+    };
+}
+
+macro_rules! impl_binop_2 {
+    ($trait_name:ident, $fn_name:ident, [$self:ident, $rhs:ident] -> T { $f:expr } where $($where_clause:tt)*) => {
+        impl_binop!($trait_name, $fn_name, [$self: Point2, $rhs: Point2] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Point2, $rhs: Vec2] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Point2, $rhs: Normal2] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec2, $rhs: Point2] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec2, $rhs: Vec2] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec2, $rhs: Normal2] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Normal2, $rhs: Point2] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Normal2, $rhs: Vec2] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Normal2, $rhs: Normal2] -> { $f } where $($where_clause)*);
+    };
+    ($trait_name:ident, $fn_name:ident, [$self:ident, $rhs:ident] -> Self { $f:expr } where $($where_clause:tt)*) => {
+        impl_binop!($trait_name, $fn_name, [$self: Point2, $rhs: Point2] -> Point2 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Point2, $rhs: Vec2] -> Point2 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Point2, $rhs: Normal2] -> Point2 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec2, $rhs: Point2] -> Vec2 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec2, $rhs: Vec2] -> Vec2 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec2, $rhs: Normal2] -> Vec2 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Normal2, $rhs: Point2] -> Normal2 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Normal2, $rhs: Vec2] -> Normal2 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Normal2, $rhs: Normal2] -> Normal2 { $f } where $($where_clause)*);
+    };
+}
+
+macro_rules! impl_binop_3 {
+    ($trait_name:ident, $fn_name:ident, [$self:ident, $rhs:ident] -> T { $f:expr } where $($where_clause:tt)*) => {
+        impl_binop!($trait_name, $fn_name, [$self: Point3, $rhs: Point3] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Point3, $rhs: Vec3] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Point3, $rhs: Normal3] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec3, $rhs: Point3] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec3, $rhs: Vec3] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec3, $rhs: Normal3] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Normal3, $rhs: Point3] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Normal3, $rhs: Vec3] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Normal3, $rhs: Normal3] -> { $f } where $($where_clause)*);
+    };
+    ($trait_name:ident, $fn_name:ident, [$self:ident, $rhs:ident] -> Self { $f:expr } where $($where_clause:tt)*) => {
+        impl_binop!($trait_name, $fn_name, [$self: Point3, $rhs: Point3] -> Point3 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Point3, $rhs: Vec3] -> Point3 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Point3, $rhs: Normal3] -> Point3 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec3, $rhs: Point3] -> Vec3 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec3, $rhs: Vec3] -> Vec3 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec3, $rhs: Normal3] -> Vec3 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Normal3, $rhs: Point3] -> Normal3 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Normal3, $rhs: Vec3] -> Normal3 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Normal3, $rhs: Normal3] -> Normal3 { $f } where $($where_clause)*);
+    };
+}
+
+macro_rules! impl_binop_4 {
+    ($trait_name:ident, $fn_name:ident, [$self:ident, $rhs:ident] -> T { $f:expr } where $($where_clause:tt)*) => {
+        impl_binop!($trait_name, $fn_name, [$self: Point4, $rhs: Point4] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Point4, $rhs: Vec4] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec4, $rhs: Point4] -> { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec4, $rhs: Vec4] -> { $f } where $($where_clause)*);
+    };
+    ($trait_name:ident, $fn_name:ident, [$self:ident, $rhs:ident] -> Self { $f:expr } where $($where_clause:tt)*) => {
+        impl_binop!($trait_name, $fn_name, [$self: Point4, $rhs: Point4] -> Point4 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Point4, $rhs: Vec4] -> Point4 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec4, $rhs: Point4] -> Vec4 { $f } where $($where_clause)*);
+        impl_binop!($trait_name, $fn_name, [$self: Vec4, $rhs: Vec4] -> Vec4 { $f } where $($where_clause)*);
+    };
+}
+
+impl_binop_2!(Dot, dot, [self, rhs] -> T { self.x * rhs.x + self.y * rhs.y } where T: Mul<T, Output = T> + Add<T, Output = T>);
+impl_binop_3!(Dot, dot, [self, rhs] -> T { self.x * rhs.x + self.y * rhs.y + self.z * rhs.z } where T: Mul<T, Output = T> + Add<T, Output = T>);
+impl_binop_4!(Dot, dot, [self, rhs] -> T { self.x * rhs.x + self.y * rhs.y + self.z * rhs.z + self.w * rhs.w } where T: Mul<T, Output = T> + Add<T, Output = T>);
+
+impl_binop_2!(Add, add, [self, rhs] -> Self { Self::new(self.x + rhs.x, self.y + rhs.y) } where T: Add<T, Output = T>);
+impl_binop_3!(Add, add, [self, rhs] -> Self { Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z) } where T: Add<T, Output = T>);
+impl_binop_4!(Add, add, [self, rhs] -> Self { Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z, self.w + rhs.w) } where T: Add<T, Output = T>);
+
+impl_binop_2!(Sub, sub, [self, rhs] -> Self { Self::new(self.x - rhs.x, self.y - rhs.y) } where T: Sub<T, Output = T>);
+impl_binop_3!(Sub, sub, [self, rhs] -> Self { Self::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z) } where T: Sub<T, Output = T>);
+impl_binop_4!(Sub, sub, [self, rhs] -> Self { Self::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z, self.w - rhs.w) } where T: Sub<T, Output = T>);
+
+impl_binop_2!(Mul, mul, [self, rhs] -> Self { Self::new(self.x * rhs.x, self.y * rhs.y) } where T: Mul<T, Output = T>);
+impl_binop_3!(Mul, mul, [self, rhs] -> Self { Self::new(self.x * rhs.x, self.y * rhs.y, self.z * rhs.z) } where T: Mul<T, Output = T>);
+impl_binop_4!(Mul, mul, [self, rhs] -> Self { Self::new(self.x * rhs.x, self.y * rhs.y, self.z * rhs.z, self.w * rhs.w) } where T: Mul<T, Output = T>);
+
+impl_binop_2!(Div, div, [self, rhs] -> Self { Self::new(self.x / rhs.x, self.y / rhs.y) } where T: Div<T, Output = T>);
+impl_binop_3!(Div, div, [self, rhs] -> Self { Self::new(self.x / rhs.x, self.y / rhs.y, self.z / rhs.z) } where T: Div<T, Output = T>);
+impl_binop_4!(Div, div, [self, rhs] -> Self { Self::new(self.x / rhs.x, self.y / rhs.y, self.z / rhs.z, self.w / rhs.w) } where T: Div<T, Output = T>);
+
+macro_rules! impl_vec_ops {
+    ($name:ident; $a:ident, $($b:ident),*; $alias0:ident:$out0:ident, $($alias:ident:$out:ident:$x:ident-$($y:ident)-*),*) => {
+        impl_vec_ops!($name; $a, $($b),*; $a; $($b),*; $alias0:$out0:$a-$($b)-*, $($alias:$out:$x-$($y)-*),*; $($alias:$x-$($y)-*),*);
+    };
+    ($name:ident; $($v:ident),*; $x:ident; $($y:ident),*; $($alias:ident:$out:ident:$($z:ident)-*),*; $($alias0:ident:$($z0:ident)-*),*) => {
+        impl<T: NumericOrd> $name<T> {
             #[inline]
             pub fn min_element(self) -> T {
-                self.$x$(
-                    .nmin(self.$y)
-                )*
+                self.$x$(.nmin(self.$y))*
             }
 
             #[inline]
             pub fn max_element(self) -> T {
-                self.$x$(
-                    .nmax(self.$y)
-                )*
+                self.$x$(.nmax(self.$y))*
             }
+        }
 
+        impl<T: NumericOrd> $name<T> {
             #[inline]
             pub fn min(self, rhs: Self) -> Self {
                 Self {$(
@@ -84,7 +270,10 @@ macro_rules! create_vect {
             }
 
             #[inline]
-            pub fn clamp(self, min: Self, max: Self) -> Self {
+            pub fn clamp(self, min: Self, max: Self) -> Self
+            where
+                T: PartialOrd
+            {
                 $(debug_assert!(min.$v < max.$v);)*
                 self.max(min).min(max)
             }
@@ -97,31 +286,27 @@ macro_rules! create_vect {
             }
         }
 
-        impl<T: Numeric + NumericNegative + Mul<T, Output = T>> $name<T> {
+        impl<T: NumericNegative> $name<T> {
             #[inline]
             pub fn abs(self) -> Self {
                 Self {$(
-                    $v: self.$v.nabs(),
+                    $v: self.$v.abs(),
                 )*}
             }
 
             #[inline]
             pub fn signum(self) -> Self {
                 Self {$(
-                    $v: self.$v.nsign(),
+                    $v: self.$v.sign(),
                 )*}
             }
 
             #[inline]
-            pub fn copysign(self, rhs: Self) -> Self {
+            pub fn copysign(self, rhs: Self) -> Self
+            where
+                T: Mul<T, Output = T>
+            {
                 self.abs() * rhs.signum()
-            }
-        }
-
-        impl<T: Clone + Copy + Add<T, Output = T> + Mul<T, Output = T>> $name<T> {
-            #[inline]
-            pub fn dot(self, rhs: Self) -> T {
-                self.$x * rhs.$x $(+ self.$y * rhs.$y)*
             }
         }
 
@@ -158,7 +343,7 @@ macro_rules! create_vect {
 
             #[inline]
             pub fn is_normalized(self) -> bool {
-                (self.length_squared() - T::ONE).nabs() <= T::BIG_EPSILON
+                (self.length_squared() - T::ONE).abs() <= T::BIG_EPSILON
             }
 
             #[inline]
@@ -266,7 +451,7 @@ macro_rules! create_vect {
 
             #[inline]
             pub fn facing(self, rhs: Self) -> Self {
-                if self.dot(rhs).nsign() < T::ZERO {
+                if self.dot(rhs).sign() < T::ZERO {
                     -self
                 } else {
                     self
@@ -301,7 +486,7 @@ macro_rules! create_vect {
             }
         }
 
-        impl<T: Clone + Copy + Div<T, Output = T> + Numeric + PartialEq> Div<T> for $name<T> {
+        impl<T: Clone + Copy + Div<T, Output = T> + NumericConsts + PartialEq> Div<T> for $name<T> {
             type Output = $name<T>;
             fn div(self, rhs: T) -> Self::Output {
                 debug_assert!(rhs != T::ZERO);
@@ -328,76 +513,6 @@ macro_rules! create_vect {
         }
 
         $(
-            impl<T: Add<T, Output = T>> Add<$alias<T>> for $name<T> {
-                type Output = $out<T>;
-                fn add(self, rhs: $alias<T>) -> Self::Output {
-                    $out {$(
-                        $z: self.$z + rhs.$z,
-                    )*}
-                }
-            }
-
-            impl<T: Sub<T, Output = T>> Sub<$alias<T>> for $name<T> {
-                type Output = $out<T>;
-                fn sub(self, rhs: $alias<T>) -> Self::Output {
-                    $out {$(
-                        $z: self.$z - rhs.$z,
-                    )*}
-                }
-            }
-
-            impl<T: Mul<T, Output = T>> Mul<$alias<T>> for $name<T> {
-                type Output = $out<T>;
-                fn mul(self, rhs: $alias<T>) -> Self::Output {
-                    $out {$(
-                        $z: self.$z * rhs.$z,
-                    )*}
-                }
-            }
-
-            impl<T: Div<T, Output = T> + Numeric + PartialEq> Div<$alias<T>> for $name<T> {
-                type Output = $out<T>;
-                fn div(self, rhs: $alias<T>) -> Self::Output {
-                    $(debug_assert!(rhs.$z != T::ZERO);)*
-                    $out {$(
-                        $z: self.$z / rhs.$z,
-                    )*}
-                }
-            }
-
-            impl<T: AddAssign<T>> AddAssign<$alias<T>> for $name<T> {
-                fn add_assign(&mut self, rhs: $alias<T>) {
-                    $(
-                        self.$z += rhs.$z;
-                    )*
-                }
-            }
-
-            impl<T: SubAssign<T>> SubAssign<$alias<T>> for $name<T> {
-                fn sub_assign(&mut self, rhs: $alias<T>) {
-                    $(
-                        self.$z -= rhs.$z;
-                    )*
-                }
-            }
-
-            impl<T: MulAssign<T>> MulAssign<$alias<T>> for $name<T> {
-                fn mul_assign(&mut self, rhs: $alias<T>) {
-                    $(
-                        self.$z *= rhs.$z;
-                    )*
-                }
-            }
-
-            impl<T: DivAssign<T>> DivAssign<$alias<T>> for $name<T> {
-                fn div_assign(&mut self, rhs: $alias<T>) {
-                    $(
-                        self.$z /= rhs.$z;
-                    )*
-                }
-            }
-        )*
-        $(
             impl<T> From<$alias0<T>> for $name<T> {
                 fn from(value: $alias0<T>) -> Self {
                     Self {$(
@@ -417,25 +532,14 @@ macro_rules! create_vect {
     }
 }
 
-
-decl_vect!(TPoint2; x,y);
-decl_vect!(TPoint3; x,y,z);
-decl_vect!(TPoint4; x,y,z,w);
-decl_vect!(TVec2; x,y);
-decl_vect!(TVec3; x,y,z);
-decl_vect!(TVec4; x,y,z,w);
-decl_vect!(TNormal2; x,y);
-decl_vect!(TNormal3; x,y,z);
-
-create_vect!(TPoint2; x, y; TPoint2:TPoint2, TVec2:TPoint2:x-y, TNormal2:TPoint2:x-y);
-create_vect!(TPoint3; x,y,z; TPoint3:TPoint3, TVec3:TPoint3:x-y-z, TNormal3:TPoint3:x-y-z);
-create_vect!(TPoint4; x,y,z,w; TPoint4:TPoint4, TVec4:TPoint4:x-y-z-w);
-create_vect!(TVec2; x,y; TVec2:TVec2, TPoint2:TPoint2:x-y, TNormal2:TVec2:x-y);
-create_vect!(TVec3; x,y,z; TVec3:TVec3, TPoint3:TPoint3:x-y-z, TNormal3:TVec3:x-y-z);
-create_vect!(TVec4; x,y,z,w; TVec4:TVec4, TPoint4:TPoint4:x-y-z-w);
-create_vect!(TNormal2; x,y; TNormal2:TNormal2, TPoint2:TPoint2:x-y, TVec2:TVec2:x-y);
-create_vect!(TNormal3; x,y,z; TNormal3:TNormal3, TPoint3:TPoint3:x-y-z, TVec3:TVec3:x-y-z);
-
+impl_vec_ops!(Point2; x, y; Point2:Point2, Vec2:Point2:x-y, Normal2:Point2:x-y);
+impl_vec_ops!(Point3; x,y,z; Point3:Point3, Vec3:Point3:x-y-z, Normal3:Point3:x-y-z);
+impl_vec_ops!(Point4; x,y,z,w; Point4:Point4, Vec4:Point4:x-y-z-w);
+impl_vec_ops!(Vec2; x,y; Vec2:Vec2, Point2:Point2:x-y, Normal2:Vec2:x-y);
+impl_vec_ops!(Vec3; x,y,z; Vec3:Vec3, Point3:Point3:x-y-z, Normal3:Vec3:x-y-z);
+impl_vec_ops!(Vec4; x,y,z,w; Vec4:Vec4, Point4:Point4:x-y-z-w);
+impl_vec_ops!(Normal2; x,y; Normal2:Normal2, Point2:Point2:x-y, Vec2:Vec2:x-y);
+impl_vec_ops!(Normal3; x,y,z; Normal3:Normal3, Point3:Point3:x-y-z, Vec3:Vec3:x-y-z);
 
 macro_rules! impl_index {
     ($($ty:ident; $dim:expr; $($index:tt / $axis:ident => $v:ident),*);* $(;)*) => {
@@ -511,14 +615,14 @@ macro_rules! impl_index {
 
 
 impl_index!(
-    TPoint2; 2; 0 / X => x, 1 / Y => y;
-    TPoint3; 3; 0 / X => x, 1 / Y => y, 2 / Z => z;
-    TPoint4; 4; 0 / X => x, 1 / Y => y, 2 / Z => z, 3 / W => w;
-    TVec2; 2; 0 / X => x, 1 / Y => y;
-    TVec3; 3; 0 / X => x, 1 / Y => y, 2 / Z => z;
-    TVec4; 4; 0 / X => x, 1 / Y => y, 2 / Z => z, 3 / W => w;
-    TNormal2; 2; 0 / X => x, 1 / Y => y;
-    TNormal3; 3; 0 / X => x, 1 / Y => y, 2 / Z => z;
+    Point2; 2; 0 / X => x, 1 / Y => y;
+    Point3; 3; 0 / X => x, 1 / Y => y, 2 / Z => z;
+    Point4; 4; 0 / X => x, 1 / Y => y, 2 / Z => z, 3 / W => w;
+    Vec2; 2; 0 / X => x, 1 / Y => y;
+    Vec3; 3; 0 / X => x, 1 / Y => y, 2 / Z => z;
+    Vec4; 4; 0 / X => x, 1 / Y => y, 2 / Z => z, 3 / W => w;
+    Normal2; 2; 0 / X => x, 1 / Y => y;
+    Normal3; 3; 0 / X => x, 1 / Y => y, 2 / Z => z;
 );
 
 
@@ -539,7 +643,7 @@ macro_rules! impl_cross {
     }
 }
 
-impl_cross!(TVec3, TNormal3);
+impl_cross!(Vec3, Normal3);
 
 
 macro_rules! impl_interval {
@@ -588,14 +692,14 @@ macro_rules! impl_interval {
 }
 
 impl_interval!(
-    TPoint2 => Float: x,y;
-    TPoint3 => Float: x,y,z;
-    TPoint4 => Float: x,y,z,w;
-    TVec2 => Float: x,y;
-    TVec3 => Float: x,y,z;
-    TVec4 => Float: x,y,z,w;
-    TNormal2 => Float: x,y;
-    TNormal3 => Float: x,y,z;
+    Point2 => Float: x,y;
+    Point3 => Float: x,y,z;
+    Point4 => Float: x,y,z,w;
+    Vec2 => Float: x,y;
+    Vec3 => Float: x,y,z;
+    Vec4 => Float: x,y,z,w;
+    Normal2 => Float: x,y;
+    Normal3 => Float: x,y,z;
 );
 
 
@@ -613,14 +717,14 @@ macro_rules! impl_debug {
 }
 
 impl_debug!(
-    TPoint2: x,y;
-    TPoint3: x,y,z;
-    TPoint4: x,y,z,w;
-    TVec2: x,y;
-    TVec3: x,y,z;
-    TVec4: x,y,z,w;
-    TNormal2: x,y;
-    TNormal3: x,y,z;
+    Point2: x,y;
+    Point3: x,y,z;
+    Point4: x,y,z,w;
+    Vec2: x,y;
+    Vec3: x,y,z;
+    Vec4: x,y,z,w;
+    Normal2: x,y;
+    Normal3: x,y,z;
 );
 
 
@@ -675,14 +779,14 @@ macro_rules! impl_approx {
 }
 
 impl_approx!(
-    TPoint2: x,y;
-    TPoint3: x,y,z;
-    TPoint4: x,y,z,w;
-    TVec2: x,y;
-    TVec3: x,y,z;
-    TVec4: x,y,z,w;
-    TNormal2: x,y;
-    TNormal3: x,y,z;
+    Point2: x,y;
+    Point3: x,y,z;
+    Point4: x,y,z,w;
+    Vec2: x,y;
+    Vec3: x,y,z;
+    Vec4: x,y,z,w;
+    Normal2: x,y;
+    Normal3: x,y,z;
 );
 
 
@@ -702,31 +806,31 @@ macro_rules! impl_mul_prim {
     }
 }
 
-impl_mul_prim!(f32: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
-               f64: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
-               i8: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
-               i16: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
-               i32: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
-               i64: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
-               i128: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
-               u8: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
-               u16: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
-               u32: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
-               u64: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
-               u128: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3;
-               Interval: TPoint2, TPoint3, TPoint4, TVec2, TVec3, TVec4, TNormal2, TNormal3);
+impl_mul_prim!(f32: Point2, Point3, Point4, Vec2, Vec3, Vec4, Normal2, Normal3;
+               f64: Point2, Point3, Point4, Vec2, Vec3, Vec4, Normal2, Normal3;
+               i8: Point2, Point3, Point4, Vec2, Vec3, Vec4, Normal2, Normal3;
+               i16: Point2, Point3, Point4, Vec2, Vec3, Vec4, Normal2, Normal3;
+               i32: Point2, Point3, Point4, Vec2, Vec3, Vec4, Normal2, Normal3;
+               i64: Point2, Point3, Point4, Vec2, Vec3, Vec4, Normal2, Normal3;
+               i128: Point2, Point3, Point4, Vec2, Vec3, Vec4, Normal2, Normal3;
+               u8: Point2, Point3, Point4, Vec2, Vec3, Vec4, Normal2, Normal3;
+               u16: Point2, Point3, Point4, Vec2, Vec3, Vec4, Normal2, Normal3;
+               u32: Point2, Point3, Point4, Vec2, Vec3, Vec4, Normal2, Normal3;
+               u64: Point2, Point3, Point4, Vec2, Vec3, Vec4, Normal2, Normal3;
+               u128: Point2, Point3, Point4, Vec2, Vec3, Vec4, Normal2, Normal3;
+               Interval: Point2, Point3, Point4, Vec2, Vec3, Vec4, Normal2, Normal3);
 
 
-impl<T: NumericField + NumericNegative + NumericFloat> TVec3<T> {
-    pub fn local_basis(self) -> (TVec3<T>, TVec3<T>) {
+impl<T: NumericField + NumericNegative + NumericFloat> Vec3<T> {
+    pub fn local_basis(self) -> (Vec3<T>, Vec3<T>) {
         debug_assert!(self.is_normalized());
 
-        let sign = self.z.nsign();
+        let sign = self.z.sign();
         let a = T::NEG_ONE / (sign + self.z);
         let b = self.x * self.y * a;
         (
-            TVec3::new(T::ONE + sign * sqr(self.x) * a, sign * b, -sign * self.x),
-            TVec3::new(b, sign + sqr(self.y) * a, -self.y)
+            Vec3::new(T::ONE + sign * sqr(self.x) * a, sign * b, -sign * self.x),
+            Vec3::new(b, sign + sqr(self.y) * a, -self.y)
         )
     }
 }

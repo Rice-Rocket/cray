@@ -2,9 +2,8 @@ use std::ops::{Add, Div, Mul, Neg, Sub};
 
 /// A trait that provides a blanket implementation for many traits a number
 /// should have.
-
 pub trait NumericField: 
-    Numeric
+    NumericConsts
     + HasNan
     + Clone
     + Copy
@@ -19,7 +18,7 @@ pub trait NumericField:
 
 impl<T> NumericField for T 
 where T: 
-    Numeric 
+    NumericConsts 
     + HasNan
     + Clone
     + Copy
@@ -36,18 +35,20 @@ pub trait NumericNegative {
     const NEG_ONE: Self;
     const NEG_TWO: Self;
 
-    fn nabs(self) -> Self;
-    fn nsign(self) -> Self;
+    fn abs(self) -> Self;
+    fn sign(self) -> Self;
 }
 
-pub trait Numeric {
+pub trait NumericConsts {
     const MIN: Self;
     const MAX: Self;
 
     const ZERO: Self;
     const ONE: Self;
     const TWO: Self;
+}
 
+pub trait NumericOrd {
     fn nmin(self, rhs: Self) -> Self;
     fn nmax(self, rhs: Self) -> Self;
 }
@@ -79,14 +80,16 @@ pub trait HasNan {
 macro_rules! impl_numeric {
     ($($ty:ident, $vmin:expr, $vmax:expr);* $(;)*) => {
         $(
-            impl Numeric for $ty {
+            impl NumericConsts for $ty {
                 const MAX: $ty = $vmax;
                 const MIN: $ty = $vmin;
 
                 const ZERO: $ty = 0 as $ty;
                 const ONE: $ty = 1 as $ty;
                 const TWO: $ty = 2 as $ty;
+            }
 
+            impl NumericOrd for $ty {
                 fn nmin(self, rhs: Self) -> Self {
                     self.min(rhs)
                 }
@@ -106,11 +109,11 @@ macro_rules! impl_numeric_negative {
                 const NEG_ONE: $ty = -1 as $ty;
                 const NEG_TWO: $ty = -2 as $ty;
 
-                fn nabs(self) -> Self {
+                fn abs(self) -> Self {
                     self.abs()
                 }
 
-                fn nsign(self) -> Self {
+                fn sign(self) -> Self {
                     self.signum()
                 }
             }

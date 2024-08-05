@@ -85,9 +85,9 @@ macro_rules! create_mat {
     }
 }
 
-create_mat!(TMat2; TVec2; 2, 2; 0;0;m00-1;m01,1;0;m10-1;m11);
-create_mat!(TMat3; TVec3; 3, 3; 0;0;m00-1;m01-2;m02,1;0;m10-1;m11-2;m12,2;0;m20-1;m21-2;m22);
-create_mat!(TMat4; TVec4; 4, 4; 0;0;m00-1;m01-2;m02-3;m03,1;0;m10-1;m11-2;m12-3;m13,2;0;m20-1;m21-2;m22-3;m23,3;0;m30-1;m31-2;m32-3;m33);
+create_mat!(TMat2; Vec2; 2, 2; 0;0;m00-1;m01,1;0;m10-1;m11);
+create_mat!(TMat3; Vec3; 3, 3; 0;0;m00-1;m01-2;m02,1;0;m10-1;m11-2;m12,2;0;m20-1;m21-2;m22);
+create_mat!(TMat4; Vec4; 4, 4; 0;0;m00-1;m01-2;m02-3;m03,1;0;m10-1;m11-2;m12-3;m13,2;0;m20-1;m21-2;m22-3;m23,3;0;m30-1;m31-2;m32-3;m33);
 
 macro_rules! impl_mul_vect {
     ($name:ident -> $($vect:ident: $($i:expr),*);*) => {
@@ -105,9 +105,9 @@ macro_rules! impl_mul_vect {
     }
 }
 
-impl_mul_vect!(TMat2 -> TVec2:0,1; TPoint2:0,1; TNormal2:0,1);
-impl_mul_vect!(TMat3 -> TVec3:0,1,2; TPoint3:0,1,2; TNormal3:0,1,2);
-impl_mul_vect!(TMat4 -> TVec4:0,1,2,3; TPoint4:0,1,2,3);
+impl_mul_vect!(TMat2 -> Vec2:0,1; Point2:0,1; Normal2:0,1);
+impl_mul_vect!(TMat3 -> Vec3:0,1,2; Point3:0,1,2; Normal3:0,1,2);
+impl_mul_vect!(TMat4 -> Vec4:0,1,2,3; Point4:0,1,2,3);
 
 macro_rules! impl_interval {
     ($($ty:ident -> $prim:ident: $($i:tt,$j:tt)-*);*) => {
@@ -130,7 +130,7 @@ impl_interval!(TMat4 -> Float: 0,0-0,1-0,2-0,3-1,0-1,1-1,2-1,3-2,0-2,1-2,2-2,3-3
 macro_rules! impl_default {
     ($($ty:ident),*) => {
         $(
-            impl<T: Numeric> Default for $ty<T> {
+            impl<T: NumericConsts> Default for $ty<T> {
                 fn default() -> Self {
                     Self::IDENTITY
                 }
@@ -142,7 +142,7 @@ macro_rules! impl_default {
 impl_default!(TMat2, TMat3, TMat4);
 
 
-impl<T: Numeric> TMat2<T> {
+impl<T: NumericConsts> TMat2<T> {
     pub const IDENTITY: Self = Self::new(
         T::ONE,  T::ZERO,
         T::ZERO, T::ONE,
@@ -161,7 +161,7 @@ impl<T: Clone + Copy> TMat2<T> {
 
 impl<T> TMat2<T> 
 where 
-    T: Clone + Copy + Numeric + NumericFloat + PartialEq + Neg<Output = T> + Mul<T, Output = T> + Sub<T, Output = T>
+    T: Clone + Copy + NumericConsts + NumericFloat + PartialEq + Neg<Output = T> + Mul<T, Output = T> + Sub<T, Output = T>
 {
     #[inline]
     pub fn determinant(self) -> T {
@@ -195,7 +195,7 @@ where
 }
 
 
-impl<T: Numeric> TMat3<T> {
+impl<T: NumericConsts> TMat3<T> {
     pub const IDENTITY: Self = Self::new(
         T::ONE,  T::ZERO, T::ZERO,
         T::ZERO, T::ONE,  T::ZERO,
@@ -216,7 +216,7 @@ impl<T: Clone + Copy> TMat3<T> {
 
 impl<T> TMat3<T> 
 where 
-    T: Clone + Copy + Numeric + NumericFloat + PartialEq + Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T>
+    T: Clone + Copy + NumericConsts + NumericFloat + PartialEq + Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T>
 {
     #[inline]
     pub fn determinant(self) -> T {
@@ -239,13 +239,13 @@ where
             return None;
         }
 
-        let inv_det = TVec3::splat(det.ninv());
+        let inv_det = Vec3::splat(det.ninv());
         Some(Self([tmp0.mul(inv_det).into(), tmp1.mul(inv_det).into(), tmp2.mul(inv_det).into()]).transpose())
     }
 }
 
 
-impl<T: Numeric> TMat4<T> {
+impl<T: NumericConsts> TMat4<T> {
     pub const IDENTITY: Self = Self::new(
         T::ONE,  T::ZERO, T::ZERO, T::ZERO,
         T::ZERO, T::ONE,  T::ZERO, T::ZERO,
@@ -268,7 +268,7 @@ impl<T: Clone + Copy> TMat4<T> {
 
 impl<T> TMat4<T>
 where 
-    T: Clone + Copy + Numeric + NumericNegative + NumericFloat + PartialEq + Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T>
+    T: Clone + Copy + NumericConsts + NumericNegative + NumericFloat + PartialEq + Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T>
 {
     #[inline]
     pub fn determinant(self) -> T {
@@ -321,25 +321,25 @@ where
         let coef22 = m10 * m31 - m30 * m11;
         let coef23 = m10 * m21 - m20 * m11;
 
-        let fac0 = TVec4::new(coef00, coef00, coef02, coef03);
-        let fac1 = TVec4::new(coef04, coef04, coef06, coef07);
-        let fac2 = TVec4::new(coef08, coef08, coef10, coef11);
-        let fac3 = TVec4::new(coef12, coef12, coef14, coef15);
-        let fac4 = TVec4::new(coef16, coef16, coef18, coef19);
-        let fac5 = TVec4::new(coef20, coef20, coef22, coef23);
+        let fac0 = Vec4::new(coef00, coef00, coef02, coef03);
+        let fac1 = Vec4::new(coef04, coef04, coef06, coef07);
+        let fac2 = Vec4::new(coef08, coef08, coef10, coef11);
+        let fac3 = Vec4::new(coef12, coef12, coef14, coef15);
+        let fac4 = Vec4::new(coef16, coef16, coef18, coef19);
+        let fac5 = Vec4::new(coef20, coef20, coef22, coef23);
 
-        let vec0 = TVec4::new(m10, m00, m00, m00);
-        let vec1 = TVec4::new(m11, m01, m01, m01);
-        let vec2 = TVec4::new(m12, m02, m02, m02);
-        let vec3 = TVec4::new(m13, m03, m03, m03);
+        let vec0 = Vec4::new(m10, m00, m00, m00);
+        let vec1 = Vec4::new(m11, m01, m01, m01);
+        let vec2 = Vec4::new(m12, m02, m02, m02);
+        let vec3 = Vec4::new(m13, m03, m03, m03);
 
         let inv0 = vec1.mul(fac0).sub(vec2.mul(fac1)).add(vec3.mul(fac2));
         let inv1 = vec0.mul(fac0).sub(vec2.mul(fac3)).add(vec3.mul(fac4));
         let inv2 = vec0.mul(fac1).sub(vec1.mul(fac3)).add(vec3.mul(fac5));
         let inv3 = vec0.mul(fac2).sub(vec1.mul(fac4)).add(vec2.mul(fac5));
 
-        let sign_a = TVec4::new(T::ONE, T::NEG_ONE, T::ONE, T::NEG_ONE);
-        let sign_b = TVec4::new(T::NEG_ONE, T::ONE, T::NEG_ONE, T::ONE);
+        let sign_a = Vec4::new(T::ONE, T::NEG_ONE, T::ONE, T::NEG_ONE);
+        let sign_b = Vec4::new(T::NEG_ONE, T::ONE, T::NEG_ONE, T::ONE);
 
         let inverse = Self([
             inv0.mul(sign_a).into(),
@@ -348,7 +348,7 @@ where
             inv3.mul(sign_b).into(),
         ]);
 
-        let col0 = TVec4::new(
+        let col0 = Vec4::new(
             inverse.rowc::<0>().x,
             inverse.rowc::<1>().x,
             inverse.rowc::<2>().x,
@@ -370,9 +370,9 @@ where
 
 impl<T> TMat4<T>
 where 
-    T: Clone + Copy + Numeric + Neg<Output = T> + Add<T, Output = T> + Mul<T, Output = T> + Sub<T, Output = T>
+    T: Clone + Copy + NumericConsts + Neg<Output = T> + Add<T, Output = T> + Mul<T, Output = T> + Sub<T, Output = T>
 {
-    pub fn from_translation(delta: TPoint3<T>) -> Self {
+    pub fn from_translation(delta: Point3<T>) -> Self {
         Self::new(
             T::ONE,  T::ZERO, T::ZERO, delta.x,
             T::ZERO, T::ONE,  T::ZERO, delta.y,
@@ -408,7 +408,7 @@ where
         )
     }
 
-    pub fn from_rotation(sin_theta: T, cos_theta: T, axis: TVec3<T>) -> Self {
+    pub fn from_rotation(sin_theta: T, cos_theta: T, axis: Vec3<T>) -> Self {
         Self::new(
             axis.x * axis.x + (T::ONE - axis.x * axis.x) * cos_theta,
             axis.x * axis.y * (T::ONE - cos_theta) - axis.z * sin_theta,
@@ -429,7 +429,7 @@ where
         )
     }
 
-    pub fn from_scale(s: TVec3<T>) -> Self {
+    pub fn from_scale(s: Vec3<T>) -> Self {
         Self::new(
             s.x, T::ZERO, T::ZERO, T::ZERO,
             T::ZERO, s.y, T::ZERO, T::ZERO,

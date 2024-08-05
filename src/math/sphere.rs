@@ -1,5 +1,7 @@
 // Pbrt 3.8 Spherical Geometry
 
+use vect::Dot;
+
 use crate::math::*;
 
 /// Computes the area of a triangle given by three vectors on the unit sphere
