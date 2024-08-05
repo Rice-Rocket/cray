@@ -54,6 +54,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "cray"
+version = "0.1.0"
+dependencies = [
+ "approx",
+ "arrayvec",
+ "auto_ops",
+ "bitflags 2.6.0",
+ "fast_polynomial",
+ "float-cmp",
+ "glam",
+ "half",
+ "itertools",
+ "num",
+ "once_cell",
+ "ordered-float",
+ "pdqselect",
+ "png",
+ "rand",
+ "rgb2spec",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "crc32fast"
 version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -76,9 +100,9 @@ checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
 
 [[package]]
 name = "fast_polynomial"
-version = "0.1.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "831e16abe0108eef0005da4a921664c9c15707301148c30ecfc5c9ae4b3fdeda"
+checksum = "62eea6ee590b08a5f8b1139f4d6caee195b646d0c07e4b1808fbd5c4dea4829a"
 dependencies = [
  "num-traits",
 ]
@@ -338,30 +362,6 @@ name = "rgb2spec"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58affc6e805f329514b459c98c1ed36062f57e4dbfcbe128b26847c51055aaf0"
-
-[[package]]
-name = "rusty-pbrt"
-version = "0.1.0"
-dependencies = [
- "approx",
- "arrayvec",
- "auto_ops",
- "bitflags 2.6.0",
- "fast_polynomial",
- "float-cmp",
- "glam",
- "half",
- "itertools",
- "num",
- "once_cell",
- "ordered-float",
- "pdqselect",
- "png",
- "rand",
- "rgb2spec",
- "thiserror",
- "tracing",
-]
 
 [[package]]
 name = "simd-adler32"

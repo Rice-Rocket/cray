@@ -344,9 +344,15 @@ pub mod safe {
     }
 }
 
-
+#[cfg(not(feature = "use_f64"))]
 pub type Float = f32;
+#[cfg(not(feature = "use_f64"))]
 pub type FloatAsBits = u32;
+
+#[cfg(feature = "use_f64")]
+pub type Float = f64;
+#[cfg(feature = "use_f64")]
+pub type FloatAsBits = u64;
 
 pub type Mat2 = TMat2<Float>;
 pub type Mat3 = TMat3<Float>;
