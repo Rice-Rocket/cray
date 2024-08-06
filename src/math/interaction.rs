@@ -5,7 +5,7 @@ use std::sync::Arc;
 use rand::rngs::SmallRng;
 use vect::Dot;
 
-use crate::{bsdf::BSDF, bxdf::{diffuse::DiffuseBxDF, BxDF, BxDFFlags}, camera::{AbstractCamera, Camera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, light::Light, material::{self, AbstractMaterial, Material, MaterialEvalContext, UniversalTextureEvaluator}, math::*, media::{Medium, MediumInterface}, numeric::DifferenceOfProducts, options::Options, phase::PhaseFunction, sampler::{AbstractSampler as _, Sampler}};
+use crate::{bsdf::BSDF, bxdf::{diffuse::DiffuseBxDF, BxDF, BxDFFlags}, camera::{AbstractCamera, Camera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, light::{AbstractLight, Light}, material::{self, AbstractMaterial, Material, MaterialEvalContext, UniversalTextureEvaluator}, math::*, media::{Medium, MediumInterface}, numeric::DifferenceOfProducts, options::Options, phase::PhaseFunction, sampler::{AbstractSampler as _, Sampler}};
 
 #[derive(Debug, Clone, Default)]
 pub struct Interaction {
@@ -334,9 +334,7 @@ impl SurfaceInteraction {
     /// Computes the emitted radiance
     pub fn le(&self, w: Vec3f, lambda: &SampledWavelengths) -> SampledSpectrum {
         if let Some(ref area_light) = self.area_light {
-            // TODO: Change this when light is implemented
-            SampledSpectrum::from_const(0.0)
-            // area_light.as_ref().l(self.position(), self.interaction.n, self.interaction.uv, w, lambda)
+            area_light.as_ref().l(self.position(), self.interaction.n, self.interaction.uv, w, lambda)
         } else {
             SampledSpectrum::from_const(0.0)
         }
