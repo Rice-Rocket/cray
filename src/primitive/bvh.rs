@@ -4,6 +4,17 @@ use crate::{bounds::Union, light::Light, material::Material, reader::paramdict::
 
 use super::{Primitive, AbstractPrimitive};
 
+pub fn create_accelerator(
+    name: &str,
+    prims: Vec<Arc<Primitive>>,
+    parameters: &mut ParameterDictionary,
+) -> Primitive {
+    match name {
+        "bvh" => Primitive::BvhAggregate(BvhAggregate::create(prims, parameters)),
+        _ => panic!("accelerator {} unknown.", name),
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum BvhSplitMethod {
     SAH,

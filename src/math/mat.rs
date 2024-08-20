@@ -141,6 +141,32 @@ macro_rules! impl_default {
 
 impl_default!(TMat2, TMat3, TMat4);
 
+impl<T: Copy> From<[T; 4]> for TMat2<T> {
+    fn from(value: [T; 4]) -> Self {
+        Self::new(value[0], value[1], value[2], value[3])
+    }
+}
+
+impl<T: Copy> From<[T; 9]> for TMat3<T> {
+    fn from(value: [T; 9]) -> Self {
+        Self::new(
+            value[0], value[1], value[2],
+            value[3], value[4], value[5],
+            value[6], value[7], value[8],
+        )
+    }
+}
+
+impl<T: Copy> From<[T; 16]> for TMat4<T> {
+    fn from(value: [T; 16]) -> Self {
+        Self::new(
+            value[0], value[1], value[2], value[3],
+            value[4], value[5], value[6], value[7],
+            value[8], value[9], value[10], value[11],
+            value[12], value[13], value[14], value[15],
+        )
+    }
+}
 
 impl<T: NumericConsts> TMat2<T> {
     pub const IDENTITY: Self = Self::new(

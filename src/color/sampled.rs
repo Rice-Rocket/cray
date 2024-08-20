@@ -1,7 +1,7 @@
 use std::ops::{Deref, Index, IndexMut};
 
 use auto_ops::{impl_op_ex, impl_op_ex_commutative};
-use numeric::HasNan as _;
+use numeric::HasNan;
 
 use crate::math::*;
 
@@ -17,7 +17,7 @@ pub struct SampledSpectrum {
 }
 
 impl SampledSpectrum {
-    pub fn new(values: [Float; NUM_SPECTRUM_SAMPLES]) -> SampledSpectrum {
+    pub const fn new(values: [Float; NUM_SPECTRUM_SAMPLES]) -> SampledSpectrum {
         SampledSpectrum { values }
     }
 
@@ -269,3 +269,15 @@ impl_op_ex!(/= |s1: &mut SampledSpectrum, v: &Float|
         s1[i] /= v;
     }
 });
+
+impl HasNan for SampledSpectrum {
+    const NAN: Self = SampledSpectrum::new([Float::NAN; NUM_SPECTRUM_SAMPLES]);
+
+    fn has_nan(&self) -> bool {
+        self.values.iter().any(|x| x.is_nan())
+    }
+
+    fn has_finite(&self) -> bool {
+        self.values.iter().all(|x| x.is_finite())
+    }
+}

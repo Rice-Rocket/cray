@@ -2,8 +2,9 @@ use std::{collections::HashMap, sync::Arc};
 
 use point::PointLight;
 
-use crate::{bounds::Union, camera::CameraTransform, color::{sampled::SampledSpectrum, spectrum::{DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, interaction::{Interaction, SurfaceInteraction}, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
+use crate::{bounds::Union, camera::CameraTransform, color::{sampled::SampledSpectrum, spectrum::{DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, interaction::{Interaction, SurfaceInteraction}, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, shape::Shape, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
 
+pub mod sampler;
 pub mod point;
 
 pub trait AbstractLight {
@@ -66,6 +67,18 @@ impl Light {
             )),
             _ => panic!("{}: Light {} unknown", loc, name)
         }
+    }
+
+    pub fn create_area(
+        name: &str,
+        parameters: &mut ParameterDictionary,
+        render_from_light: Transform,
+        shape: Arc<Shape>,
+        alpha: Arc<FloatTexture>,
+        loc: &FileLoc,
+        options: &Options,
+    ) -> Light {
+        todo!("Implement area light")
     }
 }
 

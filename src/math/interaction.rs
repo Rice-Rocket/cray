@@ -27,23 +27,23 @@ impl Interaction {
         self.pi.into()
     }
 
-    fn offset_ray_origin_d(&self, w: Vec3f) -> Point3f {
+    pub fn offset_ray_origin_d(&self, w: Vec3f) -> Point3f {
         Ray::offset_ray_origin(self.pi, self.n, w)
     }
 
-    fn offset_ray_origin_p(&self, p: Point3f) -> Point3f {
+    pub fn offset_ray_origin_p(&self, p: Point3f) -> Point3f {
         self.offset_ray_origin_d((p - self.position()).into())
     }
     
-    fn spawn_ray(&self, d: Vec3f) -> RayDifferential {
+    pub fn spawn_ray(&self, d: Vec3f) -> RayDifferential {
         RayDifferential::new(Ray::new(self.offset_ray_origin_d(d), d), None)
     }
 
-    fn spawn_ray_to(&self, p: Point3f) -> Ray {
+    pub fn spawn_ray_to(&self, p: Point3f) -> Ray {
         Ray::spawn_ray_to(self.pi, self.n, self.time, p)
     }
 
-    fn spawn_ray_to_interaction(&self, it: &Self) -> Ray {
+    pub fn spawn_ray_to_interaction(&self, it: &Self) -> Ray {
         Ray::spawn_ray_to_both_offset(self.pi, self.n, self.time, it.pi, it.n)
     }
 }

@@ -109,7 +109,6 @@ pub fn sinc(x: Float) -> Float {
 }
 
 /// Get the bits of a floating point number.
-#[cfg(not(use_f64))]
 #[inline]
 pub fn float_to_bits(f: Float) -> FloatAsBits {
     let rui: FloatAsBits;
@@ -121,7 +120,6 @@ pub fn float_to_bits(f: Float) -> FloatAsBits {
 }
 
 /// Convert the bit representation of a float back into the value.
-#[cfg(not(use_f64))]
 #[inline]
 pub fn bits_to_float(ui: FloatAsBits) -> Float {
     let rf: Float;

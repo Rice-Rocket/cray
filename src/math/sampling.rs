@@ -350,6 +350,11 @@ pub fn sample_uniform_sphere(u: Point2f) -> Vec3f {
     Vec3f::new(r * phi.cos(), r * phi.sin(), z)
 }
 
+#[inline(always)]
+pub fn uniform_sphere_pdf() -> Float {
+    FRAC_1_4PI
+}
+
 pub fn sample_discrete(
     weights: &[Float],
     u: Float,
@@ -418,7 +423,7 @@ pub fn sample_uniform_hemisphere(u: Point2f) -> Vec3f {
     Vec3f::new(r * Float::cos(phi), r * Float::sin(phi), z)
 }
 
-#[inline]
+#[inline(always)]
 pub fn uniform_hemisphere_pdf() -> Float {
     FRAC_1_4PI
 }

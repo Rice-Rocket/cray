@@ -1,6 +1,8 @@
+use std::{collections::HashMap, sync::Arc};
+
 use sphere::Sphere;
 
-use crate::{interaction::{Interaction, SurfaceInteraction}, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
+use crate::{interaction::{Interaction, SurfaceInteraction}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
 
 pub mod sphere;
 
@@ -43,6 +45,33 @@ pub trait AbstractShape {
 #[derive(Debug, Clone)]
 pub enum Shape {
     Sphere(Sphere),
+}
+
+impl Shape {
+    pub fn create(
+        name: &str,
+        render_from_object: Transform,
+        object_from_render: Transform,
+        reverse_orientation: bool,
+        parameters: &mut ParameterDictionary,
+        _float_textures: &HashMap<String, Arc<FloatTexture>>,
+        loc: &FileLoc,
+        options: &Options,
+    ) -> Vec<Arc<Shape>> {
+        match name {
+            "sphere" => {
+                let sphere = Sphere::create(
+                    render_from_object,
+                    object_from_render,
+                    reverse_orientation,
+                    parameters,
+                    loc,
+                );
+                vec![Arc::new(Shape::Sphere(sphere))]
+            },
+            _ => panic!("unknown shape {}", name),
+        }
+    }
 }
 
 impl AbstractShape for Shape {
