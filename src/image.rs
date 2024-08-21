@@ -4,7 +4,7 @@ use arrayvec::ArrayVec;
 use half::f16;
 use tracing::warn;
 
-use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{ColorEncoding, AbstractColorEncoding as _, ColorEncodingPtr}}, modulo, tile::Tile, vec2d::Vec2D, windowed_sinc, Bounds2f, Bounds2i, Mat4, Point2f, Point2i, Float};
+use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{AbstractColorEncoding as _, ColorEncoding, ColorEncodingPtr}}, modulo, tile::Tile, vec2d::Vec2D, windowed_sinc, Bounds2f, Bounds2i, Float, Mat4, Point2f, Point2i};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PixelFormat {

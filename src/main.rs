@@ -1,39 +1,10 @@
-#![allow(clippy::excessive_precision)]
-#![allow(clippy::too_many_arguments)]
-#![allow(unused)]
-#![feature(get_mut_unchecked)]
-
 use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex}, time::Instant};
 
 use clap::Parser;
-use color::rgb_xyz::ColorEncodingCache;
-use options::{CameraRenderingSpace, Options};
-use reader::{parser::parse_files, scene::{BasicScene, BasicSceneBuilder}};
-use render::render_cpu;
+use cray::{
+    color::rgb_xyz::ColorEncodingCache, math::{Bounds2f, Bounds2i, Float, Point2f, Point2i}, options::{CameraRenderingSpace, Options}, reader::{parser::parse_files, scene::{BasicScene, BasicSceneBuilder}}, render::render_cpu
+};
 use string_interner::StringInterner;
-
-use crate::math::*;
-
-pub mod math;
-pub mod color;
-pub mod file;
-pub mod camera;
-pub mod options;
-pub mod media;
-pub mod image;
-pub mod reader;
-pub mod texture;
-pub mod mipmap;
-pub mod shape;
-pub mod primitive;
-pub mod material;
-pub mod light;
-pub mod sampler;
-pub mod bxdf;
-pub mod bsdf;
-pub mod phase;
-pub mod integrator;
-pub mod render;
 
 #[derive(clap::Parser, Debug)]
 #[command(author, version, about)]
