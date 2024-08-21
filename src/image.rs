@@ -1213,7 +1213,9 @@ impl Image {
 
         let data = match &self.data {
             ImageData::Uint256(ref data) => data,
-            ImageData::Float16(ref data) => &data.iter().flat_map(|v| v.to_le_bytes()).collect::<Vec<u8>>(),
+            ImageData::Float16(ref data) => &data.iter()
+                .map(|v| v.to_f32().clamp(0.0, 1.0))
+                .flat_map(|v| ((v * u16::MAX as f32) as u16).to_be_bytes()).collect::<Vec<u8>>(),
             _ => unreachable!(),
         };
 

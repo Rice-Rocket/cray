@@ -5,7 +5,7 @@ use cray::{color::rgb_xyz::{ColorEncoding, ColorEncodingPtr, LinearColorEncoding
 
 #[test]
 fn test_image_png() {
-    let mut im = Image::new(PixelFormat::Uint256, Point2i::new(256, 256), &[
+    let mut im = Image::new(PixelFormat::Float16, Point2i::new(256, 256), &[
         "R".to_string(),
         "G".to_string(),
         "B".to_string(),
