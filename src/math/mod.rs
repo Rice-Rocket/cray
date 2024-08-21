@@ -325,6 +325,13 @@ pub fn gamma(n: i32) -> Float {
     (n as Float * MACHINE_EPSILON) / (1.0 - n as Float * MACHINE_EPSILON)
 }
 
+pub fn difference_of_products_float_vec(a: Float, b: Vec3f, c: Float, d: Vec3f) -> Vec3f {
+    let cd = c * d;
+    let difference = a * b - cd;
+    let error = -c * d + cd;
+    difference + error
+}
+
 pub mod safe {
     use crate::{math::{NumericConsts, Float}, NumericFloat, NumericOrd};
 

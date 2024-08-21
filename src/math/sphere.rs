@@ -12,7 +12,7 @@ pub fn spherical_triangle_area(a: Vec3f, b: Vec3f, c: Vec3f) -> Float {
     debug_assert!(b.is_normalized());
     debug_assert!(c.is_normalized());
 
-    (2.0 * (b.cross(c).dot(a)).atan2(1.0 + a.dot(b) + a.dot(c) + b.dot(c))).abs()
+    Float::abs(2.0 * Float::atan2(a.dot(b.cross(c)), 1.0 + a.dot(b) + a.dot(c) + b.dot(c)))
 }
 
 /// Converts a `(theta, phi)` pair to a unit `(x, y, z)` vector.

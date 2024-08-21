@@ -9,6 +9,7 @@ use clap::Parser;
 use color::rgb_xyz::ColorEncodingCache;
 use options::{CameraRenderingSpace, Options};
 use reader::{parser::parse_files, scene::{BasicScene, BasicSceneBuilder}};
+use render::render_cpu;
 use string_interner::StringInterner;
 
 use crate::math::*;
@@ -32,6 +33,7 @@ pub mod bxdf;
 pub mod bsdf;
 pub mod phase;
 pub mod integrator;
+pub mod render;
 
 #[derive(clap::Parser, Debug)]
 #[command(author, version, about)]
@@ -203,7 +205,7 @@ fn main() {
 
     let scene = scene_builder.done();
     let start_time = Instant::now();
-    // render_cpu(scene, &options, &mut string_interner, &mut cached_spectra, &mut texture_cache, &mut gamma_encoding_cache);
+    render_cpu(scene, &options, &mut string_interner, &mut cached_spectra, &mut texture_cache, &mut gamma_encoding_cache);
     let elapsed = start_time.elapsed();
     println!(
         "Finished rendering in {}.{:03} seconds",

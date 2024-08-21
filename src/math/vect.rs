@@ -2,6 +2,7 @@ use std::ops::{Add, Sub, Mul, Div, AddAssign, SubAssign, MulAssign, DivAssign, N
 use approx::{AbsDiffEq, RelativeEq, UlpsEq};
 
 use crate::math::*;
+use crate::numeric::DifferenceOfProducts;
 
 macro_rules! decl_vect {
     ($name:ident; $($v:ident),*) => {
@@ -444,6 +445,7 @@ macro_rules! impl_vec_ops {
                 (self + rhs) * T::HALF
             }
 
+            // NOTE: This may be wrong, but I think it should be fine
             #[inline]
             pub fn angle(self, rhs: Self) -> T {
                 (self.dot(rhs) / (self.length_squared() * rhs.length_squared()).nsqrt()).nacos()
@@ -629,13 +631,13 @@ impl_index!(
 macro_rules! impl_cross {
     ($($ty:ident),*) => {
         $(
-            impl<T: Clone + Copy + Sub<T, Output = T> + Mul<T, Output = T>> $ty<T> {
+            impl<T: Copy + DifferenceOfProducts> $ty<T> {
                 #[inline]
                 pub fn cross(self, rhs: Self) -> Self {
                     Self {
-                        x: self.y * rhs.z - self.z * rhs.y,
-                        y: self.z * rhs.x - self.x * rhs.z,
-                        z: self.x * rhs.y - self.y * rhs.x
+                        x: T::difference_of_products(self.y, rhs.z, self.z, rhs.y),
+                        y: T::difference_of_products(self.z, rhs.x, self.x, rhs.z),
+                        z: T::difference_of_products(self.x, rhs.y, self.y, rhs.x),
                     }
                 }
             }
@@ -643,7 +645,7 @@ macro_rules! impl_cross {
     }
 }
 
-impl_cross!(Vec3, Normal3);
+impl_cross!(Point3, Vec3, Normal3);
 
 
 macro_rules! impl_interval {
@@ -685,6 +687,18 @@ macro_rules! impl_interval {
                     Self::new($(
                         value.$i.to_scalar(),
                     )*)
+                }
+            }
+
+            impl From<$ty<f32>> for $ty<f64> {
+                fn from(value: $ty<f32>) -> Self {
+                    Self::new($(value.$i as f64,)*)
+                }
+            }
+
+            impl From<$ty<f64>> for $ty<f32> {
+                fn from(value: $ty<f64>) -> Self {
+                    Self::new($(value.$i as f32,)*)
                 }
             }
         )*
@@ -832,5 +846,212 @@ impl<T: NumericField + NumericNegative + NumericFloat> Vec3<T> {
             Vec3::new(T::ONE + sign * sqr(self.x) * a, sign * b, -sign * self.x),
             Vec3::new(b, sign + sqr(self.y) * a, -self.y)
         )
+    }
+}
+
+impl<T: PartialOrd> Point3<T> {
+    pub fn min_element_index(&self) -> usize {
+        if self.x < self.y && self.x < self.z {
+            0
+        } else if self.y < self.z {
+            1
+        } else {
+            2
+        }
+    }
+
+    pub fn max_element_index(&self) -> usize {
+        if self.x > self.y && self.x > self.z {
+            0
+        } else if self.y > self.z {
+            1
+        } else {
+            2
+        }
+    }
+
+    pub fn permute(self, perm: (usize, usize, usize)) -> Self
+    where
+        T: Copy
+    {
+        let x = if perm.0 == 0 {
+            self.x
+        } else if perm.0 == 1 {
+            self.y
+        } else {
+            self.z
+        };
+
+        let y = if perm.1 == 0 {
+            self.x
+        } else if perm.1 == 1 {
+            self.y
+        } else {
+            self.z
+        };
+
+        let z = if perm.2 == 0 {
+            self.x
+        } else if perm.2 == 1 {
+            self.y
+        } else {
+            self.z
+        };
+
+        Self::new(x, y, z)
+    }
+}
+
+impl<T: PartialOrd> Vec3<T> {
+    pub fn min_element_index(&self) -> usize {
+        if self.x < self.y && self.x < self.z {
+            0
+        } else if self.y < self.z {
+            1
+        } else {
+            2
+        }
+    }
+
+    pub fn max_element_index(&self) -> usize {
+        if self.x > self.y && self.x > self.z {
+            0
+        } else if self.y > self.z {
+            1
+        } else {
+            2
+        }
+    }
+
+    pub fn permute(self, perm: (usize, usize, usize)) -> Self
+    where
+        T: Copy
+    {
+        let x = if perm.0 == 0 {
+            self.x
+        } else if perm.0 == 1 {
+            self.y
+        } else {
+            self.z
+        };
+
+        let y = if perm.1 == 0 {
+            self.x
+        } else if perm.1 == 1 {
+            self.y
+        } else {
+            self.z
+        };
+
+        let z = if perm.2 == 0 {
+            self.x
+        } else if perm.2 == 1 {
+            self.y
+        } else {
+            self.z
+        };
+
+        Self::new(x, y, z)
+    }
+}
+
+impl<T: PartialOrd> Normal3<T> {
+    pub fn min_element_index(&self) -> usize {
+        if self.x < self.y && self.x < self.z {
+            0
+        } else if self.y < self.z {
+            1
+        } else {
+            2
+        }
+    }
+
+    pub fn max_element_index(&self) -> usize {
+        if self.x > self.y && self.x > self.z {
+            0
+        } else if self.y > self.z {
+            1
+        } else {
+            2
+        }
+    }
+
+    pub fn permute(self, perm: (usize, usize, usize)) -> Self
+    where
+        T: Copy
+    {
+        let x = if perm.0 == 0 {
+            self.x
+        } else if perm.0 == 1 {
+            self.y
+        } else {
+            self.z
+        };
+
+        let y = if perm.1 == 0 {
+            self.x
+        } else if perm.1 == 1 {
+            self.y
+        } else {
+            self.z
+        };
+
+        let z = if perm.2 == 0 {
+            self.x
+        } else if perm.2 == 1 {
+            self.y
+        } else {
+            self.z
+        };
+
+        Self::new(x, y, z)
+    }
+}
+
+impl Point3<Float> {
+    pub fn coordinate_system(&self) -> (Vec3f, Vec3f) {
+        let sign = Float::copysign(1.0, self.z);
+
+        let a = -1.0 / (sign + self.z);
+        let b = self.x * self.y * a;
+        let v2 = Vec3f::new(1.0 + sign * sqr(self.x) * a, sign * b, -sign * self.x);
+        let v3 = Vec3f::new(b, sign + sqr(self.y) * a, -self.y);
+
+        (v2, v3)
+    }
+
+    pub fn angle_between(self, v: Self) -> Float {
+        debug_assert!(!self.is_nan());
+        debug_assert!(!v.is_nan());
+
+        if self.dot(v) < 0.0 {
+            PI - 2.0 * safe::asin((self + v).length() / 2.0)
+        } else {
+            2.0 * safe::asin((v - self).length() / 2.0)
+        }
+    }
+}
+
+impl Vec3<Float> {
+    pub fn coordinate_system(&self) -> (Vec3f, Vec3f) {
+        let sign = Float::copysign(1.0, self.z);
+
+        let a = -1.0 / (sign + self.z);
+        let b = self.x * self.y * a;
+        let v2 = Vec3f::new(1.0 + sign * sqr(self.x) * a, sign * b, -sign * self.x);
+        let v3 = Vec3f::new(b, sign + sqr(self.y) * a, -self.y);
+
+        (v2, v3)
+    }
+
+    pub fn angle_between(self, v: Self) -> Float {
+        debug_assert!(!self.is_nan());
+        debug_assert!(!v.is_nan());
+
+        if self.dot(v) < 0.0 {
+            PI - 2.0 * safe::asin((self + v).length() / 2.0)
+        } else {
+            2.0 * safe::asin((v - self).length() / 2.0)
+        }
     }
 }

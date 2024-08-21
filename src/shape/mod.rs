@@ -1,10 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
 use sphere::Sphere;
+use triangle::Triangle;
 
 use crate::{interaction::{Interaction, SurfaceInteraction}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
 
 pub mod sphere;
+pub mod mesh;
+pub mod triangle;
 
 pub trait AbstractShape {
     /// Spatial extent of the shape
@@ -45,6 +48,7 @@ pub trait AbstractShape {
 #[derive(Debug, Clone)]
 pub enum Shape {
     Sphere(Sphere),
+    Triangle(Triangle),
 }
 
 impl Shape {
@@ -69,6 +73,15 @@ impl Shape {
                 );
                 vec![Arc::new(Shape::Sphere(sphere))]
             },
+            "trianglemesh" => {
+                let trianglemesh = Arc::new(Triangle::create_mesh(
+                    &render_from_object,
+                    reverse_orientation,
+                    parameters,
+                    loc,
+                ));
+                Triangle::create_triangles(trianglemesh)
+            },
             _ => panic!("unknown shape {}", name),
         }
     }
@@ -78,54 +91,63 @@ impl AbstractShape for Shape {
     fn bounds(&self) -> Bounds3f {
         match self {
             Shape::Sphere(s) => s.bounds(),
+            Shape::Triangle(s) => s.bounds(),
         }
     }
 
     fn normal_bounds(&self) -> DirectionCone {
         match self {
             Shape::Sphere(s) => s.normal_bounds(),
+            Shape::Triangle(s) => s.normal_bounds(),
         }
     }
 
     fn intersect(&self, ray: &Ray, t_max: Float) -> Option<ShapeIntersection> {
         match self {
             Shape::Sphere(s) => s.intersect(ray, t_max),
+            Shape::Triangle(s) => s.intersect(ray, t_max),
         }
     }
 
     fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool {
         match self {
             Shape::Sphere(s) => s.intersect_predicate(ray, t_max),
+            Shape::Triangle(s) => s.intersect_predicate(ray, t_max),
         }
     }
 
     fn area(&self) -> Float {
         match self {
             Shape::Sphere(s) => s.area(),
+            Shape::Triangle(s) => s.area(),
         }
     }
 
     fn sample(&self, u: Point2f) -> Option<ShapeSample> {
         match self {
             Shape::Sphere(s) => s.sample(u),
+            Shape::Triangle(s) => s.sample(u),
         }
     }
 
     fn pdf(&self, interaction: &Interaction) -> Float {
         match self {
             Shape::Sphere(s) => s.pdf(interaction),
+            Shape::Triangle(s) => s.pdf(interaction),
         }
     }
 
     fn sample_with_context(&self, ctx: &ShapeSampleContext, u: Point2f) -> Option<ShapeSample> {
         match self {
             Shape::Sphere(s) => s.sample_with_context(ctx, u),
+            Shape::Triangle(s) => s.sample_with_context(ctx, u),
         }
     }
 
     fn pdf_with_context(&self, ctx: &ShapeSampleContext, wi: Vec3f) -> Float {
         match self {
             Shape::Sphere(s) => s.pdf_with_context(ctx, wi),
+            Shape::Triangle(s) => s.pdf_with_context(ctx, wi),
         }
     }
 }

@@ -126,7 +126,7 @@ macro_rules! impl_numeric_float {
         $(
             impl NumericFloat for $ty {
                 const EPSILON: Self = $eps;
-                const BIG_EPSILON: Self = $eps;
+                const BIG_EPSILON: Self = $beps;
                 const HALF: Self = $half;
 
                 fn nsqrt(self) -> Self {

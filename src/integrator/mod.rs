@@ -260,7 +260,7 @@ impl ImageTileIntegrator {
 
         let l = if let Some(mut camera_ray) = camera_ray {
             debug_assert!(camera_ray.ray.ray.direction.length() > 0.999);
-            debug_assert!(camera_ray.ray.ray.direction.length() > 1.001);
+            debug_assert!(camera_ray.ray.ray.direction.length() < 1.001);
 
             let ray_diff_scale = Float::max(
                 0.125,

@@ -1,4 +1,6 @@
 use std::ops::{Add, Index, IndexMut, Mul, Neg, Sub};
+use numeric::DifferenceOfProducts;
+
 use crate::math::*;
 
 macro_rules! create_mat {
@@ -242,7 +244,8 @@ impl<T: Clone + Copy> TMat3<T> {
 
 impl<T> TMat3<T> 
 where 
-    T: Clone + Copy + NumericConsts + NumericFloat + PartialEq + Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T>
+    T: Clone + Copy + NumericConsts + NumericFloat + PartialEq + DifferenceOfProducts
+        + Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T>
 {
     #[inline]
     pub fn determinant(self) -> T {

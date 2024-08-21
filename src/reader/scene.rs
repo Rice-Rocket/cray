@@ -489,7 +489,7 @@ impl BasicScene {
         textures: &NamedTextures,
         string_interner: &StringInterner<DefaultBackend>,
         options: &Options,
-    ) -> (Arc<Vec<Arc<Light>>>, HashMap<usize, Vec<Arc<Light>>>) {
+    ) -> (Arc<[Arc<Light>]>, HashMap<usize, Vec<Arc<Light>>>) {
         let mut shape_index_to_area_lights = HashMap::new();
         // TODO: We'll want to handle media and alpha textures, but hold off for now.
 
@@ -583,7 +583,7 @@ impl BasicScene {
         // TODO: We'd rather move self.lights out rather than an expensive clone.
         //   We can switch to make lights vec in this fn though when we parallelize,
         //   which obviates this issue.
-        (Arc::new(self.lights.clone()), shape_index_to_area_lights)
+        (self.lights.clone().into(), shape_index_to_area_lights)
     }
 
     pub fn create_materials(

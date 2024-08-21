@@ -1,11 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
+use diffuse_area::DiffuseAreaLight;
 use point::PointLight;
 
 use crate::{bounds::Union, camera::CameraTransform, color::{sampled::SampledSpectrum, spectrum::{DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, interaction::{Interaction, SurfaceInteraction}, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, shape::Shape, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
 
 pub mod sampler;
 pub mod point;
+pub mod diffuse_area;
 
 pub trait AbstractLight {
     fn phi(&self, lambda: &SampledWavelengths) -> SampledSpectrum;
@@ -43,6 +45,7 @@ pub trait AbstractLight {
 #[derive(Debug, Clone)]
 pub enum Light {
     Point(PointLight),
+    DiffuseArea(DiffuseAreaLight),
 }
 
 impl Light {
@@ -69,6 +72,7 @@ impl Light {
         }
     }
 
+    // TODO: add medium interface; use medium_interface.outside for diffuse area light
     pub fn create_area(
         name: &str,
         parameters: &mut ParameterDictionary,
@@ -78,7 +82,19 @@ impl Light {
         loc: &FileLoc,
         options: &Options,
     ) -> Light {
-        todo!("Implement area light")
+        match name {
+            "diffuse" => Light::DiffuseArea(DiffuseAreaLight::create(
+                render_from_light,
+                None,
+                parameters,
+                parameters.color_space.clone(),
+                loc,
+                shape,
+                alpha,
+                options,
+            )),
+            _ => panic!("Area light {} unknown", name),
+        }
     }
 }
 
@@ -86,12 +102,14 @@ impl AbstractLight for Light {
     fn phi(&self, lambda: &SampledWavelengths) -> SampledSpectrum {
         match self {
             Light::Point(l) => l.phi(lambda),
+            Light::DiffuseArea(l) => l.phi(lambda),
         }
     }
 
     fn light_type(&self) -> LightType {
         match self {
             Light::Point(l) => l.light_type(),
+            Light::DiffuseArea(l) => l.light_type(),
         }
     }
 
@@ -104,12 +122,14 @@ impl AbstractLight for Light {
     ) -> Option<LightLiSample> {
         match self {
             Light::Point(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
+            Light::DiffuseArea(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
         }
     }
 
     fn pdf_li(&self, ctx: &LightSampleContext, wi: Vec3f, allow_incomplete_pdf: bool) -> Float {
         match self {
             Light::Point(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
+            Light::DiffuseArea(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
         }
     }
 
@@ -123,24 +143,28 @@ impl AbstractLight for Light {
     ) -> SampledSpectrum {
         match self {
             Light::Point(l) => l.l(p, n, uv, w, lambda),
+            Light::DiffuseArea(l) => l.l(p, n, uv, w, lambda),
         }
     }
 
     fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
         match self {
             Light::Point(l) => l.le(ray, lambda),
+            Light::DiffuseArea(l) => l.le(ray, lambda),
         }
     }
 
     fn preprocess(&mut self, scene_bounds: &Bounds3f) {
         match self {
             Light::Point(l) => l.preprocess(scene_bounds),
+            Light::DiffuseArea(l) => l.preprocess(scene_bounds),
         }
     }
 
     fn bounds(&self) -> Option<LightBounds> {
         match self {
             Light::Point(l) => l.bounds(),
+            Light::DiffuseArea(l) => l.bounds(),
         }
     }
 }

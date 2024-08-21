@@ -1,5 +1,6 @@
 use vec2d::Vec2D;
 
+use crate::numeric::DifferenceOfProducts;
 use crate::math::*;
 
 #[derive(Debug, Clone, Default)]
@@ -436,4 +437,168 @@ pub fn sample_cosine_hemisphere(u: Point2f) -> Vec3f {
 
 pub fn cosine_hemisphere_pdf(cos_theta: Float) -> Float {
     cos_theta * FRAC_1_PI
+}
+
+pub fn sample_uniform_triangle(u: Point2f) -> (Float, Float, Float) {
+    let (b0, b1) = if u[0] < u[1] {
+        let b0 = u[0] / 2.0;
+        let b1 = u[1] - b0;
+        (b0, b1)
+    } else {
+        let b1 = u[1] / 2.0;
+        let b0 = u[0] - b1;
+        (b0, b1)
+    };
+    (b0, b1, 1.0 - b1 - b0)
+}
+
+pub fn sample_bilinear(u: Point2f, w: &[Float]) -> Point2f {
+    debug_assert_eq!(4, w.len());
+    let y = sample_linear(u[1], w[0] + w[1], w[2] + w[3]);
+    let x = sample_linear(u[0], lerp(w[0], w[2], y), lerp(w[1], w[3], y));
+    Point2f { x, y }
+}
+
+pub fn bilinear_pdf(p: Point2f, w: &[Float]) -> Float {
+    debug_assert_eq!(4, w.len());
+    if p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 {
+        return 0.0;
+    }
+    if w[0] + w[1] + w[2] + w[3] == 0.0 {
+        return 1.0;
+    }
+    4.0 * ((1.0 - p[0]) * (1.0 - p[1]) * w[0]
+        + p[0] * (1.0 - p[1]) * w[1]
+        + (1.0 - p[0]) * p[1] * w[2]
+        + p[0] * p[1] * w[3])
+        / (w[0] + w[1] + w[2] + w[3])
+}
+
+pub fn sample_spherical_triangle(v: &[Point3f; 3], p: Point3f, u: Point2f) -> ([Float; 3], Float) {
+    let a = v[0] - p;
+    let b = v[1] - p;
+    let c = v[2] - p;
+    debug_assert!(a.length_squared() > 0.0);
+    debug_assert!(b.length_squared() > 0.0);
+    debug_assert!(c.length_squared() > 0.0);
+
+    let a = a.normalize();
+    let b = b.normalize();
+    let c = c.normalize();
+
+    let n_ab = a.cross(b);
+    let n_bc = b.cross(c);
+    let n_ca = c.cross(a);
+    if n_ab.length_squared() == 0.0 || n_bc.length_squared() == 0.0 || n_ca.length_squared() == 0.0
+    {
+        // TODO: Consider using an Option return type instead.
+        return ([0.0, 0.0, 0.0], 0.0);
+    }
+
+    let n_ab = n_ab.normalize();
+    let n_bc = n_bc.normalize();
+    let n_ca = n_ca.normalize();
+
+    let alpha = n_ab.angle_between(-n_ca);
+    let beta = n_bc.angle_between(-n_ab);
+    let gamma = n_ca.angle_between(-n_bc);
+
+    let a_pi = alpha + beta + gamma;
+    let ap_pi = lerp(PI, a_pi, u[0]);
+    let area = a_pi - PI;
+    let pdf = if area <= 0.0 { 0.0 } else { 1.0 / area };
+
+    let cos_alpha = Float::cos(alpha);
+    let sin_alpha = Float::sin(alpha);
+    let sin_phi = Float::sin(ap_pi) * cos_alpha - Float::cos(ap_pi) * sin_alpha;
+    let cos_phi = Float::cos(ap_pi) * cos_alpha + Float::sin(ap_pi) * sin_alpha;
+    let k1 = cos_phi + cos_alpha;
+    let k2 = sin_phi - sin_alpha * a.dot(b);
+    let cos_bp = (k2 + (Float::difference_of_products(k2, cos_phi, k1, sin_phi)) * cos_alpha)
+        / (Float::sum_of_products(k2, sin_phi, k1, cos_phi) * sin_alpha);
+
+    debug_assert!(!cos_bp.is_nan());
+    let cos_bp = cos_bp.clamp(-1.0, 1.0);
+
+    let sin_bp = safe::sqrt(1.0 - cos_bp * cos_bp);
+    let cp = cos_bp * a + sin_bp * c.gram_schmidt(a).normalize();
+
+    let cos_theta = 1.0 - u[1] * (1.0 - cp.dot(b));
+    let sin_theta = safe::sqrt(1.0 - cos_theta * cos_theta);
+    let w = cos_theta * b + sin_theta * cp.gram_schmidt(b).normalize();
+
+    let e1 = v[1] - v[0];
+    let e2 = v[2] - v[0];
+    let s1 = w.cross(e2);
+    let divisor = e1.dot(e1);
+
+    if divisor == 0.0 {
+        return ([1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0], pdf);
+    }
+
+    let inv_divisor = 1.0 / divisor;
+    let s = p - v[0];
+    let b1 = s.dot(s1) * inv_divisor;
+    let b2 = w.dot(s.cross(e1)) * inv_divisor;
+
+    let b1 = b1.clamp(0.0, 1.0);
+    let b2 = b2.clamp(0.0, 1.0);
+    let (b1, b2) = if b1 + b2 > 1.0 {
+        (b1 / (b1 + b2), b2 / (b1 + b2))
+    } else {
+        (b1, b2)
+    };
+    ([1.0 - b1 - b2, b1, b2], pdf)
+}
+
+pub fn invert_spherical_triangle_sample(v: &[Point3f; 3], p: Point3f, w: Vec3f) -> Point2f {
+    let a = v[0] - p;
+    let b = v[1] - p;
+    let c = v[2] - p;
+    debug_assert!(a.length_squared() > 0.0);
+    debug_assert!(b.length_squared() > 0.0);
+    debug_assert!(c.length_squared() > 0.0);
+
+    let a = a.normalize();
+    let b = b.normalize();
+    let c = c.normalize();
+
+    let n_ab = a.cross(b);
+    let n_bc = b.cross(c);
+    let n_ca = c.cross(a);
+    if n_ab.length_squared() == 0.0 || n_bc.length_squared() == 0.0 || n_ca.length_squared() == 0.0
+    {
+        // TODO: Consider using an Option return type instead.
+        return Point2f::ZERO;
+    }
+
+    let n_ab = n_ab.normalize();
+    let n_bc = n_bc.normalize();
+    let n_ca = n_ca.normalize();
+
+    let alpha = n_ab.angle_between(-n_ca);
+    let beta = n_bc.angle_between(-n_ab);
+    let gamma = n_ca.angle_between(-n_bc);
+
+    let cp = b.cross(w.into()).cross(c.cross(a)).normalize();
+    let cp = if cp.dot(a + c) < 0.0 { -cp } else { cp };
+
+    let u0 = if a.dot(cp) > 0.99999847691 {
+        0.0
+    } else {
+        let n_cpb = cp.cross(b);
+        let n_acp = a.cross(cp);
+        if n_cpb.length_squared() == 0.0 || n_acp.length_squared() == 0.0 {
+            return Point2f::new(0.5, 0.5);
+        }
+        let n_cpb = n_cpb.normalize();
+        let n_acp = n_acp.normalize();
+        let ap = alpha + n_ab.angle_between(n_cpb) + n_acp.angle_between(-n_cpb) - PI;
+
+        let area = alpha + beta + gamma - PI;
+        ap / area
+    };
+
+    let u1 = (1.0 - w.dot(b)) / (1.0 - cp.dot(b));
+    Point2f::new(u0.clamp(0.0, 1.0), u1.clamp(0.0, 1.0))
 }
