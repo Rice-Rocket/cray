@@ -708,7 +708,7 @@ pub struct DebugFilm {
     base: FilmBase,
     write_fp16: bool,
     filter_integral: Float,
-    pixels: Vec2D<Float>,
+    pixels: Vec2D<Rgb>,
 }
 
 impl DebugFilm {
@@ -764,6 +764,10 @@ impl DebugFilm {
             pixels,
         }
     }
+
+    pub fn add_pixel(&mut self, p: Point2i, v: Rgb) {
+        *self.pixels.get_mut(p) += v;
+    }
 }
 
 impl AbstractFilm for DebugFilm {
@@ -817,7 +821,7 @@ impl AbstractFilm for DebugFilm {
         let mut image = Image::new(
             format,
             self.pixel_bounds().diagonal(),
-            &["R".to_owned()],
+            &["R".to_owned(), "G".to_owned(), "B".to_owned()],
             None,
         );
 
@@ -829,15 +833,27 @@ impl AbstractFilm for DebugFilm {
 
                 debug_assert!(!rgb.has_nan());
 
-                if self.write_fp16 && rgb.r > max_f16 {
-                    rgb.r = max_f16;
+                if self.write_fp16 && [rgb.r, rgb.g, rgb.b]
+                    .iter()
+                    .fold(Float::NEG_INFINITY, |a, b| Float::max(a, *b))
+                        > max_f16
+                {
+                    if rgb.r > max_f16 {
+                        rgb.r = max_f16;
+                    }
+                    if rgb.g > max_f16 {
+                        rgb.g = max_f16;
+                    }
+                    if rgb.b > max_f16 {
+                        rgb.b = max_f16;
+                    }
                 }
 
                 let p_offset = Point2i::new(
                     p.x - self.pixel_bounds().min.x,
                     p.y - self.pixel_bounds().min.y,
                 );
-                image.set_channels_slice(p_offset, &[rgb.r])
+                image.set_channels_slice(p_offset, &[rgb.r, rgb.g, rgb.b])
             }
         }
         
@@ -858,8 +874,7 @@ impl AbstractFilm for DebugFilm {
     }
 
     fn get_pixel_rgb(&self, p: Point2i, splat_scale: Float) -> Rgb {
-        let mut pixel = self.pixels.get(p);
-        Rgb::new(pixel, pixel, pixel)
+        self.pixels.get(p)
     }
 
     fn get_filter(&self) -> &Filter {

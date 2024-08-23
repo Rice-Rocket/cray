@@ -9,7 +9,7 @@ use simple_path::SimplePathIntegrator;
 use thread_local::ThreadLocal;
 use tracing::error;
 
-use crate::{camera::{film::{AbstractFilm, VisibleSurface}, filter::get_camera_sample, AbstractCamera, Camera}, color::{colorspace::RgbColorSpace, sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, interaction::Interaction, light::{sampler::uniform::UniformLightSampler, AbstractLight, Light, LightType}, numeric::HasNan, options::Options, primitive::{AbstractPrimitive, Primitive}, reader::paramdict::ParameterDictionary, sampler::{AbstractSampler, Sampler}, shape::ShapeIntersection, tile::Tile, Float, Point2i, Ray, RayDifferential, Vec3f};
+use crate::{camera::{film::{AbstractFilm, Film, VisibleSurface}, filter::get_camera_sample, AbstractCamera, Camera}, color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, interaction::Interaction, light::{sampler::uniform::UniformLightSampler, AbstractLight, Light, LightType}, numeric::HasNan, options::Options, primitive::{AbstractPrimitive, Primitive}, reader::paramdict::ParameterDictionary, sampler::{AbstractSampler, Sampler}, shape::ShapeIntersection, tile::Tile, Float, Normal3f, Point2i, Ray, RayDifferential, Vec3f};
 
 pub mod random_walk;
 pub mod simple_path;
@@ -20,7 +20,7 @@ pub trait AbstractIntegrator {
 
 pub enum Integrator {
     ImageTile(ImageTileIntegrator),
-    DebugDepth(DebugDepthIntegrator),
+    DebugDepth(DebugIntegrator),
 }
 
 impl Integrator {
@@ -40,7 +40,7 @@ impl Integrator {
             "simplepath" => Integrator::ImageTile(ImageTileIntegrator::create_simple_path_integrator(
                 parameters, camera, sampler, aggregate, lights,
             )),
-            "debugdepth" => Integrator::DebugDepth(DebugDepthIntegrator::create(
+            "debug" => Integrator::DebugDepth(DebugIntegrator::create(
                 parameters, camera, sampler, aggregate, lights,
             )),
             _ => panic!("unknown integrator {}", name),
@@ -324,29 +324,36 @@ impl ImageTileIntegrator {
     }
 }
 
-pub struct DebugDepthIntegrator {
+pub struct DebugIntegrator {
     base: IntegratorBase,
     camera: Camera,
     sampler_prototype: Sampler,
+    show_normals: bool,
 }
 
-impl DebugDepthIntegrator {
+impl DebugIntegrator {
     pub fn create(
-        _parameters: &mut ParameterDictionary,
+        parameters: &mut ParameterDictionary,
         camera: Camera,
         sampler: Sampler,
         aggregate: Arc<Primitive>,
         lights: Arc<[Arc<Light>]>,
-    ) -> DebugDepthIntegrator {
-        DebugDepthIntegrator {
+    ) -> DebugIntegrator {
+        let show_normals = parameters.get_one_bool("normals", false);
+        let Film::Debug(_) = camera.get_film().as_ref() else {
+            panic!("debug integrator must be used with debug film");
+        };
+
+        DebugIntegrator {
             base: IntegratorBase::new(aggregate, lights),
             camera,
             sampler_prototype: sampler,
+            show_normals,
         }
     }
 }
 
-impl AbstractIntegrator for DebugDepthIntegrator {
+impl AbstractIntegrator for DebugIntegrator {
     fn render(&mut self, options: &Options) {
         let pixel_bounds = self.camera.get_film().pixel_bounds();
         let spp = self.sampler_prototype.samples_per_pixel();
@@ -361,20 +368,20 @@ impl AbstractIntegrator for DebugDepthIntegrator {
                 let camera_ray = self.camera.generate_ray_differential(&camera_sample, &lambda);
 
                 if let Some(camera_ray) = camera_ray {
-                    let dist = if let Some(i) = self.base.intersect(&camera_ray.ray.ray, Float::INFINITY) {
-                        1.0 / i.t_hit
+                    let (dist, normal) = if let Some(i) = self.base.intersect(&camera_ray.ray.ray, Float::INFINITY) {
+                        (1.0 / i.t_hit, i.intr.interaction.n)
                     } else {
-                        0.0
+                        (0.0, Normal3f::splat(-1.0))
                     };
 
                     unsafe {
-                        Arc::get_mut_unchecked(&mut film.clone()).add_sample(
-                            p_pixel,
-                            &SampledSpectrum::from_const(0.0),
-                            &SampledWavelengths::default(),
-                            &None,
-                            dist,
-                        );
+                        if let Film::Debug(f) = Arc::get_mut_unchecked(&mut film.clone()) {
+                            if self.show_normals {
+                                f.add_pixel(p_pixel, Rgb::new(normal.x, normal.y, normal.z) * 0.5 + 0.5);
+                            } else {
+                                f.add_pixel(p_pixel, Rgb::new(dist, dist, dist));
+                            }
+                        }
                     }
                 }
             }
