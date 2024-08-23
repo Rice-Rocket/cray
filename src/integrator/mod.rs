@@ -273,8 +273,11 @@ impl ImageTileIntegrator {
         };
 
         let mut lambda = camera.get_film().sample_wavelengths(lu);
+        let res = camera.get_film().full_resolution();
 
-        let camera_sample = get_camera_sample(sampler, p_pixel, camera.get_film().get_filter(), options);
+        // TODO: The source of the issue is probably somewhere else, find it
+        // Issue is with screen space, camera says its -1 to 1 so here we account for that
+        let camera_sample = get_camera_sample(sampler, p_pixel - res / 2, camera.get_film().get_filter(), options);
         let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
 
         let l = if let Some(mut camera_ray) = camera_ray {
@@ -359,29 +362,22 @@ impl AbstractIntegrator for DebugIntegrator {
         let spp = self.sampler_prototype.samples_per_pixel();
         let mut film = self.camera.get_film_mut().clone();
 
+        let sampler = RefCell::new(self.sampler_prototype.clone());
         for x in pixel_bounds.min.x..pixel_bounds.max.x {
             for y in pixel_bounds.min.y..pixel_bounds.max.y {
                 let p_pixel = Point2i::new(x, y);
 
-                let lambda = self.camera.get_film().sample_wavelengths(0.5);
-                let camera_sample = get_camera_sample(&mut self.sampler_prototype, p_pixel, self.camera.get_film().get_filter(), options);
-                let camera_ray = self.camera.generate_ray_differential(&camera_sample, &lambda);
+                let rgb = self.evaluate_pixel_sample(
+                    &self.base,
+                    &self.camera,
+                    p_pixel,
+                    &mut sampler.borrow_mut(),
+                    options,
+                );
 
-                if let Some(camera_ray) = camera_ray {
-                    let (dist, normal) = if let Some(i) = self.base.intersect(&camera_ray.ray.ray, Float::INFINITY) {
-                        (1.0 / i.t_hit, i.intr.interaction.n)
-                    } else {
-                        (0.0, Normal3f::splat(-1.0))
-                    };
-
-                    unsafe {
-                        if let Film::Debug(f) = Arc::get_mut_unchecked(&mut film.clone()) {
-                            if self.show_normals {
-                                f.add_pixel(p_pixel, Rgb::new(normal.x, normal.y, normal.z) * 0.5 + 0.5);
-                            } else {
-                                f.add_pixel(p_pixel, Rgb::new(dist, dist, dist));
-                            }
-                        }
+                unsafe {
+                    if let Film::Debug(f) = Arc::get_mut_unchecked(&mut film.clone()) {
+                        f.add_pixel(p_pixel, rgb);
                     }
                 }
             }
@@ -389,6 +385,41 @@ impl AbstractIntegrator for DebugIntegrator {
 
         let mut metadata = ImageMetadata::default();
         self.camera.get_film().write_image(&mut metadata, 1.0).unwrap();
+    }
+}
+
+impl DebugIntegrator {
+    fn evaluate_pixel_sample(
+        &self,
+        base: &IntegratorBase,
+        camera: &Camera,
+        p_pixel: Point2i,
+        sampler: &mut Sampler,
+        options: &Options,
+    ) -> Rgb {
+        let lambda = camera.get_film().sample_wavelengths(0.5);
+        let res = camera.get_film().full_resolution();
+        
+        // TODO: The source of the issue is probably somewhere else, find it
+        // Issue is with screen space, camera says its -1 to 1 so here we account for that
+        let camera_sample = get_camera_sample(sampler, p_pixel - res / 2, camera.get_film().get_filter(), options);
+        let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
+
+        let (dist, normal) = if let Some(camera_ray) = camera_ray {
+            if let Some(i) = base.intersect(&camera_ray.ray.ray, Float::INFINITY) {
+                (1.0 / i.t_hit, i.intr.interaction.n)
+            } else {
+                (0.0, Normal3f::splat(-1.0))
+            }
+        } else {
+            (0.0, Normal3f::splat(-1.0))
+        };
+
+        if self.show_normals {
+            Rgb::new(normal.x, normal.y, normal.z) * 0.5 + 0.5
+        } else {
+            Rgb::new(dist, dist, dist)
+        }
     }
 }
 

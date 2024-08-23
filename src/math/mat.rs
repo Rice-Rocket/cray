@@ -78,10 +78,31 @@ macro_rules! create_mat {
             }
         }
 
-        impl<T: std::fmt::Debug> std::fmt::Debug for $name<T> {
-            #[inline]
-            fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                self.0.fmt(fmt)
+        impl<T: ToString> std::fmt::Debug for $name<T> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "\n")?;
+                let mut size = [0; $col];
+                for col in 0..$col {
+                    for row in 0..$row {
+                        size[col] = size[col].max(self[(row, col)].to_string().len());
+                    }
+                }
+                
+                for row in 0..$row {
+                    write!(f, "[")?;
+
+                    for col in 0..$col {
+                        let spacing = size[col] - self[(row, col)].to_string().len() + 1;
+                        write!(f, "{}", " ".repeat(spacing))?;
+                        write!(f, "{}", self[(row, col)].to_string())?;
+                    }
+
+                    write!(f, " ]")?;
+                    if row != $row - 1 {
+                        write!(f, "\n")?;
+                    }
+                }
+                Ok(())
             }
         }
     }

@@ -29,6 +29,8 @@ impl Sphere {
         let z_max = parameters.get_one_float("zmax", radius);
         let phi_max = parameters.get_one_float("phimax", 360.0);
 
+        dbg!(&render_from_object);
+
         Sphere::new(
             render_from_object,
             object_from_render,
