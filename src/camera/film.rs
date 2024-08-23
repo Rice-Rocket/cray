@@ -1,5 +1,6 @@
 use std::{ops::{AddAssign, Div, Index, IndexMut, MulAssign}, path::PathBuf, str::FromStr, sync::Arc};
 
+use half::f16;
 use once_cell::sync::Lazy;
 use rgb2spec::{LAMBDA_MAX, LAMBDA_MIN};
 use tracing::{error, warn};
@@ -50,6 +51,7 @@ pub trait AbstractFilm {
 #[derive(Debug, Clone)]
 pub enum Film {
     RgbFilm(RgbFilm),
+    Debug(DebugFilm),
 }
 
 impl Film {
@@ -64,6 +66,14 @@ impl Film {
     ) -> Film {
         match name {
             "rgb" => Film::RgbFilm(RgbFilm::create(
+                parameters,
+                exposure_time,
+                filter,
+                parameters.color_space.clone(),
+                loc,
+                options,
+            )),
+            "debug" => Film::Debug(DebugFilm::create(
                 parameters,
                 exposure_time,
                 filter,
@@ -87,90 +97,105 @@ impl AbstractFilm for Film {
     ) {
         match self {
             Film::RgbFilm(f) => f.add_sample(p_film, l, lambda, visible_surface, weight),
+            Film::Debug(f) => f.add_sample(p_film, l, lambda, visible_surface, weight),
         }
     }
 
     fn add_splat(&mut self, p: Point2f, l: &SampledSpectrum, lambda: &SampledWavelengths) {
         match self {
             Film::RgbFilm(f) => f.add_splat(p, l, lambda),
+            Film::Debug(f) => f.add_splat(p, l, lambda),
         }
     }
 
     fn full_resolution(&self) -> Point2i {
         match self {
-            Film::RgbFilm(f) => f.full_resolution()
+            Film::RgbFilm(f) => f.full_resolution(),
+            Film::Debug(f) => f.full_resolution(),
         }
     }
 
     fn pixel_bounds(&self) -> Bounds2i {
         match self {
             Film::RgbFilm(f) => f.pixel_bounds(),
+            Film::Debug(f) => f.pixel_bounds(),
         }
     }
 
     fn sample_bounds(&self) -> Bounds2f {
         match self {
             Film::RgbFilm(f) => f.sample_bounds(),
+            Film::Debug(f) => f.sample_bounds(),
         }
     }
 
     fn diagonal(&self) -> Float {
         match self {
             Film::RgbFilm(f) => f.diagonal(),
+            Film::Debug(f) => f.diagonal(),
         }
     }
 
     fn uses_visible_surface(&self) -> bool {
         match self {
             Film::RgbFilm(f) => f.uses_visible_surface(),
+            Film::Debug(f) => f.uses_visible_surface(),
         }
     }
 
     fn sample_wavelengths(&self, u: Float) -> SampledWavelengths {
         match self {
             Film::RgbFilm(f) => f.sample_wavelengths(u),
+            Film::Debug(f) => f.sample_wavelengths(u),
         }
     }
 
     fn get_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> Image {
         match self {
             Film::RgbFilm(f) => f.get_image(metadata, splat_scale),
+            Film::Debug(f) => f.get_image(metadata, splat_scale),
         }
     }
 
     fn write_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> std::io::Result<()> {
         match self {
             Film::RgbFilm(f) => f.write_image(metadata, splat_scale),
+            Film::Debug(f) => f.write_image(metadata, splat_scale),
         }
     }
 
     fn to_output_rgb(&self, l: &SampledSpectrum, lambda: &SampledWavelengths) -> Rgb {
         match self {
             Film::RgbFilm(f) => f.to_output_rgb(l, lambda),
+            Film::Debug(f) => f.to_output_rgb(l, lambda),
         }
     }
 
     fn get_pixel_rgb(&self, p: Point2i, splat_scale: Float) -> Rgb {
         match self {
             Film::RgbFilm(f) => f.get_pixel_rgb(p, splat_scale),
+            Film::Debug(f) => f.get_pixel_rgb(p, splat_scale),
         }
     }
 
     fn get_filter(&self) -> &Filter {
         match self {
             Film::RgbFilm(f) => f.get_filter(),
+            Film::Debug(f) => f.get_filter(),
         }
     }
 
     fn get_pixel_sensor(&self) -> &PixelSensor {
         match self {
             Film::RgbFilm(f) => f.get_pixel_sensor(),
+            Film::Debug(f) => f.get_pixel_sensor(),
         }
     }
 
     fn get_filename(&self) -> &str {
         match self {
             Film::RgbFilm(f) => f.get_filename(),
+            Film::Debug(f) => f.get_filename(),
         }
     }
 }
@@ -603,10 +628,9 @@ impl AbstractFilm for RgbFilm {
 
                 debug_assert!(!rgb.has_nan());
 
-                if self.write_fp16
-                    && [rgb.r, rgb.g, rgb.b]
-                        .iter()
-                        .fold(Float::NEG_INFINITY, |a, b| Float::max(a, *b))
+                if self.write_fp16 && [rgb.r, rgb.g, rgb.b]
+                    .iter()
+                    .fold(Float::NEG_INFINITY, |a, b| Float::max(a, *b))
                         > max_f16
                 {
                     if rgb.r > max_f16 {
@@ -664,6 +688,178 @@ impl AbstractFilm for RgbFilm {
         }
 
         self.output_rgb_from_sensor_rgb * rgb
+    }
+
+    fn get_filter(&self) -> &Filter {
+        &self.base.filter
+    }
+
+    fn get_pixel_sensor(&self) -> &PixelSensor {
+        &self.base.sensor
+    }
+
+    fn get_filename(&self) -> &str {
+        &self.base.filename
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DebugFilm {
+    base: FilmBase,
+    write_fp16: bool,
+    filter_integral: Float,
+    pixels: Vec2D<Float>,
+}
+
+impl DebugFilm {
+    pub fn create(
+        parameters: &mut ParameterDictionary,
+        exposure_time: Float,
+        filter: Filter,
+        color_space: Arc<RgbColorSpace>,
+        loc: &FileLoc,
+        options: &Options,
+    ) -> DebugFilm {
+        let write_fp16 = parameters.get_one_bool("savefp16", true);
+
+        let sensor = PixelSensor::create(parameters, color_space.clone(), exposure_time, loc);
+        let film_base_parameters = FilmBaseParameters::create(parameters, filter, sensor, loc, options);
+
+        DebugFilm::new(
+            film_base_parameters.full_resolution,
+            film_base_parameters.pixel_bounds,
+            film_base_parameters.filter,
+            film_base_parameters.diagonal,
+            film_base_parameters.sensor,
+            &film_base_parameters.filename,
+            write_fp16,
+        )
+    }
+
+    pub fn new(
+        full_resolution: Point2i,
+        pixel_bounds: Bounds2i,
+        filter: Filter,
+        diagonal: Float,
+        sensor: PixelSensor,
+        filename: &str,
+        write_fp16: bool,
+    ) -> DebugFilm {
+        debug_assert!(!pixel_bounds.is_empty());
+        let filter_integral = filter.integral();
+        let pixels = Vec2D::from_bounds(pixel_bounds);
+        let base = FilmBase::new(
+            full_resolution,
+            pixel_bounds,
+            filter,
+            diagonal,
+            sensor,
+            filename.to_owned(),
+        );
+
+        DebugFilm {
+            base,
+            write_fp16,
+            filter_integral,
+            pixels,
+        }
+    }
+}
+
+impl AbstractFilm for DebugFilm {
+    fn add_sample(
+        &mut self,
+        p_film: Point2i,
+        l: &SampledSpectrum,
+        lambda: &SampledWavelengths,
+        visible_surface: &Option<VisibleSurface>,
+        weight: Float,
+    ) {
+        let pixel = self.pixels.get_mut(p_film);
+        *pixel += weight;
+    }
+
+    fn add_splat(&mut self, p: Point2f, l: &SampledSpectrum, lambda: &SampledWavelengths) {
+        unimplemented!()
+    }
+
+    fn full_resolution(&self) -> Point2i {
+        self.base.full_resolution
+    }
+
+    fn pixel_bounds(&self) -> Bounds2i {
+        self.base.pixel_bounds
+    }
+
+    fn sample_bounds(&self) -> Bounds2f {
+        self.base.sample_bounds()
+    }
+
+    fn diagonal(&self) -> Float {
+        self.base.diagonal
+    }
+
+    fn uses_visible_surface(&self) -> bool {
+        false
+    }
+
+    fn sample_wavelengths(&self, u: Float) -> SampledWavelengths {
+        self.base.sample_wavelengths(u)
+    }
+
+    fn get_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> Image {
+        let format = if self.write_fp16 {
+            PixelFormat::Float16
+        } else {
+            PixelFormat::Float32
+        };
+
+        let mut image = Image::new(
+            format,
+            self.pixel_bounds().diagonal(),
+            &["R".to_owned()],
+            None,
+        );
+
+        let max_f16 = 65504.0;
+        for x in self.pixel_bounds().min.x..self.pixel_bounds().max.x {
+            for y in self.pixel_bounds().min.y..self.pixel_bounds().max.y {
+                let p = Point2i::new(x, y);
+                let mut rgb = self.get_pixel_rgb(p, splat_scale);
+
+                debug_assert!(!rgb.has_nan());
+
+                if self.write_fp16 && rgb.r > max_f16 {
+                    rgb.r = max_f16;
+                }
+
+                let p_offset = Point2i::new(
+                    p.x - self.pixel_bounds().min.x,
+                    p.y - self.pixel_bounds().min.y,
+                );
+                image.set_channels_slice(p_offset, &[rgb.r])
+            }
+        }
+        
+        metadata.pixel_bounds = Some(self.pixel_bounds());
+        metadata.full_resolution = Some(self.full_resolution());
+
+        image
+    }
+
+    fn write_image(&self, metadata: &mut ImageMetadata, splat_scale: Float) -> std::io::Result<()> {
+        let image = self.get_image(metadata, splat_scale);
+        image.write(&PathBuf::from(self.get_filename()), metadata)?;
+        Ok(())
+    }
+
+    fn to_output_rgb(&self, l: &SampledSpectrum, lambda: &SampledWavelengths) -> Rgb {
+        unimplemented!()
+    }
+
+    fn get_pixel_rgb(&self, p: Point2i, splat_scale: Float) -> Rgb {
+        let mut pixel = self.pixels.get(p);
+        Rgb::new(pixel, pixel, pixel)
     }
 
     fn get_filter(&self) -> &Filter {

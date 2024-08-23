@@ -234,6 +234,9 @@ impl Triangle {
         let (p0, p1, p2) = self.get_points();
         let v = self.get_vertex_indices();
 
+        // Compute triangle partial derivatives
+        // Computes deltas and matrix determinant for triangle partial derivatives
+        // Get triangle texture coordinates in uv array
         let uv = if self.mesh.uv.is_empty() {
             [Point2f::ZERO, Point2f::new(1.0, 0.0), Point2f::ONE]
         } else {
@@ -269,8 +272,7 @@ impl Triangle {
         };
 
         let p_hit: Point3f = ti.b0 * p0 + ti.b1 * Vec3f::from(p1) + ti.b2 * Vec3f::from(p2);
-        let uv_hit: Point2f =
-            ti.b0 * uv[0] + ti.b1 * Vec2f::from(uv[1]) + ti.b2 * Vec2f::from(uv[2]);
+        let uv_hit: Point2f = ti.b0 * uv[0] + ti.b1 * Vec2f::from(uv[1]) + ti.b2 * Vec2f::from(uv[2]);
 
         let flip_normal = self.mesh.reverse_orientation ^ self.mesh.transform_swaps_handedness;
 
@@ -344,8 +346,7 @@ impl Triangle {
                 let duv02 = uv[0] - uv[2];
                 let duv12 = uv[1] - uv[2];
 
-                let determinant =
-                    Float::difference_of_products(duv02[0], duv12[1], duv02[1], duv12[0]);
+                let determinant = Float::difference_of_products(duv02[0], duv12[1], duv02[1], duv12[0]);
                 let degenerate_uv = determinant.abs() < 1e-9;
                 if degenerate_uv {
                     let dn = Vec3f::from(self.mesh.n[v[2]] - self.mesh.n[v[0]])
@@ -549,7 +550,7 @@ impl AbstractShape for Triangle {
 
         Some(ShapeSample {
             intr: Interaction::new(
-                Point3fi::from_errors(p, p_error.into()),
+                Point3fi::from_errors(p, p_error),
                 n,
                 uv_sample,
                 Vec3f::default(),

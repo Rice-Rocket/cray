@@ -25,7 +25,7 @@ impl PiecewiseConstant1D {
         let mut cdf = vec![0.0; n + 1];
         cdf[0] = 0.0;
 
-        for i in 0..=n {
+        for i in 1..=n {
             cdf[i] = cdf[i - 1] + func[i - 1] * (max - min) / n as Float;
         }
 

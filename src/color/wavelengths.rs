@@ -4,7 +4,7 @@ use super::{sampled::{SampledSpectrum, NUM_SPECTRUM_SAMPLES}, spectrum::{LAMBDA_
 use crate::math::*;
 
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SampledWavelengths {
     lambda: [Float; NUM_SPECTRUM_SAMPLES],
     pdf: [Float; NUM_SPECTRUM_SAMPLES]

@@ -3,7 +3,7 @@ use std::{collections::{HashMap, HashSet}, ops::{Index, IndexMut}, path::{Path, 
 use string_interner::{symbol::SymbolU32, DefaultBackend, StringInterner};
 use tracing::{info, warn};
 
-use crate::{camera::{film::{AbstractFilm, Film}, filter::Filter, AbstractCamera, Camera, CameraTransform}, color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{ColorEncoding, ColorEncodingCache}, spectrum::Spectrum}, file::resolve_filename, image::Image, integrator::{create_integrator, AbstractIntegrator}, light::Light, material::Material, media::Medium, mipmap::MIPMap, options::{CameraRenderingSpace, Options}, primitive::{bvh::{create_accelerator, BvhAggregate, BvhSplitMethod}, geometric::GeometricPrimitive, simple::SimplePrimitive, transformed::TransformedPrimitive, Primitive}, sampler::Sampler, shape::Shape, texture::{FloatConstantTexture, FloatTexture, SpectrumTexture, TexInfo}, transform::{ApplyTransform, Transform}, Float, Mat4, Point3f, Vec3f};
+use crate::{camera::{film::{AbstractFilm, Film}, filter::Filter, AbstractCamera, Camera, CameraTransform}, color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{ColorEncoding, ColorEncodingCache}, spectrum::Spectrum}, file::resolve_filename, image::Image, integrator::{AbstractIntegrator, Integrator}, light::Light, material::Material, media::Medium, mipmap::MIPMap, options::{CameraRenderingSpace, Options}, primitive::{bvh::{create_accelerator, BvhAggregate, BvhSplitMethod}, geometric::GeometricPrimitive, simple::SimplePrimitive, transformed::TransformedPrimitive, Primitive}, sampler::Sampler, shape::Shape, texture::{FloatConstantTexture, FloatTexture, SpectrumTexture, TexInfo}, transform::{ApplyTransform, Transform}, Float, Mat4, Point3f, Vec3f};
 
 use super::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::{FileLoc, ParsedParameterVector, ParserTarget}, utils::normalize_arg};
 
@@ -839,8 +839,8 @@ impl BasicScene {
         accelerator: Arc<Primitive>,
         lights: Arc<[Arc<Light>]>,
         string_interner: &StringInterner<DefaultBackend>,
-    ) -> Box<dyn AbstractIntegrator> {
-        create_integrator(
+    ) -> Integrator {
+        Integrator::create(
             string_interner
                 .resolve(self.integrator.as_ref().unwrap().name)
                 .unwrap(),

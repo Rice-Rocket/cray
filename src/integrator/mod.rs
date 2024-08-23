@@ -14,28 +14,47 @@ use crate::{camera::{film::{AbstractFilm, VisibleSurface}, filter::get_camera_sa
 pub mod random_walk;
 pub mod simple_path;
 
-pub fn create_integrator(
-    name: &str,
-    parameters: &mut ParameterDictionary,
-    camera: Camera,
-    sampler: Sampler,
-    aggregate: Arc<Primitive>,
-    lights: Arc<[Arc<Light>]>,
-    color_space: Arc<RgbColorSpace>,
-) -> Box<dyn AbstractIntegrator> {
-    match name {
-        "randomwalk" => Box::new(ImageTileIntegrator::create_random_walk_integrator(
-            parameters, camera, sampler, aggregate, lights,
-        )),
-        "simplepath" => Box::new(ImageTileIntegrator::create_simple_path_integrator(
-            parameters, camera, sampler, aggregate, lights,
-        )),
-        _ => panic!("unknown integrator {}", name),
+pub trait AbstractIntegrator {
+    fn render(&mut self, options: &Options);
+}
+
+pub enum Integrator {
+    ImageTile(ImageTileIntegrator),
+    DebugDepth(DebugDepthIntegrator),
+}
+
+impl Integrator {
+    pub fn create(
+        name: &str,
+        parameters: &mut ParameterDictionary,
+        camera: Camera,
+        sampler: Sampler,
+        aggregate: Arc<Primitive>,
+        lights: Arc<[Arc<Light>]>,
+        color_space: Arc<RgbColorSpace>,
+    ) -> Integrator {
+        match name {
+            "randomwalk" => Integrator::ImageTile(ImageTileIntegrator::create_random_walk_integrator(
+                parameters, camera, sampler, aggregate, lights,
+            )),
+            "simplepath" => Integrator::ImageTile(ImageTileIntegrator::create_simple_path_integrator(
+                parameters, camera, sampler, aggregate, lights,
+            )),
+            "debugdepth" => Integrator::DebugDepth(DebugDepthIntegrator::create(
+                parameters, camera, sampler, aggregate, lights,
+            )),
+            _ => panic!("unknown integrator {}", name),
+        }
     }
 }
 
-pub trait AbstractIntegrator {
-    fn render(&mut self, options: &Options);
+impl AbstractIntegrator for Integrator {
+    fn render(&mut self, options: &Options) {
+        match self {
+            Integrator::ImageTile(i) => i.render(options),
+            Integrator::DebugDepth(i) => i.render(options),
+        }
+    }
 }
 
 pub struct FilmSample {
@@ -302,6 +321,67 @@ impl ImageTileIntegrator {
             visible_surface: None,
             weight: camera_sample.filter_weight,
         }
+    }
+}
+
+pub struct DebugDepthIntegrator {
+    base: IntegratorBase,
+    camera: Camera,
+    sampler_prototype: Sampler,
+}
+
+impl DebugDepthIntegrator {
+    pub fn create(
+        _parameters: &mut ParameterDictionary,
+        camera: Camera,
+        sampler: Sampler,
+        aggregate: Arc<Primitive>,
+        lights: Arc<[Arc<Light>]>,
+    ) -> DebugDepthIntegrator {
+        DebugDepthIntegrator {
+            base: IntegratorBase::new(aggregate, lights),
+            camera,
+            sampler_prototype: sampler,
+        }
+    }
+}
+
+impl AbstractIntegrator for DebugDepthIntegrator {
+    fn render(&mut self, options: &Options) {
+        let pixel_bounds = self.camera.get_film().pixel_bounds();
+        let spp = self.sampler_prototype.samples_per_pixel();
+        let mut film = self.camera.get_film_mut().clone();
+
+        for x in pixel_bounds.min.x..pixel_bounds.max.x {
+            for y in pixel_bounds.min.y..pixel_bounds.max.y {
+                let p_pixel = Point2i::new(x, y);
+
+                let lambda = self.camera.get_film().sample_wavelengths(0.5);
+                let camera_sample = get_camera_sample(&mut self.sampler_prototype, p_pixel, self.camera.get_film().get_filter(), options);
+                let camera_ray = self.camera.generate_ray_differential(&camera_sample, &lambda);
+
+                if let Some(camera_ray) = camera_ray {
+                    let dist = if let Some(i) = self.base.intersect(&camera_ray.ray.ray, Float::INFINITY) {
+                        1.0 / i.t_hit
+                    } else {
+                        0.0
+                    };
+
+                    unsafe {
+                        Arc::get_mut_unchecked(&mut film.clone()).add_sample(
+                            p_pixel,
+                            &SampledSpectrum::from_const(0.0),
+                            &SampledWavelengths::default(),
+                            &None,
+                            dist,
+                        );
+                    }
+                }
+            }
+        }
+
+        let mut metadata = ImageMetadata::default();
+        self.camera.get_film().write_image(&mut metadata, 1.0).unwrap();
     }
 }
 

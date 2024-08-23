@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::{Arc, Mutex}};
 use string_interner::{DefaultBackend, StringInterner};
 use tracing::info;
 
-use crate::{color::{rgb_xyz::ColorEncodingCache, spectrum::Spectrum}, mipmap::MIPMap, options::Options, reader::scene::BasicScene, texture::TexInfo};
+use crate::{color::{rgb_xyz::ColorEncodingCache, spectrum::Spectrum}, integrator::AbstractIntegrator, mipmap::MIPMap, options::Options, reader::scene::BasicScene, texture::TexInfo};
 
 pub fn render_cpu(
     mut scene: Box<BasicScene>,
