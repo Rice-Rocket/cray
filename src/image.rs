@@ -1025,10 +1025,10 @@ impl Image {
             return io::Result::Err(io::Error::new(io::ErrorKind::InvalidInput, format!("no file extension for {}", path.to_str().unwrap())))
         }
 
-        // TODO: EXR Support
-
         if path.extension().unwrap().eq("png") {
             Self::read_png(path, encoding)
+        } else if path.extension().unwrap().eq("exr") {
+            Self::read_exr(path, encoding)
         } else {
             io::Result::Err(io::Error::new(io::ErrorKind::InvalidInput, format!("unsupported file extension for {}", path.to_str().unwrap())))
         }
@@ -1085,7 +1085,7 @@ impl Image {
 
                         image
                     },
-                    _ => return io::Result::Err(io::Error::new(io::ErrorKind::InvalidInput, "unsupported bit depth"))
+                    _ => return io::Result::Err(io::Error::new(io::ErrorKind::InvalidData, "unsupported bit depth"))
                 }
             },
             png::ColorType::Rgb | png::ColorType::Rgba => {
@@ -1158,10 +1158,10 @@ impl Image {
                             image
                         }
                     },
-                    _ => return io::Result::Err(io::Error::new(io::ErrorKind::InvalidInput, "unsupported bit depth")),
+                    _ => return io::Result::Err(io::Error::new(io::ErrorKind::InvalidData, "unsupported bit depth")),
                 }
             },
-            png::ColorType::Indexed => return io::Result::Err(io::Error::new(io::ErrorKind::InvalidInput, "indexed PNGs are not supported")),
+            png::ColorType::Indexed => return io::Result::Err(io::Error::new(io::ErrorKind::InvalidData, "indexed PNGs are not supported")),
         };
 
         let metadata = match info.color_type {
@@ -1178,6 +1178,80 @@ impl Image {
         io::Result::Ok(ImageAndMetadata { image, metadata })
     }
 
+    fn read_exr(path: &PathBuf, encoding: Option<ColorEncodingPtr>) -> io::Result<ImageAndMetadata> {
+        use exr::prelude::{ReadChannels, ReadLayers};
+
+        let Ok(im_exr) = exr::image::read::read()
+            .no_deep_data()
+            .largest_resolution_level() // or all_resolution_levels()
+            .all_channels()
+            .first_valid_layer() // or all_layers()
+            .all_attributes()
+            .from_file(path) else { return io::Result::Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("image file {} not found", path.to_str().unwrap()),
+            ))};
+
+        let attrs = &im_exr.attributes;
+        let resolution = attrs.display_window.size;
+        let mut channel_names = Vec::new();
+        let mut pixel_format = PixelFormat::Float32;
+
+        if im_exr.layer_data.channel_data.list.is_empty() {
+            return io::Result::Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "EXR images with no channels not supported",
+            ));
+        }
+
+        for channel in im_exr.layer_data.channel_data.list.iter() {
+            let name = &channel.name;
+        }
+
+        let channel_info = im_exr.layer_data.channel_data.list.first().unwrap();
+        let sample_vec = &channel_info.sample_data;
+        match sample_vec {
+            exr::image::FlatSamples::F16(_) => pixel_format = PixelFormat::Float16,
+            exr::image::FlatSamples::F32(_) => pixel_format = PixelFormat::Float32,
+            exr::image::FlatSamples::U32(_) => return io::Result::Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "unsupported image data format: U32",
+            )),
+        }
+
+        let mut image = Image::new(
+            pixel_format,
+            Point2i::new(resolution.x() as i32, resolution.y() as i32),
+            &channel_names,
+            None,
+        );
+
+        for (i, channel) in im_exr.layer_data.channel_data.list.iter().enumerate() {
+            for x in 0..image.resolution.x {
+                for y in 0..image.resolution.y {
+                    let v = channel.sample_data.value_by_flat_index((y * image.resolution.x + x) as usize);
+                    image.set_channel(Point2i::new(x, y), i, v.to_f32());
+                }
+            }
+        }
+
+        let color_space = if channel_names.contains(&"R".to_owned()) 
+            && channel_names.contains(&"G".to_owned()) 
+            && channel_names.contains(&"B".to_owned())
+        {
+            Some(RgbColorSpace::get_named(NamedColorSpace::SRgb).clone())
+        } else {
+            None
+        };
+
+        let metadata = ImageMetadata {
+            color_space,
+            ..Default::default()
+        };
+
+        io::Result::Ok(ImageAndMetadata { image, metadata })
+    }
+
     pub fn write(&self, path: &PathBuf, metadata: &ImageMetadata) -> io::Result<()> {
         if path.extension().is_none() {
             return io::Result::Err(io::Error::new(io::ErrorKind::InvalidInput, format!("no file extension for {}", path.to_str().unwrap())))
@@ -1187,6 +1261,8 @@ impl Image {
 
         if path.extension().unwrap().eq("png") {
             self.write_png(path, metadata)
+        } else if path.extension().unwrap().eq("exr") {
+            self.write_exr(path, metadata)
         } else {
             io::Result::Err(io::Error::new(io::ErrorKind::InvalidInput, format!("unsupported file extension for {}", path.to_str().unwrap())))
         }
@@ -1221,6 +1297,83 @@ impl Image {
 
         let mut writer = encoder.write_header().unwrap();
         Ok(writer.write_image_data(data)?)
+    }
+
+    fn write_exr(&self, path: &PathBuf, _metadata: &ImageMetadata) -> io::Result<()> {
+        use exr::{image::{Encoding, Layer, SpecificChannels}, math::Vec2, prelude::{LayerAttributes, WritableImage}};
+
+        match self.n_channels() {
+            1 => unimplemented!(),
+            2 => unimplemented!(),
+            3 => {
+                let get_pixels = |p: Vec2<usize>| {
+                    let c = self.get_channels(Point2i::new(p.x() as i32, p.y() as i32));
+                    (c.values[0], c.values[1], c.values[2])
+                };
+
+                let layer = Layer::new(
+                    (self.resolution.x as usize, self.resolution.y as usize),
+                    LayerAttributes::named("rgb main layer"),
+                    Encoding::FAST_LOSSLESS,
+                    SpecificChannels::rgb(get_pixels),
+                );
+
+                let mut image = exr::image::Image::from_layer(layer);
+                image.attributes.pixel_aspect = 1.0;
+
+                if let Err(e) = image.write().to_file(path) {
+                    let errorkind = match e {
+                        exr::error::Error::Aborted => io::ErrorKind::Interrupted,
+                        exr::error::Error::NotSupported(_) => io::ErrorKind::InvalidInput,
+                        exr::error::Error::Invalid(_) => io::ErrorKind::InvalidData,
+                        exr::error::Error::Io(err) => return io::Result::Err(err),
+                    };
+
+                    io::Result::Err(io::Error::new(
+                        errorkind,
+                        "failed to write EXR image to file",
+                    ))
+                } else {
+                    Ok(())
+                }
+            },
+            4 => {
+                let get_pixels = |p: Vec2<usize>| {
+                    let c = self.get_channels(Point2i::new(p.x() as i32, p.y() as i32));
+                    (c.values[0], c.values[1], c.values[2], c.values[3])
+                };
+
+                let layer = Layer::new(
+                    (self.resolution.x as usize, self.resolution.y as usize),
+                    LayerAttributes::named("rgba main layer"),
+                    Encoding::FAST_LOSSLESS,
+                    SpecificChannels::rgba(get_pixels),
+                );
+
+                let mut image = exr::image::Image::from_layer(layer);
+                image.attributes.pixel_aspect = 1.0;
+
+                if let Err(e) = image.write().to_file(path) {
+                    let errorkind = match e {
+                        exr::error::Error::Aborted => io::ErrorKind::Interrupted,
+                        exr::error::Error::NotSupported(_) => io::ErrorKind::InvalidInput,
+                        exr::error::Error::Invalid(_) => io::ErrorKind::InvalidData,
+                        exr::error::Error::Io(err) => return io::Result::Err(err),
+                    };
+
+                    io::Result::Err(io::Error::new(
+                        errorkind,
+                        "failed to write EXR image to file",
+                    ))
+                } else {
+                    Ok(())
+                }
+            },
+            _ => io::Result::Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("cannot write {} image channels", self.n_channels()),
+            ))
+        }
     }
 }
 
