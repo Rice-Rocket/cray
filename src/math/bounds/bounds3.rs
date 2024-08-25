@@ -245,7 +245,10 @@ where
 {
     /// Creates a new [`TBounds3`] with no points.
     fn default() -> Self {
-        Self::new(Point3::MAX, Point3::MIN)
+        Self {
+            min: Point3::MAX,
+            max: Point3::MIN,
+        }
     }
 }
 

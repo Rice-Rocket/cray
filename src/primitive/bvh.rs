@@ -198,12 +198,12 @@ impl BvhAggregate {
                                 costs[i - 1] += count_above as Float * bounds_above.surface_area();
                             }
 
-                            let mut min_cost_split_bucket = 0;
+                            let mut min_cost_split_bucket = -1;
                             let mut min_cost = Float::INFINITY;
                             for (i, cost) in costs.iter().enumerate() {
                                 if *cost < min_cost {
                                     min_cost = *cost;
-                                    min_cost_split_bucket = i;
+                                    min_cost_split_bucket = i as i32;
                                 }
                             }
 
@@ -212,8 +212,8 @@ impl BvhAggregate {
 
                             if bvh_primitives.len() > max_prims_in_node || min_cost < leaf_cost {
                                 let split_index = itertools::partition(bvh_primitives.iter_mut(), |bp: &BvhPrimitive| {
-                                    let mut b = (N_BUCKETS as Float * centroid_bounds.offset(bp.centroid())[dim]) as usize;
-                                    if b == N_BUCKETS { b = N_BUCKETS - 1 };
+                                    let mut b = (N_BUCKETS as Float * centroid_bounds.offset(bp.centroid())[dim]) as i32;
+                                    if b == N_BUCKETS as i32 { b = N_BUCKETS as i32 - 1 };
                                     b <= min_cost_split_bucket
                                 });
 

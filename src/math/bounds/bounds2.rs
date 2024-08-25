@@ -163,7 +163,10 @@ where
     T: NumericConsts + NumericOrd + PartialOrd + Clone + Copy + Add<T, Output = T> + Mul<T, Output = T> + Sub<T, Output = T> + Div<T, Output = T>
 {
     fn default() -> Self {
-        Self::new(Point2::MAX, Point2::MIN)
+        Self {
+            min: Point2::MAX,
+            max: Point2::MIN,
+        }
     }
 }
 
