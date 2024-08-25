@@ -19,8 +19,8 @@ where
 {
     /// Creates a new [`TBounds2`] with the given `min` and `max`.
     #[inline]
-    pub const fn new(min: Point2<T>, max: Point2<T>) -> Self {
-        Self { min, max }
+    pub fn new(p1: Point2<T>, p2: Point2<T>) -> Self {
+        Self { min: p1.min(p2), max: p1.max(p2) }
     }
 
     /// Creates a new [`TBounds2`] containing a single `point`.

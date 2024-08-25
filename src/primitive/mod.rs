@@ -1,5 +1,6 @@
 use bvh::BvhAggregate;
 use geometric::GeometricPrimitive;
+use list::BasicListAggregate;
 use simple::SimplePrimitive;
 use transformed::TransformedPrimitive;
 
@@ -9,6 +10,7 @@ pub mod simple;
 pub mod transformed;
 pub mod geometric;
 pub mod bvh;
+pub mod list;
 
 pub trait AbstractPrimitive {
     /// The bounding box of the primitive
@@ -22,10 +24,12 @@ pub trait AbstractPrimitive {
     fn intersect_predicate(&self, ray: &Ray, t_max: Float) -> bool;
 }
 
+#[derive(Debug, Clone)]
 pub enum Primitive {
     Simple(SimplePrimitive),
     Transformed(TransformedPrimitive),
     BvhAggregate(BvhAggregate),
+    BasicListAggregate(BasicListAggregate),
     Geometric(GeometricPrimitive),
 }
 
@@ -35,6 +39,7 @@ impl AbstractPrimitive for Primitive {
             Primitive::Simple(p) => p.bounds(),
             Primitive::Transformed(p) => p.bounds(),
             Primitive::BvhAggregate(p) => p.bounds(),
+            Primitive::BasicListAggregate(p) => p.bounds(),
             Primitive::Geometric(p) => p.bounds(),
         }
     }
@@ -44,6 +49,7 @@ impl AbstractPrimitive for Primitive {
             Primitive::Simple(p) => p.intersect(ray, t_max),
             Primitive::Transformed(p) => p.intersect(ray, t_max),
             Primitive::BvhAggregate(p) => p.intersect(ray, t_max),
+            Primitive::BasicListAggregate(p) => p.intersect(ray, t_max),
             Primitive::Geometric(p) => p.intersect(ray, t_max),
         }
     }
@@ -53,6 +59,7 @@ impl AbstractPrimitive for Primitive {
             Primitive::Simple(p) => p.intersect_predicate(ray, t_max),
             Primitive::Transformed(p) => p.intersect_predicate(ray, t_max),
             Primitive::BvhAggregate(p) => p.intersect_predicate(ray, t_max),
+            Primitive::BasicListAggregate(p) => p.intersect_predicate(ray, t_max),
             Primitive::Geometric(p) => p.intersect_predicate(ray, t_max),
         }
     }

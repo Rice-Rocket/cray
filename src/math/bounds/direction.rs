@@ -44,7 +44,7 @@ impl DirectionCone {
 
         let theta_a = safe::acos(self.cos_theta);
         let theta_b = safe::acos(rhs.cos_theta);
-        let theta_d = self.w.angle(rhs.w);
+        let theta_d = self.w.angle_between(rhs.w);
 
         if (theta_d + theta_b).min(PI) <= theta_a {
             return self;

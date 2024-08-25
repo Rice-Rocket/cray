@@ -19,8 +19,8 @@ where
 {
     /// Creates a new [`TBounds3`] with from a minimum and maximum.
     #[inline]
-    pub const fn new(min: Point3<T>, max: Point3<T>) -> Self {
-        Self { min, max }
+    pub fn new(p1: Point3<T>, p2: Point3<T>) -> Self {
+        Self { min: p1.min(p2), max: p1.max(p2) }
     }
 
     /// Creates a new [`TBounds3`] containing a single `point`.
@@ -277,8 +277,8 @@ impl<T: NumericOrd + Clone + Copy> Bounds3<T> {
     #[inline]
     fn union_box(self, rhs: Self) -> Self {
         Self {
-            min: Point3::new(self.min.x.nmin(rhs.min.x), self.min.y.nmin(rhs.min.y), self.min.z.nmin(rhs.min.z)),
-            max: Point3::new(self.max.x.nmax(rhs.max.x), self.max.y.nmax(rhs.max.y), self.max.z.nmax(rhs.max.z)),
+            min: self.min.min(rhs.min),
+            max: self.max.max(rhs.max),
         }
     }
 
@@ -287,8 +287,8 @@ impl<T: NumericOrd + Clone + Copy> Bounds3<T> {
     #[inline]
     fn union_vect(self, rhs: Point3<T>) -> Self {
         Self {
-            min: Point3::new(self.min.x.nmin(rhs.x), self.min.y.nmin(rhs.y), self.min.z.nmin(rhs.z)),
-            max: Point3::new(self.max.x.nmax(rhs.x), self.max.y.nmax(rhs.y), self.max.z.nmax(rhs.z)),
+            min: self.min.min(rhs),
+            max: self.max.max(rhs),
         }
     }
 

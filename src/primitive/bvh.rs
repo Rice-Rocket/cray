@@ -23,6 +23,7 @@ pub enum BvhSplitMethod {
     EqualCounts,
 }
 
+#[derive(Debug, Clone)]
 pub struct BvhAggregate {
     max_prims_in_node: usize,
     primitives: Vec<Arc<Primitive>>,
@@ -126,7 +127,7 @@ impl BvhAggregate {
 
         total_nodes.fetch_add(1, Ordering::SeqCst);
         
-        let bounds = bvh_primitives.iter().fold(Bounds3f::default(), |acc, p| -> Bounds3<Float> {
+        let bounds = bvh_primitives.iter().fold(Bounds3f::default(), |acc, p| -> Bounds3f {
             acc.union(p.bounds)
         });
 
@@ -478,7 +479,7 @@ struct LinearBvhNode {
     axis: u8
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 struct BvhBuildNode {
     bounds: Bounds3f,
     left: Option<Box<BvhBuildNode>>,
@@ -514,6 +515,7 @@ impl BvhBuildNode {
     }
 }
 
+#[derive(Debug)]
 struct BvhPrimitive {
     primitive_index: usize,
     bounds: Bounds3f,

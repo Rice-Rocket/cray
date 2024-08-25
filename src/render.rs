@@ -38,8 +38,6 @@ pub fn render_cpu(
         options,
     );
 
-    // FIX: camera transforms are different than PBRT for some reason for the same scene.
-    // Resolve length(ray.direction) != 1.0 as well
     let camera = scene.get_camera().unwrap();
     let sampler = scene.get_sampler().unwrap();
     

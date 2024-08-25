@@ -4,6 +4,7 @@ use crate::{light::Light, material::Material, media::MediumInterface, shape::{Ab
 
 use super::AbstractPrimitive;
 
+#[derive(Debug, Clone)]
 pub struct GeometricPrimitive {
     pub shape: Arc<Shape>,
     pub material: Arc<Material>,

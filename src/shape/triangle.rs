@@ -56,9 +56,9 @@ impl Triangle {
             // TODO: Could just discard instead of panicing + warn
         }
 
-        for i in 0..vi.len() {
-            if vi[i] as usize >= p.len() {
-                panic!("vertex indices {} out of bounds 'P' array length {}", vi[i], p.len());
+        for v in vi.iter() {
+            if *v as usize >= p.len() {
+                panic!("vertex indices {} out of bounds 'P' array length {}", v, p.len());
             }
         }
 
@@ -132,9 +132,9 @@ impl Triangle {
             return None;
         }
 
-        let p0t = p0 - ray.origin;
-        let p1t = p1 - ray.origin;
-        let p2t = p2 - ray.origin;
+        let mut p0t = p0 - ray.origin;
+        let mut p1t = p1 - ray.origin;
+        let mut p2t = p2 - ray.origin;
 
         let kz = ray.direction.abs().max_element_index();
         let mut kx = kz + 1;
@@ -148,9 +148,9 @@ impl Triangle {
         }
 
         let d = ray.direction.permute((kx, ky, kz));
-        let mut p0t = p0t.permute((kx, ky, kz));
-        let mut p1t = p1t.permute((kx, ky, kz));
-        let mut p2t = p2t.permute((kx, ky, kz));
+        p0t = p0t.permute((kx, ky, kz));
+        p1t = p1t.permute((kx, ky, kz));
+        p2t = p2t.permute((kx, ky, kz));
 
         let sx = -d.x / d.z;
         let sy = -d.y / d.z;
@@ -436,7 +436,7 @@ impl AbstractShape for Triangle {
 
         let n: Normal3f = (p1 - p0).cross(p2 - p0).normalize().into();
         let n = if self.mesh.n.is_empty() {
-            n * -1.0
+            -n
         } else {
             let ns: Normal3f =
                 b0 * self.mesh.n[v[0]] + b1 * self.mesh.n[v[1]] + b2 * self.mesh.n[v[2]];
@@ -534,7 +534,7 @@ impl AbstractShape for Triangle {
             let ns = b[0] * self.mesh.n[v[0]] + b[1] * self.mesh.n[v[1]] + b[2] * self.mesh.n[v[2]];
             n.facing(ns)
         } else if self.mesh.reverse_orientation ^ self.mesh.transform_swaps_handedness {
-            n * -1.0
+            -n
         } else {
             n
         };
@@ -545,8 +545,7 @@ impl AbstractShape for Triangle {
             [self.mesh.uv[v[0]], self.mesh.uv[v[1]], self.mesh.uv[v[2]]]
         };
 
-        let uv_sample: Point2f =
-            b[0] * uv[0] + Vec2f::from(b[1] * uv[1]) + Vec2f::from(b[2] * uv[2]);
+        let uv_sample: Point2f = b[0] * uv[0] + Vec2f::from(b[1] * uv[1]) + Vec2f::from(b[2] * uv[2]);
 
         Some(ShapeSample {
             intr: Interaction::new(
@@ -570,11 +569,7 @@ impl AbstractShape for Triangle {
             || solid_angle > Self::MAX_SPHERICAL_SAMPLE_AREA
         {
             let ray = ctx.spawn_ray(wi);
-            let isect = self.intersect(&ray, Float::INFINITY);
-            if isect.is_none() {
-                return 0.0;
-            }
-            let isect = isect.unwrap();
+            let Some(isect) = self.intersect(&ray, Float::INFINITY) else { return 0.0 };
 
             let pdf = (1.0 / self.area())
                 / (isect.intr.interaction.n.dot(-wi).abs()
@@ -607,9 +602,85 @@ impl AbstractShape for Triangle {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct TriangleIntersection {
     b0: Float,
     b1: Float,
     b2: Float,
     t: Float,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use float_cmp::assert_approx_eq;
+
+    use crate::{sampler::{AbstractSampler, IndependentSampler, Sampler}, shape::{mesh::TriangleMesh, AbstractShape, Shape, ShapeSampleContext}, transform::Transform, Float, Mat4, Normal3f, Point3f, Point3fi, Ray, Vec3f};
+
+    use super::Triangle;
+
+    #[test]
+    fn test_triangle_intersect() {
+        let vertices = vec![
+            Point3f::new(1.0, 2.0, 1.0),
+            Point3f::new(-1.0, 2.0, 1.0),
+            Point3f::new(-1.0, 2.0, -1.0),
+            Point3f::new(1.0, 2.0, -1.0),
+        ];
+
+        let indices = vec![0, 1, 2, 2, 3, 0];
+
+        let mesh = Arc::new(TriangleMesh::new(
+            &Transform::new_with_inverse(Mat4::new(
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, -1.0,
+                0.0, 0.0, 1.0, -6.8,
+                0.0, 0.0, 0.0, 1.0,
+            )),
+            false,
+            indices,
+            vertices,
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        ));
+
+        let tris = Triangle::create_triangles(mesh);
+
+        let ray = Ray::new_with_time(Point3f::ZERO, Vec3f::new(-0.03684295, 0.15507203, -0.9872159), 0.5854021);
+        if let Shape::Triangle(tri) = tris[0].as_ref() {
+            let (p0, p1, p2) = tri.get_points();
+            let isect = Triangle::intersect_triangle(&ray, Float::INFINITY, p0, p1, p2);
+
+            assert!(isect.is_some());
+            let isect = isect.unwrap();
+
+            assert_approx_eq!(Float, isect.t, 6.448617);
+            assert_approx_eq!(Float, isect.b0, 0.38120696);
+            assert_approx_eq!(Float, isect.b1, 0.3357048);
+            assert_approx_eq!(Float, isect.b2, 0.28308824);
+
+            let isect = Triangle::intersect(tri, &ray, Float::INFINITY);
+
+            assert!(isect.is_some());
+            let isect = isect.unwrap();
+
+            assert_approx_eq!(Float, isect.t_hit, 6.448617);
+        }
+
+        let p0 = Point3f::new(1.0, 1.0, -5.8);
+        let p1 = Point3f::new(-1.0, 1.0, -5.8);
+        let p2 = Point3f::new(-1.0, 1.0, -7.8);
+        let isect = Triangle::intersect_triangle(&ray, Float::INFINITY, p0, p1, p2);
+
+        assert!(isect.is_some());
+        let isect = isect.unwrap();
+
+        assert_approx_eq!(Float, isect.t, 6.448617);
+        assert_approx_eq!(Float, isect.b0, 0.38120696);
+        assert_approx_eq!(Float, isect.b1, 0.3357048);
+        assert_approx_eq!(Float, isect.b2, 0.28308824);
+    }
 }

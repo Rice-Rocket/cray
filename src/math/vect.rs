@@ -874,31 +874,7 @@ impl<T: PartialOrd> Point3<T> {
     where
         T: Copy
     {
-        let x = if perm.0 == 0 {
-            self.x
-        } else if perm.0 == 1 {
-            self.y
-        } else {
-            self.z
-        };
-
-        let y = if perm.1 == 0 {
-            self.x
-        } else if perm.1 == 1 {
-            self.y
-        } else {
-            self.z
-        };
-
-        let z = if perm.2 == 0 {
-            self.x
-        } else if perm.2 == 1 {
-            self.y
-        } else {
-            self.z
-        };
-
-        Self::new(x, y, z)
+        Self::new(self[perm.0], self[perm.1], self[perm.2])
     }
 }
 
@@ -927,31 +903,7 @@ impl<T: PartialOrd> Vec3<T> {
     where
         T: Copy
     {
-        let x = if perm.0 == 0 {
-            self.x
-        } else if perm.0 == 1 {
-            self.y
-        } else {
-            self.z
-        };
-
-        let y = if perm.1 == 0 {
-            self.x
-        } else if perm.1 == 1 {
-            self.y
-        } else {
-            self.z
-        };
-
-        let z = if perm.2 == 0 {
-            self.x
-        } else if perm.2 == 1 {
-            self.y
-        } else {
-            self.z
-        };
-
-        Self::new(x, y, z)
+        Self::new(self[perm.0], self[perm.1], self[perm.2])
     }
 }
 
@@ -980,31 +932,7 @@ impl<T: PartialOrd> Normal3<T> {
     where
         T: Copy
     {
-        let x = if perm.0 == 0 {
-            self.x
-        } else if perm.0 == 1 {
-            self.y
-        } else {
-            self.z
-        };
-
-        let y = if perm.1 == 0 {
-            self.x
-        } else if perm.1 == 1 {
-            self.y
-        } else {
-            self.z
-        };
-
-        let z = if perm.2 == 0 {
-            self.x
-        } else if perm.2 == 1 {
-            self.y
-        } else {
-            self.z
-        };
-
-        Self::new(x, y, z)
+        Self::new(self[perm.0], self[perm.1], self[perm.2])
     }
 }
 

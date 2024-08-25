@@ -4,6 +4,7 @@ use crate::{light::Light, material::Material, shape::{AbstractShape, Shape, Shap
 
 use super::{Primitive, AbstractPrimitive};
 
+#[derive(Debug, Clone)]
 pub struct TransformedPrimitive {
     primitive: Arc<Primitive>,
     render_from_primitive: Transform,

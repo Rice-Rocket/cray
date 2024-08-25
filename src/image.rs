@@ -1257,8 +1257,6 @@ impl Image {
             return io::Result::Err(io::Error::new(io::ErrorKind::InvalidInput, format!("no file extension for {}", path.to_str().unwrap())))
         }
 
-        // TODO: EXR Support
-
         if path.extension().unwrap().eq("png") {
             self.write_png(path, metadata)
         } else if path.extension().unwrap().eq("exr") {

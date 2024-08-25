@@ -55,7 +55,7 @@ impl TriangleMesh {
 
         let s = if !s.is_empty() {
             debug_assert_eq!(n_vertices, s.len());
-            s.iter().map(|ss| { render_from_object.apply(*ss) }).collect()
+            s.iter().map(|ss| render_from_object.apply(*ss)).collect()
         } else {
             s
         };

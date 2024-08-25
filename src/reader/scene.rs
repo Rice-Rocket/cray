@@ -770,11 +770,10 @@ impl BasicScene {
             // TODO: animated instance primitives
 
             let instance_primitives = if instance_primitives.len() > 1 {
-                // TODO: Use a better split method
                 let bvh = BvhAggregate::new(
                     instance_primitives,
                     1,
-                    BvhSplitMethod::Middle,
+                    BvhSplitMethod::SAH,
                 );
                 vec![Arc::new(Primitive::BvhAggregate(bvh))]
             } else {

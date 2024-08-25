@@ -4,6 +4,7 @@ use crate::{material::Material, shape::{Shape, ShapeIntersection, AbstractShape}
 
 use super::AbstractPrimitive;
 
+#[derive(Debug, Clone)]
 pub struct SimplePrimitive {
     pub shape: Arc<Shape>,
     pub material: Arc<Material>,
