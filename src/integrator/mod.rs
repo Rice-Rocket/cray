@@ -4,7 +4,7 @@ use bumpalo::Bump;
 use rand::{rngs::SmallRng, SeedableRng};
 use random_walk::RandomWalkIntegrator;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
-use indicatif::ParallelProgressIterator;
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use simple_path::SimplePathIntegrator;
 use thread_local::ThreadLocal;
 use tracing::error;
@@ -201,9 +201,33 @@ impl AbstractIntegrator for ImageTileIntegrator {
         let sampler_tl = ThreadLocal::new();
         let mut film = self.camera.get_film_mut().clone();
 
+        let mut n_waves = 0;
         while wave_start < spp {
+            wave_start = wave_end;
+            wave_end = i32::min(spp, wave_end + next_wave_size);
+            next_wave_size = i32::min(2 * next_wave_size, 64);
+            n_waves += 1;
+        };
+
+        wave_start = 0;
+        wave_end = 1;
+        next_wave_size = 1;
+
+        let mut wave_index = 0;
+
+        let bar_template = "{spinner:.green} [{elapsed}] [{bar:50.white/white}] {pos}/{len} ({eta})";
+        let style = ProgressStyle::with_template(bar_template).unwrap()
+            .progress_chars("=> ").tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏");
+
+        while wave_start < spp {
+            wave_index += 1;
+
             tiles.par_iter()
-                .progress()
+                .progress_with_style(style.clone().template(&format!(
+                    "{} {}",
+                    console::style(format!("Wave {}/{}", wave_index, n_waves)).green().bold(),
+                    bar_template,
+                )).unwrap())
                 .for_each(|tile| {
                     let scratch_buffer = scratch_buffer_tl.get_or(|| RefCell::new(Bump::with_capacity(256)));
                     let sampler = sampler_tl.get_or(|| RefCell::new(self.sampler_prototype.clone()));

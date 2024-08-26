@@ -195,6 +195,7 @@ dependencies = [
  "bitflags 2.6.0",
  "bumpalo",
  "clap",
+ "console",
  "exr",
  "fast_polynomial",
  "float-cmp",

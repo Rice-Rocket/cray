@@ -232,44 +232,44 @@ impl AbstractSampler for StratifiedSampler {
 }
 
 fn ihash21(mut x: u32, mut y: u32) -> u32 {
-    x *= 73333;
-    y *= 7777;
-    x ^= 3333777777 >> (x >> 28);
-    y ^= 3333777777 >> (y >> 28);
-    let n = x * y;
-    n ^ (n >> 15)
+    x = x.wrapping_mul(73333);
+    y = y.wrapping_mul(7777);
+    x ^= 3333777777u32.wrapping_shr(x.wrapping_shr(28));
+    y ^= 3333777777u32.wrapping_shr(y.wrapping_shr(28));
+    let n = x.wrapping_mul(y);
+    n ^ (n.wrapping_shr(15))
 }
 
 fn permutation_element(mut i: u32, l: u32, p: u32) -> i32 {
     let mut w = l - 1;
-    w |= w >> 1;
-    w |= w >> 2;
-    w |= w >> 4;
-    w |= w >> 8;
-    w |= w >> 16;
+    w |= w.wrapping_shr(1);
+    w |= w.wrapping_shr(2);
+    w |= w.wrapping_shr(4);
+    w |= w.wrapping_shr(8);
+    w |= w.wrapping_shr(16);
 
     while {
         i ^= p;
-        i *= 0xe170893d;
-        i ^= p >> 16;
-        i ^= (i & w) >> 4;
-        i ^= p >> 8;
-        i *= 0x0929eb3f;
-        i ^= p >> 23;
-        i ^= (i & w) >> 1;
-        i *= 1 | p >> 27;
-        i *= 0x6935fa69;
-        i ^= (i & w) >> 11;
-        i *= 0x74dcb303;
-        i ^= (i & w) >> 2;
-        i *= 0x9e501cc3;
-        i ^= (i & w) >> 2;
-        i *= 0xc860a3df;
+        i = i.wrapping_mul(0xe170893d);
+        i ^= p.wrapping_shr(16);
+        i ^= (i & w).wrapping_shr(4);
+        i ^= p.wrapping_shr(8);
+        i = i.wrapping_mul(0x0929eb3f);
+        i ^= p.wrapping_shr(23);
+        i ^= (i & w).wrapping_shr(1);
+        i = i.wrapping_mul(1 | p.wrapping_shr(27));
+        i = i.wrapping_mul(0x6935fa69);
+        i ^= (i & w).wrapping_shr(11);
+        i = i.wrapping_mul(0x74dcb303);
+        i ^= (i & w).wrapping_shr(2);
+        i = i.wrapping_mul(0x9e501cc3);
+        i ^= (i & w).wrapping_shr(2);
+        i = i.wrapping_mul(0xc860a3df);
         i &= w;
-        i ^= i >> 5;
+        i ^= i.wrapping_shr(5);
 
         i >= l
     } {}
 
-    ((i + p) % l) as i32
+    ((i.wrapping_add(p)) % l) as i32
 }
