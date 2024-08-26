@@ -1,6 +1,7 @@
 use std::{cell::RefCell, sync::Arc};
 
 use bumpalo::Bump;
+use path::PathIntegrator;
 use rand::{rngs::SmallRng, SeedableRng};
 use random_walk::RandomWalkIntegrator;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
@@ -9,10 +10,11 @@ use simple_path::SimplePathIntegrator;
 use thread_local::ThreadLocal;
 use tracing::error;
 
-use crate::{camera::{film::{AbstractFilm, Film, VisibleSurface}, filter::get_camera_sample, AbstractCamera, Camera}, color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, interaction::Interaction, light::{sampler::uniform::UniformLightSampler, AbstractLight, Light, LightType}, numeric::HasNan, options::Options, primitive::{AbstractPrimitive, Primitive}, reader::paramdict::ParameterDictionary, sampler::{AbstractSampler, Sampler}, shape::ShapeIntersection, tile::Tile, Float, Normal3f, Point2i, Ray, RayDifferential, Vec3f};
+use crate::{camera::{film::{AbstractFilm, Film, VisibleSurface}, filter::get_camera_sample, AbstractCamera, Camera}, color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, interaction::Interaction, light::{sampler::{uniform::UniformLightSampler, LightSampler}, AbstractLight, Light, LightType}, numeric::HasNan, options::Options, primitive::{AbstractPrimitive, Primitive}, reader::paramdict::ParameterDictionary, sampler::{AbstractSampler, Sampler}, shape::ShapeIntersection, tile::Tile, Float, Normal3f, Point2i, Ray, RayDifferential, Vec3f};
 
 pub mod random_walk;
 pub mod simple_path;
+pub mod path;
 
 pub trait AbstractIntegrator {
     fn render(&mut self, options: &Options);
@@ -20,7 +22,7 @@ pub trait AbstractIntegrator {
 
 pub enum Integrator {
     ImageTile(ImageTileIntegrator),
-    DebugDepth(DebugIntegrator),
+    Debug(DebugIntegrator),
 }
 
 impl Integrator {
@@ -40,7 +42,10 @@ impl Integrator {
             "simplepath" => Integrator::ImageTile(ImageTileIntegrator::create_simple_path_integrator(
                 parameters, camera, sampler, aggregate, lights,
             )),
-            "debug" => Integrator::DebugDepth(DebugIntegrator::create(
+            "path" => Integrator::ImageTile(ImageTileIntegrator::create_path_integrator(
+                parameters, camera, sampler, aggregate, lights,
+            )),
+            "debug" => Integrator::Debug(DebugIntegrator::create(
                 parameters, camera, sampler, aggregate, lights,
             )),
             _ => panic!("unknown integrator {}", name),
@@ -52,7 +57,7 @@ impl AbstractIntegrator for Integrator {
     fn render(&mut self, options: &Options) {
         match self {
             Integrator::ImageTile(i) => i.render(options),
-            Integrator::DebugDepth(i) => i.render(options),
+            Integrator::Debug(i) => i.render(options),
         }
     }
 }
@@ -175,6 +180,35 @@ impl ImageTileIntegrator {
             sample_bsdf,
             light_sampler,
         });
+
+        ImageTileIntegrator::new(
+            aggregate,
+            lights,
+            camera,
+            sampler,
+            pixel_sample_evaluator,
+        )
+    }
+
+    pub fn create_path_integrator(
+        parameters: &mut ParameterDictionary,
+        camera: Camera,
+        sampler: Sampler,
+        aggregate: Arc<Primitive>,
+        lights: Arc<[Arc<Light>]>,
+    ) -> ImageTileIntegrator {
+        let max_depth = parameters.get_one_int("maxdepth", 5);
+        let regularize = parameters.get_one_bool("regularize", false);
+
+        // TODO: Change default to BVH
+        let light_strategy = parameters.get_one_string("lightsampler", "uniform");
+        let light_sampler = LightSampler::create(&light_strategy, lights.clone());
+
+        let pixel_sample_evaluator = RayIntegrator::Path(PathIntegrator::new(
+            max_depth,
+            light_sampler,
+            regularize,
+        ));
 
         ImageTileIntegrator::new(
             aggregate,
@@ -464,6 +498,7 @@ pub trait AbstractRayIntegrator {
 pub enum RayIntegrator {
     RandomWalk(RandomWalkIntegrator),
     SimplePath(SimplePathIntegrator),
+    Path(PathIntegrator),
 }
 
 impl AbstractRayIntegrator for RayIntegrator {
@@ -490,6 +525,16 @@ impl AbstractRayIntegrator for RayIntegrator {
                 rng,
             ),
             RayIntegrator::SimplePath(r) => r.li(
+                base,
+                camera,
+                ray,
+                lambda,
+                sampler,
+                scratch_buffer,
+                options,
+                rng,
+            ),
+            RayIntegrator::Path(r) => r.li(
                 base,
                 camera,
                 ray,

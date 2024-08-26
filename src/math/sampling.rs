@@ -328,6 +328,16 @@ impl<T> SampledGrid<T> {
     }
 }
 
+pub fn power_heuristic(nf: u8, f_pdf: Float, ng: u8, g_pdf: Float) -> Float {
+    let f = nf as Float * f_pdf;
+    let g = ng as Float * g_pdf;
+    if sqr(f).is_infinite() {
+        1.0
+    } else {
+        (f * f) / (f * f + g * g)
+    }
+}
+
 pub fn sample_uniform_disk_concentric(u: Point2f) -> Point2f {
     let u_offset = u * 2.0 - Vec2f::new(1.0, 1.0);
     if u_offset.x == 0.0 && u_offset.y == 0.0 {
