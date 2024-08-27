@@ -197,6 +197,7 @@ impl SurfaceInteraction {
         }
 
         let material = match material.as_ref() {
+            Material::Interface => return None,
             Material::Single(m) => m,
             Material::Mix(m) => unreachable!(),
         };

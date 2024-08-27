@@ -612,3 +612,7 @@ pub fn invert_spherical_triangle_sample(v: &[Point3f; 3], p: Point3f, w: Vec3f) 
     let u1 = (1.0 - w.dot(b)) / (1.0 - cp.dot(b));
     Point2f::new(u0.clamp(0.0, 1.0), u1.clamp(0.0, 1.0))
 }
+
+pub fn sample_exponential(x: Float, a: Float) -> Float {
+    a * Float::exp(-a * x)
+}

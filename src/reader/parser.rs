@@ -304,7 +304,7 @@ impl<'a> Parser<'a> {
             return Err(Error::EndOfFile);
         };
 
-        let directive = next_token.directive().ok_or(Error::UnknownDirective)?;
+        let directive = next_token.directive().ok_or(Error::UnknownDirective(next_token.value().to_owned()))?;
 
         let element = match directive {
             Directive::Include => Element::Include(self.read_str()?),

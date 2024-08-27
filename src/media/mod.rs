@@ -3,9 +3,10 @@ use std::{collections::HashMap, sync::Arc};
 use grid::GridMedium;
 use homogeneous::HomogeneousMedium;
 use iterator::{HomogeneousMajorantIterator, RayMajorantIterator};
+use rand::{rngs::SmallRng, Rng};
 use rgb::RgbGridMedium;
 
-use crate::{color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, phase::PhaseFunction, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, Float, Point3f, Ray};
+use crate::{color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, phase::PhaseFunction, ray::AbstractRay, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::sample_exponential, transform::Transform, Float, Point3f, Ray};
 
 pub mod iterator;
 pub mod homogeneous;
@@ -104,4 +105,81 @@ pub struct RayMajorantSegment {
     pub t_min: Float,
     pub t_max: Float,
     pub sigma_maj: SampledSpectrum,
+}
+
+pub fn sample_t_maj<F>(
+    ray: &mut Ray,
+    mut t_max: Float,
+    mut u: Float,
+    rng: &mut SmallRng,
+    lambda: &SampledWavelengths,
+    mut callback: F,
+) -> SampledSpectrum
+where
+    F: FnMut(&mut Ray, Point3f, &MediumProperties, &SampledSpectrum, &SampledSpectrum, &mut SmallRng) -> bool,
+{
+    let rd_length = ray.direction.length();
+    t_max *= rd_length;
+    ray.direction /= rd_length;
+
+    let Some(medium) = ray.medium.clone() else {
+        return SampledSpectrum::from_const(0.0);
+    };
+
+    let Some(mut iter) = medium.sample_ray(ray, t_max, lambda) else {
+        return SampledSpectrum::from_const(0.0);
+    };
+
+    let mut t_maj = SampledSpectrum::from_const(1.0);
+    let mut done = false;
+
+    while !done {
+        let Some(seg) = iter.next() else {
+            return t_maj;
+        };
+
+        if seg.sigma_maj[0] == 0.0 {
+            let mut dt = seg.t_max - seg.t_min;
+
+            if dt.is_infinite() {
+                dt = Float::MAX;
+            }
+
+            // TODO: fast_exp()
+            t_maj *= (-dt * seg.sigma_maj).exp();
+            continue;
+        }
+
+        let mut t_min = seg.t_min;
+        loop {
+            let t = t_min + sample_exponential(u, seg.sigma_maj[0]);
+            u = rng.gen();
+
+            if t < seg.t_max {
+                // TODO: fast_exp()
+                t_maj *= (-(t - t_min) * seg.sigma_maj).exp();
+                let mp = medium.sample_point(ray.at(t), lambda);
+
+                if !callback(ray, ray.at(t), &mp, &seg.sigma_maj, &t_maj, rng) {
+                    done = true;
+                    break;
+                }
+
+                t_maj = SampledSpectrum::from_const(1.0);
+                t_min = t;
+            } else {
+                let mut dt = seg.t_max - t_min;
+
+                if dt.is_infinite() {
+                    dt = Float::MAX;
+                }
+
+                // TODO: fast_exp()
+                t_maj *= (-dt * seg.sigma_maj).exp();
+                break;
+            }
+        }
+    }
+
+    SampledSpectrum::from_const(1.0)
 }

@@ -180,7 +180,7 @@ impl FromStr for Directive {
             "MakeNamedMaterial" => Directive::MakeNamedMaterial,
             "NamedMaterial" => Directive::NamedMaterial,
             "PixelFilter" => Directive::PixelFilter,
-            _ => return Err(Error::UnknownDirective),
+            _ => return Err(Error::UnknownDirective(s.to_owned())),
         };
 
         Ok(e)

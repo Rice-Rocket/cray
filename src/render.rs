@@ -41,6 +41,8 @@ pub fn render_cpu(
 
     let camera = scene.get_camera().unwrap();
     let sampler = scene.get_sampler().unwrap();
+
+    dbg!(&media);
     
     // TODO: check options, give warnings.
     let mut integrator = scene.create_integrator(camera, sampler, accelerator, lights, string_interner);

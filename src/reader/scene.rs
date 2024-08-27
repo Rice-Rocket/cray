@@ -7,7 +7,7 @@ use crate::{camera::{film::{AbstractFilm, Film}, filter::Filter, AbstractCamera,
 
 use super::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::{FileLoc, ParsedParameterVector, ParserTarget}, utils::normalize_arg};
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct BasicScene {
     pub integrator: Option<SceneEntity>,
     pub accelerator: Option<SceneEntity>,
@@ -1010,6 +1010,7 @@ impl InstanceSceneEntity {
     }
 }
 
+#[derive(Debug)]
 pub struct InstanceDefinitionSceneEntity {
     name: SymbolU32,
     loc: FileLoc,

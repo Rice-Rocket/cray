@@ -39,7 +39,7 @@ pub enum Error {
 
     /// Directive is unknown.
     #[error("Unsupported directive")]
-    UnknownDirective,
+    UnknownDirective(String),
 
     #[error("Expected string token")]
     InvalidString,

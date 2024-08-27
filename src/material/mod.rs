@@ -35,6 +35,7 @@ pub trait AbstractMaterial {
 
 #[derive(Debug, Clone)]
 pub enum Material {
+    Interface,
     Single(SingleMaterial),
     Mix(MixMaterial),
 }
@@ -50,6 +51,9 @@ impl Material {
         loc: &FileLoc,
     ) -> Material {
         match name {
+            "interface" => {
+                Material::Interface
+            },
             "mix" => {
                 let material_names = parameters.get_string_array("materials");
                 if material_names.len() != 2 {

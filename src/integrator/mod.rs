@@ -7,6 +7,7 @@ use random_walk::RandomWalkIntegrator;
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use simple_path::SimplePathIntegrator;
+use simple_vol_path::SimpleVolumetricPathIntegrator;
 use thread_local::ThreadLocal;
 use tracing::error;
 
@@ -15,6 +16,7 @@ use crate::{camera::{film::{AbstractFilm, Film, VisibleSurface}, filter::get_cam
 pub mod random_walk;
 pub mod simple_path;
 pub mod path;
+pub mod simple_vol_path;
 
 pub trait AbstractIntegrator {
     fn render(&mut self, options: &Options);
@@ -43,6 +45,9 @@ impl Integrator {
                 parameters, camera, sampler, aggregate, lights,
             )),
             "path" => Integrator::ImageTile(ImageTileIntegrator::create_path_integrator(
+                parameters, camera, sampler, aggregate, lights,
+            )),
+            "simplevolpath" => Integrator::ImageTile(ImageTileIntegrator::create_simple_vol_path_integrator(
                 parameters, camera, sampler, aggregate, lights,
             )),
             "debug" => Integrator::Debug(DebugIntegrator::create(
@@ -216,6 +221,25 @@ impl ImageTileIntegrator {
             camera,
             sampler,
             pixel_sample_evaluator,
+        )
+    }
+
+    pub fn create_simple_vol_path_integrator(
+        parameters: &mut ParameterDictionary,
+        camera: Camera,
+        sampler: Sampler,
+        aggregate: Arc<Primitive>,
+        lights: Arc<[Arc<Light>]>,
+    ) -> ImageTileIntegrator {
+        let max_depth = parameters.get_one_int("maxdepth", 5);
+        let ray_integrator = RayIntegrator::SimpleVolumetricPath(SimpleVolumetricPathIntegrator { max_depth });
+
+        ImageTileIntegrator::new(
+            aggregate,
+            lights,
+            camera,
+            sampler,
+            ray_integrator,
         )
     }
 }
@@ -499,6 +523,7 @@ pub enum RayIntegrator {
     RandomWalk(RandomWalkIntegrator),
     SimplePath(SimplePathIntegrator),
     Path(PathIntegrator),
+    SimpleVolumetricPath(SimpleVolumetricPathIntegrator),
 }
 
 impl AbstractRayIntegrator for RayIntegrator {
@@ -535,6 +560,16 @@ impl AbstractRayIntegrator for RayIntegrator {
                 rng,
             ),
             RayIntegrator::Path(r) => r.li(
+                base,
+                camera,
+                ray,
+                lambda,
+                sampler,
+                scratch_buffer,
+                options,
+                rng,
+            ),
+            RayIntegrator::SimpleVolumetricPath(r) => r.li(
                 base,
                 camera,
                 ray,
