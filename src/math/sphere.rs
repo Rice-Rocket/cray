@@ -1,5 +1,6 @@
 // Pbrt 3.8 Spherical Geometry
 
+use fast_polynomial::poly_array;
 use vect::Dot;
 
 use crate::math::*;
@@ -238,6 +239,51 @@ pub fn equal_area_square_to_sphere(p: Vec2f) -> Vec3f {
     let sin_phi = phi.sin() * v.signum();
 
     Vec3f::new(cos_phi * r * safe::sqrt(2.0 - r * r), sin_phi * r * safe::sqrt(2.0 - r * r), z)
+}
+
+pub fn equal_area_sphere_to_square(d: Vec3f) -> Point2f {
+    debug_assert!(d.length_squared() > 0.999 && d.length_squared() < 1.001);
+
+    let x = d.x.abs();
+    let y = d.y.abs();
+    let z = d.z.abs();
+
+    let r = safe::sqrt(1.0 - z);
+
+    let a = Float::max(x, y);
+    let b = Float::min(x, y);
+    let b = if a == 0.0 { 0.0 } else { b / a };
+
+    let t1 = 0.406758566246788489601959989e-5;
+    let t2 = 0.636226545274016134946890922156;
+    let t3 = 0.61572017898280213493197203466e-2;
+    let t4 = -0.247333733281268944196501420480;
+    let t5 = 0.881770664775316294736387951347e-1;
+    let t6 = 0.419038818029165735901852432784e-1;
+    let t7 = -0.251390972343483509333252996350e-1;
+
+    let mut phi = poly_array(b, &[t1, t2, t3, t4, t5, t6, t7]);
+
+    if x < y {
+        phi = 1.0 - phi;
+    }
+
+    let mut v = phi * r;
+    let mut u = r - v;
+
+    if d.z < 0.0 {
+        std::mem::swap(&mut u, &mut v);
+        u = 1.0 - u;
+        v = 1.0 - v;
+    }
+
+    u = Float::copysign(u, d.x);
+    v = Float::copysign(v, d.y);
+
+    Point2f::new(
+        0.5 * (u + 1.0),
+        0.5 * (v + 1.0),
+    )
 }
 
 

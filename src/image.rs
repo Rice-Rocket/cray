@@ -1206,6 +1206,7 @@ impl Image {
 
         for channel in im_exr.layer_data.channel_data.list.iter() {
             let name = &channel.name;
+            channel_names.push(name.to_string())
         }
 
         let channel_info = im_exr.layer_data.channel_data.list.first().unwrap();

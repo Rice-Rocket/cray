@@ -1,13 +1,17 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use diffuse_area::DiffuseAreaLight;
+use image_infinite::ImageInfiniteLight;
 use point::PointLight;
+use uniform_infinite::UniformInfiniteLight;
 
-use crate::{bounds::Union, camera::CameraTransform, color::{sampled::SampledSpectrum, spectrum::{DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, interaction::{Interaction, SurfaceInteraction}, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, shape::Shape, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
+use crate::{bounds::Union, camera::CameraTransform, color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, cos_theta, equal_area_square_to_sphere, file::resolve_filename, image::Image, interaction::{Interaction, SurfaceInteraction}, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, shape::Shape, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point2i, Point3f, Point3fi, Ray, Vec2f, Vec3f, PI};
 
 pub mod sampler;
 pub mod point;
 pub mod diffuse_area;
+pub mod uniform_infinite;
+pub mod image_infinite;
 
 pub trait AbstractLight {
     fn phi(&self, lambda: &SampledWavelengths) -> SampledSpectrum;
@@ -46,6 +50,8 @@ pub trait AbstractLight {
 pub enum Light {
     Point(PointLight),
     DiffuseArea(DiffuseAreaLight),
+    UniformInfinite(UniformInfiniteLight),
+    ImageInfinite(ImageInfiniteLight),
 }
 
 impl Light {
@@ -68,6 +74,109 @@ impl Light {
                 loc,
                 cached_spectra,
             )),
+            "infinite" => {
+                let color_space = parameters.color_space.clone();
+                let l = parameters.get_spectrum_array(
+                    "L",
+                    SpectrumType::Illuminant,
+                    cached_spectra,
+                );
+
+                let mut scale = parameters.get_one_float("scale", 1.0);
+                let portal = parameters.get_point3f_array("portal");
+                let filename = resolve_filename(
+                    options,
+                    parameters.get_one_string("filename", "").as_str(),
+                );
+                
+                let e_v = parameters.get_one_float("illuminance", -1.0);
+
+                if l.is_empty() && filename.is_empty() && portal.is_empty() {
+                    scale /= spectrum_to_photometric(&color_space.illuminant);
+                    if e_v > 0.0 {
+                        let k_e = 4.0 * PI;
+                        scale *= e_v / k_e;
+                    }
+
+                    Light::UniformInfinite(UniformInfiniteLight::new(
+                        render_from_light,
+                        color_space.illuminant.clone(),
+                        scale,
+                    ))
+                } else if !l.is_empty() && portal.is_empty() {
+                    if !filename.is_empty() {
+                        panic!("Can't specify both emission L and filename with ImageInfiniteLight");
+                    }
+
+                    scale /= spectrum_to_photometric(&l[0]);
+                    if e_v > 0.0 {
+                        let k_e = 4.0 * PI;
+                        scale *= e_v / k_e;
+                    }
+
+                    Light::UniformInfinite(UniformInfiniteLight::new(
+                        render_from_light,
+                        l[0].clone(),
+                        scale,
+                    ))
+                } else {
+                    let image_and_metadata = if filename.is_empty() {
+                        todo!("implement empty filename case");
+                    } else {
+                        let image_and_metadata = Image::read(&PathBuf::from(&filename), None).unwrap();
+                        // TODO: Check for NaN pixels
+                        image_and_metadata
+                    };
+
+                    let color_space = image_and_metadata.metadata.color_space.expect("expected color space");
+                    let Some(channel_desc) = image_and_metadata.image.get_channel_desc(&["R", "G", "B"]) else {
+                        panic!("Infinite image light sources must have RGB channels");
+                    };
+
+                    scale /= spectrum_to_photometric(&color_space.illuminant);
+
+                    if e_v > 0.0 {
+                        let mut illuminance = 0.0;
+                        let image = &image_and_metadata.image;
+                        let lum = color_space.luminance_vector();
+
+                        for y in 0..image.resolution().y {
+                            let v = (y as Float + 0.5) / image.resolution().y as Float;
+                            for x in 0..image.resolution().x {
+                                let u = (x as Float + 0.5) / image.resolution().x as Float;
+                                let w = equal_area_square_to_sphere(Vec2f::new(u, v));
+                                if w.z <= 0.0 {
+                                    continue;
+                                }
+
+                                let values = image.get_channels(Point2i::new(x, y));
+                                for c in 0..3 {
+                                    illuminance += values[c] * lum[c] * cos_theta(w);
+                                }
+                            }
+                        }
+
+                        illuminance *= 2.0 * PI / (image.resolution().x * image.resolution().y) as Float;
+                        
+                        let k_e = illuminance;
+                        scale *= e_v / k_e;
+                    }
+
+                    let image = image_and_metadata.image.select_channels(&channel_desc);
+
+                    if !portal.is_empty() {
+                        todo!("implement portals");
+                    } else {
+                        Light::ImageInfinite(ImageInfiniteLight::new(
+                            render_from_light,
+                            Arc::new(image),
+                            color_space,
+                            scale,
+                            &filename,
+                        ))
+                    }
+                }
+            },
             _ => panic!("{}: Light {} unknown", loc, name)
         }
     }
@@ -103,6 +212,8 @@ impl AbstractLight for Light {
         match self {
             Light::Point(l) => l.phi(lambda),
             Light::DiffuseArea(l) => l.phi(lambda),
+            Light::UniformInfinite(l) => l.phi(lambda),
+            Light::ImageInfinite(l) => l.phi(lambda),
         }
     }
 
@@ -110,6 +221,8 @@ impl AbstractLight for Light {
         match self {
             Light::Point(l) => l.light_type(),
             Light::DiffuseArea(l) => l.light_type(),
+            Light::UniformInfinite(l) => l.light_type(),
+            Light::ImageInfinite(l) => l.light_type(),
         }
     }
 
@@ -123,6 +236,8 @@ impl AbstractLight for Light {
         match self {
             Light::Point(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
             Light::DiffuseArea(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
+            Light::UniformInfinite(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
+            Light::ImageInfinite(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
         }
     }
 
@@ -130,6 +245,8 @@ impl AbstractLight for Light {
         match self {
             Light::Point(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
             Light::DiffuseArea(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
+            Light::UniformInfinite(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
+            Light::ImageInfinite(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
         }
     }
 
@@ -144,6 +261,8 @@ impl AbstractLight for Light {
         match self {
             Light::Point(l) => l.l(p, n, uv, w, lambda),
             Light::DiffuseArea(l) => l.l(p, n, uv, w, lambda),
+            Light::UniformInfinite(l) => l.l(p, n, uv, w, lambda),
+            Light::ImageInfinite(l) => l.l(p, n, uv, w, lambda),
         }
     }
 
@@ -151,6 +270,8 @@ impl AbstractLight for Light {
         match self {
             Light::Point(l) => l.le(ray, lambda),
             Light::DiffuseArea(l) => l.le(ray, lambda),
+            Light::UniformInfinite(l) => l.le(ray, lambda),
+            Light::ImageInfinite(l) => l.le(ray, lambda),
         }
     }
 
@@ -158,6 +279,8 @@ impl AbstractLight for Light {
         match self {
             Light::Point(l) => l.preprocess(scene_bounds),
             Light::DiffuseArea(l) => l.preprocess(scene_bounds),
+            Light::UniformInfinite(l) => l.preprocess(scene_bounds),
+            Light::ImageInfinite(l) => l.preprocess(scene_bounds),
         }
     }
 
@@ -165,6 +288,8 @@ impl AbstractLight for Light {
         match self {
             Light::Point(l) => l.bounds(),
             Light::DiffuseArea(l) => l.bounds(),
+            Light::UniformInfinite(l) => l.bounds(),
+            Light::ImageInfinite(l) => l.bounds(),
         }
     }
 }
