@@ -143,7 +143,7 @@ pub fn parse_str<T: ParserTarget>(
             Element::ObjectBegin { name } => target.object_begin(name, loc, string_interner),
             Element::ObjectEnd => target.object_end(loc),
             Element::ObjectInstance { name } => target.object_instance(name, loc, string_interner),
-            Element::MakeNamedMedium { name, params } => target.make_named_medium(name, params.into(), loc),
+            Element::MakeNamedMedium { name, params } => target.make_named_medium(name, params.into(), string_interner, cached_spectra, loc),
             Element::MediumInterface { interior, exterior } => target.medium_interface(interior, exterior, loc),
         }
     }

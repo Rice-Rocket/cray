@@ -77,12 +77,12 @@ impl<'a> AbstractMedium for &'a Medium {
 
 #[derive(Debug, Clone)]
 pub struct MediumInterface {
-    pub inside: Medium,
-    pub outside: Medium,
+    pub inside: Arc<Medium>,
+    pub outside: Arc<Medium>,
 }
 
 impl MediumInterface {
-    pub fn new(inside: Medium, outside: Medium) -> MediumInterface {
+    pub fn new(inside: Arc<Medium>, outside: Arc<Medium>) -> MediumInterface {
         MediumInterface { inside, outside }
     }
 

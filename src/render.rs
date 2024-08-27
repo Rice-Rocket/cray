@@ -13,8 +13,9 @@ pub fn render_cpu(
     texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
     gamma_encoding_cache: &mut ColorEncodingCache,
 ) {
-    // TODO: instantiate media in scene
-    let media = HashMap::new();
+    info!("Creating media...");
+    let media = scene.create_media();
+    info!("Done creating media.");
 
     info!("Creating textures...");
     let textures = scene.create_textures(cached_spectra, string_interner, options, texture_cache, gamma_encoding_cache);

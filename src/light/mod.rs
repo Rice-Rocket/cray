@@ -72,11 +72,11 @@ impl Light {
         }
     }
 
-    // TODO: add medium interface; use medium_interface.outside for diffuse area light
     pub fn create_area(
         name: &str,
         parameters: &mut ParameterDictionary,
         render_from_light: Transform,
+        medium_interface: Option<Arc<MediumInterface>>,
         shape: Arc<Shape>,
         alpha: Arc<FloatTexture>,
         loc: &FileLoc,
@@ -85,7 +85,7 @@ impl Light {
         match name {
             "diffuse" => Light::DiffuseArea(DiffuseAreaLight::create(
                 render_from_light,
-                None,
+                medium_interface.map(|m| m.outside.clone()),
                 parameters,
                 parameters.color_space.clone(),
                 loc,

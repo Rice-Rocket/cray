@@ -46,7 +46,7 @@ impl DiffuseAreaLight {
 
     pub fn create(
         render_from_light: Transform,
-        medium: Option<Medium>,
+        medium: Option<Arc<Medium>>,
         parameters: &mut ParameterDictionary,
         color_space: Arc<RgbColorSpace>,
         loc: &FileLoc,
@@ -122,7 +122,7 @@ impl AbstractLight for DiffuseAreaLight {
         allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample> {
         let shape_ctx = ShapeSampleContext::new(ctx.pi, ctx.n, ctx.ns, 0.0);
-        let Some(ss) = self.shape.sample_with_context(&shape_ctx, u) else { return None };
+        let mut ss = self.shape.sample_with_context(&shape_ctx, u)?;
 
         if ss.pdf == 0.0 || (ss.intr.position() - ctx.p()).length_squared() == 0.0 {
             return None;
@@ -130,11 +130,12 @@ impl AbstractLight for DiffuseAreaLight {
 
         debug_assert!(!ss.pdf.is_nan());
 
-        // TODO: set the medium interface of ss
+        ss.intr.medium_interface = self.base.medium.clone();
+
         // TODO: check against the alpha texture with alpha_masked().
 
         let wi = Vec3f::from((ss.intr.position() - ctx.p()).normalize());
-        let le = self.l(ss.intr.position(), ss.intr.n, ss.intr.uv, -wi, &lambda);
+        let le = self.l(ss.intr.position(), ss.intr.n, ss.intr.uv, -wi, lambda);
         if le.is_zero() {
             return None;
         }

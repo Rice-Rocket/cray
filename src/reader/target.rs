@@ -106,7 +106,14 @@ pub trait ParserTarget {
         loc: FileLoc,
         options: &Options,
     );
-    fn make_named_medium(&mut self, name: &str, params: ParsedParameterVector, loc: FileLoc);
+    fn make_named_medium(
+        &mut self,
+        name: &str,
+        params: ParsedParameterVector,
+        string_interner: &mut StringInterner<DefaultBackend>,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+        loc: FileLoc,
+    );
     fn medium_interface(&mut self, inside_name: &str, outside_name: &str, loc: FileLoc);
     fn sampler(
         &mut self,
