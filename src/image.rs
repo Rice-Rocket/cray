@@ -1,10 +1,11 @@
-use std::{collections::HashMap, fmt::Display, fs::File, io, ops::{Index, IndexMut}, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, ffi::OsStr, fmt::Display, fs::File, io, ops::{Index, IndexMut}, path::PathBuf, sync::Arc};
 
 use arrayvec::ArrayVec;
 use half::f16;
+use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use tracing::warn;
 
-use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{AbstractColorEncoding as _, ColorEncoding, ColorEncodingPtr}}, modulo, tile::Tile, vec2d::Vec2D, windowed_sinc, Bounds2f, Bounds2i, Float, Mat4, Point2f, Point2i};
+use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{AbstractColorEncoding as _, ColorEncoding, ColorEncodingPtr}}, modulo, reader::utils::truncate_filename, tile::Tile, vec2d::Vec2D, windowed_sinc, Bounds2f, Bounds2i, Float, Mat4, Point2f, Point2i};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PixelFormat {
@@ -1181,16 +1182,27 @@ impl Image {
     fn read_exr(path: &PathBuf, encoding: Option<ColorEncodingPtr>) -> io::Result<ImageAndMetadata> {
         use exr::prelude::{ReadChannels, ReadLayers};
 
+        let image_name = truncate_filename(path);
+
+        let mut bar_template = format!("Reading image '{}' ", &image_name);
+        bar_template += "{spinner:.green} [{elapsed}] [{bar:30.white/white}] {percent} ({eta})";
+        let style = ProgressStyle::with_template(&bar_template).unwrap()
+            .progress_chars("=> ").tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏");
+        let mut bar = ProgressBar::new(1000).with_style(style);
+
         let Ok(im_exr) = exr::image::read::read()
             .no_deep_data()
             .largest_resolution_level() // or all_resolution_levels()
             .all_channels()
             .first_valid_layer() // or all_layers()
             .all_attributes()
+            .on_progress(|progress: f64| bar.set_position((progress * 1000.0) as u64))
             .from_file(path) else { return io::Result::Err(io::Error::new(
                 io::ErrorKind::NotFound,
                 format!("image file {} not found", path.to_str().unwrap()),
             ))};
+
+        bar.finish_and_clear();
 
         let attrs = &im_exr.attributes;
         let resolution = attrs.display_window.size;
@@ -1227,14 +1239,23 @@ impl Image {
             None,
         );
 
+        let mut bar_template = format!("Processing image '{}' ", &image_name);
+        bar_template += "{spinner:.green} [{elapsed}] [{bar:30.white/white}] {percent} ({eta})";
+        let style = ProgressStyle::with_template(&bar_template).unwrap()
+            .progress_chars("=> ").tick_chars("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏");
+        let mut bar = ProgressBar::new(image.resolution.x as u64 * channel_names.len() as u64).with_style(style);
+
         for (i, channel) in im_exr.layer_data.channel_data.list.iter().enumerate() {
             for x in 0..image.resolution.x {
                 for y in 0..image.resolution.y {
                     let v = channel.sample_data.value_by_flat_index((y * image.resolution.x + x) as usize);
                     image.set_channel(Point2i::new(x, y), i, v.to_f32());
                 }
+                bar.inc(1);
             }
         }
+
+        bar.finish_and_clear();
 
         let color_space = if channel_names.contains(&"R".to_owned()) 
             && channel_names.contains(&"G".to_owned()) 

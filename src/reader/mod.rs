@@ -6,4 +6,4 @@ pub mod token;
 pub mod tokenizer;
 pub mod parser;
 pub mod scene;
-mod utils;
+pub mod utils;

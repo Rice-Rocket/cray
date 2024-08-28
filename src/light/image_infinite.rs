@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use std::{io::Write, sync::Arc};
 
 use num::Zero;
 
-use crate::{color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum}, wavelengths::SampledWavelengths}, equal_area_sphere_to_square, equal_area_square_to_sphere, image::{Image, WrapMode}, interaction::Interaction, sampling::PiecewiseConstant2D, sqr, transform::{ApplyInverseTransform, ApplyTransform, Transform}, Bounds2f, Bounds3f, Float, Normal3f, Point2f, Point2i, Point3f, Ray, Vec3f, PI};
+use crate::{clear_log, color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum}, wavelengths::SampledWavelengths}, equal_area_sphere_to_square, equal_area_square_to_sphere, image::{Image, WrapMode}, interaction::Interaction, log, reader::utils::truncate_filename, sampling::PiecewiseConstant2D, sqr, transform::{ApplyInverseTransform, ApplyTransform, Transform}, Bounds2f, Bounds3f, Float, Normal3f, Point2f, Point2i, Point3f, Ray, Vec3f, PI};
 
 use super::{AbstractLight, LightBase, LightBounds, LightLiSample, LightSampleContext, LightType};
 
@@ -135,6 +135,8 @@ impl ImageInfiniteLight {
             medium: None,
         };
 
+        log!("Creating image infinite light from file '{}'...", truncate_filename(filename));
+
         let channel_desc = image.get_channel_desc(&["R", "G", "B"]);
         if channel_desc.is_none(){
             panic!("{} Image used for ImageInfiniteLight doesn't have RGB channels", filename);
@@ -158,6 +160,8 @@ impl ImageInfiniteLight {
             d.data.iter_mut().for_each(|v| *v = 1.0 );
         }
         let compensated_distribution = PiecewiseConstant2D::new_from_2d(&d, domain);
+
+        clear_log!();
 
         ImageInfiniteLight
         {

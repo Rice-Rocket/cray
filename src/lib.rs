@@ -25,3 +25,5 @@ pub mod bsdf;
 pub mod phase;
 pub mod integrator;
 pub mod render;
+#[macro_use]
+pub mod macros;

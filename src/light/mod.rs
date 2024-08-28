@@ -1,11 +1,12 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, io::Write, path::PathBuf, sync::Arc};
 
 use diffuse_area::DiffuseAreaLight;
 use image_infinite::ImageInfiniteLight;
+use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use point::PointLight;
 use uniform_infinite::UniformInfiniteLight;
 
-use crate::{bounds::Union, camera::CameraTransform, color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, cos_theta, equal_area_square_to_sphere, file::resolve_filename, image::Image, interaction::{Interaction, SurfaceInteraction}, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, shape::Shape, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point2i, Point3f, Point3fi, Ray, Vec2f, Vec3f, PI};
+use crate::{bounds::Union, camera::CameraTransform, clear_log, color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, cos_theta, equal_area_square_to_sphere, file::resolve_filename, image::Image, interaction::{Interaction, SurfaceInteraction}, log, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc, utils::truncate_filename}, shape::Shape, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point2i, Point3f, Point3fi, Ray, Vec2f, Vec3f, PI};
 
 pub mod sampler;
 pub mod point;
@@ -140,6 +141,8 @@ impl Light {
                         let image = &image_and_metadata.image;
                         let lum = color_space.luminance_vector();
 
+                        log!("Preparing image '{}' for image infinite light...", truncate_filename(&filename));
+
                         for y in 0..image.resolution().y {
                             let v = (y as Float + 0.5) / image.resolution().y as Float;
                             for x in 0..image.resolution().x {
@@ -156,13 +159,18 @@ impl Light {
                             }
                         }
 
+                        clear_log!();
+
                         illuminance *= 2.0 * PI / (image.resolution().x * image.resolution().y) as Float;
                         
                         let k_e = illuminance;
                         scale *= e_v / k_e;
                     }
 
+
+                    log!("Extracting image '{}' for image infinite light...", truncate_filename(&filename));
                     let image = image_and_metadata.image.select_channels(&channel_desc);
+                    clear_log!();
 
                     if !portal.is_empty() {
                         todo!("implement portals");

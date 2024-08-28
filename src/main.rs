@@ -1,6 +1,7 @@
 use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex}, time::Instant};
 
 use clap::Parser;
+use console::style;
 use cray::{
     color::rgb_xyz::ColorEncodingCache, math::{Bounds2f, Bounds2i, Float, Point2f, Point2i}, options::{CameraRenderingSpace, Options}, reader::{parser::parse_files, scene::{BasicScene, BasicSceneBuilder}}, render::render_cpu
 };
@@ -164,6 +165,14 @@ fn main() {
 
     let scene = Box::new(BasicScene::default());
     let mut scene_builder = BasicSceneBuilder::new(scene, &mut string_interner, &options);
+    
+    println!(
+        "{} Reading scene '{}/{}'...",
+        style("[1/7]").bold().dim(),
+        PathBuf::from(&cli.scene_file).components().nth_back(1).and_then(|c| c.as_os_str().to_str()).unwrap_or(""),
+        PathBuf::from(&cli.scene_file).file_name().and_then(|s| s.to_str()).unwrap_or(""),
+    );
+
     parse_files(
         &[&cli.scene_file],
         &mut scene_builder,
