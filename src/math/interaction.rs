@@ -36,15 +36,36 @@ impl Interaction {
     }
     
     pub fn spawn_ray(&self, d: Vec3f) -> RayDifferential {
-        RayDifferential::new(Ray::new(self.offset_ray_origin_d(d), d), None)
+        RayDifferential::new(Ray::new_with_medium(self.offset_ray_origin_d(d), d, self.get_medium_from_w(d)), None)
     }
 
     pub fn spawn_ray_to(&self, p: Point3f) -> Ray {
-        Ray::spawn_ray_to(self.pi, self.n, self.time, p)
+        let mut r = Ray::spawn_ray_to(self.pi, self.n, self.time, p);
+        r.medium = self.get_medium_from_w(r.direction);
+        r
     }
 
     pub fn spawn_ray_to_interaction(&self, it: &Self) -> Ray {
-        Ray::spawn_ray_to_both_offset(self.pi, self.n, self.time, it.pi, it.n)
+        let mut r = Ray::spawn_ray_to_both_offset(self.pi, self.n, self.time, it.pi, it.n);
+        r.medium = self.get_medium_from_w(r.direction);
+        r
+    }
+
+    pub fn get_medium_from_w(&self, w: Vec3f) -> Option<Arc<Medium>> {
+        if let Some(ref mi) = self.medium_interface {
+            if w.dot(self.n) > 0.0 { mi.outside.clone() } else { mi.inside.clone() }
+        } else {
+            self.medium.clone()
+        }
+    }
+
+    pub fn get_medium(&self) -> Option<Arc<Medium>> {
+        if let Some(ref mi) = self.medium_interface {
+            debug_assert_eq!(mi.inside, mi.outside);
+            mi.inside.clone()
+        } else {
+            self.medium.clone()
+        }
     }
 }
 
@@ -156,17 +177,17 @@ impl SurfaceInteraction {
     pub fn set_intersection_properties(
         &mut self,
         material: &Arc<Material>,
-        area_light: &Option<Arc<Light>>,
-        prim_medium_interface: &Option<Arc<MediumInterface>>,
-        ray_medium: &Option<Arc<Medium>>,
+        area_light: Option<&Arc<Light>>,
+        prim_medium_interface: Option<&Arc<MediumInterface>>,
+        ray_medium: Option<&Arc<Medium>>,
     ) {
-        self.area_light.clone_from(area_light);
+        self.area_light = area_light.cloned();
         self.material = Some(material.clone());
 
         if prim_medium_interface.as_ref().is_some_and(|m| m.is_transition()) {
-            self.interaction.medium_interface.clone_from(prim_medium_interface);
+            self.interaction.medium_interface = prim_medium_interface.cloned();
         } else {
-            self.interaction.medium.clone_from(ray_medium)
+            self.interaction.medium = ray_medium.cloned();
         }
     }
 

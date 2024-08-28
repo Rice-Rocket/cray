@@ -9,7 +9,7 @@ pub struct GeometricPrimitive {
     pub shape: Arc<Shape>,
     pub material: Arc<Material>,
     pub area_light: Option<Arc<Light>>,
-    pub medium_interface: Option<Arc<MediumInterface>>,
+    pub medium_interface: Arc<MediumInterface>,
 }
 
 impl GeometricPrimitive {
@@ -17,7 +17,7 @@ impl GeometricPrimitive {
         shape: Arc<Shape>,
         material: Arc<Material>,
         area_light: Option<Arc<Light>>,
-        medium_interface: Option<Arc<MediumInterface>>,
+        medium_interface: Arc<MediumInterface>,
     ) -> GeometricPrimitive {
         GeometricPrimitive {
             shape,
@@ -37,7 +37,7 @@ impl AbstractPrimitive for GeometricPrimitive {
         let mut si = self.shape.intersect(ray, t_max)?;
         debug_assert!(si.t_hit < 1.001 * t_max);
 
-        si.intr.set_intersection_properties(&self.material, &self.area_light, &self.medium_interface, &ray.medium);
+        si.intr.set_intersection_properties(&self.material, self.area_light.as_ref(), Some(&self.medium_interface), ray.medium.as_ref());
         Some(si)
     }
 

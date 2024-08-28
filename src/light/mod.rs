@@ -185,7 +185,7 @@ impl Light {
         name: &str,
         parameters: &mut ParameterDictionary,
         render_from_light: Transform,
-        medium_interface: Option<Arc<MediumInterface>>,
+        medium_interface: Arc<MediumInterface>,
         shape: Arc<Shape>,
         alpha: Arc<FloatTexture>,
         loc: &FileLoc,
@@ -194,7 +194,7 @@ impl Light {
         match name {
             "diffuse" => Light::DiffuseArea(DiffuseAreaLight::create(
                 render_from_light,
-                medium_interface.map(|m| m.outside.clone()),
+                medium_interface.outside.clone(),
                 parameters,
                 parameters.color_space.clone(),
                 loc,

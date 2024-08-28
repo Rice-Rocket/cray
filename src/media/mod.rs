@@ -76,19 +76,36 @@ impl<'a> AbstractMedium for &'a Medium {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct MediumInterface {
-    pub inside: Arc<Medium>,
-    pub outside: Arc<Medium>,
+    pub inside: Option<Arc<Medium>>,
+    pub outside: Option<Arc<Medium>>,
 }
 
 impl MediumInterface {
-    pub fn new(inside: Arc<Medium>, outside: Arc<Medium>) -> MediumInterface {
+    pub fn new(inside: Option<Arc<Medium>>, outside: Option<Arc<Medium>>) -> MediumInterface {
         MediumInterface { inside, outside }
+    }
+
+    pub fn empty() -> MediumInterface {
+        MediumInterface::new(None, None)
+    }
+
+    pub fn is_some(&self) -> bool {
+        self.inside.is_some() || self.outside.is_some()
     }
 
     pub fn is_transition(&self) -> bool {
         self.inside != self.outside
+    }
+}
+
+impl From<Option<MediumInterface>> for MediumInterface {
+    fn from(value: Option<MediumInterface>) -> Self {
+        match value {
+            Some(mi) => mi,
+            None => MediumInterface::empty(),
+        }
     }
 }
 

@@ -98,7 +98,7 @@ impl BasicScene {
         self.camera = Some(Camera::create(
             string_interner.resolve(camera.base.name).unwrap(),
             &mut camera.base.parameters,
-            None,
+            self.get_medium(&camera.medium),
             camera.camera_transform,
             Arc::new(self.film.as_ref().unwrap().clone()),
             options,
@@ -512,9 +512,13 @@ impl BasicScene {
         string_interner: &StringInterner<DefaultBackend>,
         options: &Options,
     ) -> (Arc<[Arc<Light>]>, HashMap<usize, Vec<Arc<Light>>>) {
-        let find_medium = |s: &str| -> &Arc<Medium> {
+        let find_medium = |s: &str| -> Option<&Arc<Medium>> {
+            if s.is_empty() {
+                return None;
+            }
+
             match self.media.get(s) {
-                Some(m) => m,
+                Some(m) => Some(m),
                 None => panic!("Medium {} not defined", s),
             }
         };
@@ -577,14 +581,10 @@ impl BasicScene {
             let alpha = shape.base.parameters.get_one_float("alpha", 1.0);
             let alpha = Arc::new(FloatTexture::Constant(FloatConstantTexture::new(alpha)));
 
-            let mi = if shape.inside_medium.is_empty() || shape.outside_medium.is_empty() {
-                None
-            } else {
-                Some(Arc::new(MediumInterface::new(
-                    find_medium(&shape.inside_medium).clone(),
-                    find_medium(&shape.outside_medium).clone(),
-                )))
-            };
+            let mi = Arc::new(MediumInterface::new(
+                find_medium(&shape.inside_medium).cloned(),
+                find_medium(&shape.outside_medium).cloned(),
+            ));
 
             let mut shape_lights = Vec::new();
             let area_light_entity = &mut self.area_lights[shape.light_index as usize];
@@ -710,9 +710,13 @@ impl BasicScene {
         string_interner: &StringInterner<DefaultBackend>,
         options: &Options,
     ) -> Arc<Primitive> {
-        let find_medium = |s: &str| -> &Arc<Medium> {
+        let find_medium = |s: &str| -> Option<&Arc<Medium>> {
+            if s.is_empty() {
+                return None;
+            }
+            
             match media.get(s) {
-                Some(m) => m,
+                Some(m) => Some(m),
                 None => panic!("Medium {} not defined", s),
             }
         };
@@ -760,14 +764,12 @@ impl BasicScene {
                         &materials[material_index as usize]
                     };
 
-                    let mi = if sh.inside_medium.is_empty() || sh.outside_medium.is_empty() {
-                        None
-                    } else {
-                        Some(Arc::new(MediumInterface::new(
-                            find_medium(&sh.inside_medium).clone(),
-                            find_medium(&sh.outside_medium).clone(),
-                        )))
-                    };
+                    // FIX: MediumInterface should instead have Optional inside and outside
+                    // This should fix the issue of mediums not rendering
+                    let mi = Arc::new(MediumInterface::new(
+                        find_medium(&sh.inside_medium).cloned(),
+                        find_medium(&sh.outside_medium).cloned(),
+                    ));
 
                     let area_lights = shape_index_to_area_lights.get(&i);
                     for j in 0..shapes.len() {
@@ -779,7 +781,7 @@ impl BasicScene {
                         };
 
                         // TODO: Also check against alpha_tex.is_none()
-                        if area.is_none() && mi.as_ref().is_some_and(|m| !m.is_transition()) {
+                        if area.is_none() && !mi.is_transition() {
                             let prim = Arc::new(Primitive::Simple(SimplePrimitive {
                                 shape: shapes[j].clone(),
                                 material: mtl.clone(),
