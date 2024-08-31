@@ -17,6 +17,7 @@ pub mod preset;
 pub trait AbstractMedium {
     type MajorantIterator: Iterator<Item = RayMajorantSegment>;
 
+    #[allow(clippy::wrong_self_convention)]
     fn is_emissive(self) -> bool;
 
     fn sample_point(self, p: Point3f, lambda: &SampledWavelengths) -> MediumProperties;
@@ -24,11 +25,12 @@ pub trait AbstractMedium {
     fn sample_ray(self, ray: &Ray, t_max: Float, lambda: &SampledWavelengths) -> Option<Self::MajorantIterator>;
 }
 
+// TODO: Test if boxing here is faster
 #[derive(Debug, Clone, PartialEq)]
 pub enum Medium {
-    Homogeneous(HomogeneousMedium),
-    Grid(GridMedium),
-    RgbGrid(RgbGridMedium),
+    Homogeneous(Box<HomogeneousMedium>),
+    Grid(Box<GridMedium>),
+    RgbGrid(Box<RgbGridMedium>),
 }
 
 impl Medium {
@@ -40,9 +42,9 @@ impl Medium {
         loc: &FileLoc,
     ) -> Medium {
         match name {
-            "homogeneous" => Medium::Homogeneous(HomogeneousMedium::create(parameters, cached_spectra, loc)),
-            "uniformgrid" => Medium::Grid(GridMedium::create(parameters, render_from_medium, cached_spectra, loc)),
-            "rgbgrid" => Medium::RgbGrid(RgbGridMedium::create(parameters, render_from_medium, cached_spectra, loc)),
+            "homogeneous" => Medium::Homogeneous(Box::new(HomogeneousMedium::create(parameters, cached_spectra, loc))),
+            "uniformgrid" => Medium::Grid(Box::new(GridMedium::create(parameters, render_from_medium, cached_spectra, loc))),
+            "rgbgrid" => Medium::RgbGrid(Box::new(RgbGridMedium::create(parameters, render_from_medium, cached_spectra, loc))),
             _ => panic!("{}: Unknown medium {}", loc, name),
         }
     }

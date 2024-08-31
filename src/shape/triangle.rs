@@ -83,10 +83,10 @@ impl Triangle {
     pub fn create_triangles(mesh: Arc<TriangleMesh>) -> Vec<Arc<Shape>> {
         let mut tris = Vec::with_capacity(mesh.n_triangles);
         for i in 0..mesh.n_triangles {
-            tris.push(Arc::new(Shape::Triangle(Triangle::new(
+            tris.push(Arc::new(Shape::Triangle(Box::new(Triangle::new(
                 mesh.clone(),
                 i as i32,
-            ))));
+            )))));
         }
         tris
     }
@@ -166,7 +166,8 @@ impl Triangle {
         let mut e1 = Float::difference_of_products(p2t.x, p0t.y, p2t.y, p0t.x);
         let mut e2 = Float::difference_of_products(p0t.x, p1t.y, p0t.y, p1t.x);
 
-        if size_of::<Float>() == size_of::<f32>() && (e0 == 0.0 || e1 == 0.0 || e2 == 0.0) {
+        #[cfg(not(feature = "use_f64"))]
+        if e0 == 0.0 || e1 == 0.0 || e2 == 0.0 {
             let p2txp1ty = p2t.x as f64 * p1t.y as f64;
             let p2typ1tx = p2t.y as f64 * p1t.x as f64;
             e0 = (p2typ1tx - p2txp1ty) as f32;
@@ -190,9 +191,8 @@ impl Triangle {
         p1t.z *= sz;
         p2t.z *= sz;
         let t_scaled = e0 * p0t.z + e1 * p1t.z + e2 * p2t.z;
-        if det < 0.0 && (t_scaled >= 0.0 || t_scaled < t_max * det) {
-            return None;
-        } else if det > 0.0 && (t_scaled <= 0.0 || t_scaled > t_max * det) {
+        if det < 0.0 && (t_scaled >= 0.0 || t_scaled < t_max * det)
+        || det > 0.0 && (t_scaled <= 0.0 || t_scaled > t_max * det) {
             return None;
         }
 
@@ -263,7 +263,14 @@ impl Triangle {
             if ng.length_squared() == 0.0 {
                 let v1 = p2 - p0;
                 let v2 = p1 - p0;
-                ng = Point3::<f64>::from(v1).cross(Point3::<f64>::from(v2)).into();
+                #[cfg(not(feature = "use_f64"))]
+                {
+                    ng = Point3::<f64>::from(v1).cross(Point3::<f64>::from(v2)).into();
+                }
+                #[cfg(feature = "use_f64")]
+                {
+                    ng = v1.cross(v2);
+                }
                 debug_assert_ne!(ng.length_squared(), 0.0);
             }
             ng.normalize().coordinate_system()
@@ -476,8 +483,7 @@ impl AbstractShape for Triangle {
         u: Point2f,
     ) -> Option<ShapeSample> {
         let solid_angle = self.solid_angle(ctx.p());
-        if solid_angle < Self::MIN_SPHERICAL_SAMPLE_AREA
-            || solid_angle > Self::MAX_SPHERICAL_SAMPLE_AREA
+        if !(Self::MIN_SPHERICAL_SAMPLE_AREA..=Self::MAX_SPHERICAL_SAMPLE_AREA).contains(&solid_angle)
         {
             let ss = self.sample(u);
             debug_assert!(ss.is_some());
@@ -565,8 +571,7 @@ impl AbstractShape for Triangle {
         wi: Vec3f,
     ) -> Float {
         let solid_angle = self.solid_angle(ctx.p());
-        if solid_angle < Self::MIN_SPHERICAL_SAMPLE_AREA
-            || solid_angle > Self::MAX_SPHERICAL_SAMPLE_AREA
+        if !(Self::MIN_SPHERICAL_SAMPLE_AREA..=Self::MAX_SPHERICAL_SAMPLE_AREA).contains(&solid_angle)
         {
             let ray = ctx.spawn_ray(wi);
             let Some(isect) = self.intersect(&ray, Float::INFINITY) else { return 0.0 };

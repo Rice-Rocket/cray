@@ -355,7 +355,7 @@ impl<T> WeightedReservoirSampler<T> {
             self.reservoir_weight = weight;
             return true;
         }
-        debug_assert!(self.weight_sum < f32::MAX);
+        debug_assert!(self.weight_sum < Float::MAX);
         false
     }
 
@@ -367,7 +367,7 @@ impl<T> WeightedReservoirSampler<T> {
             self.reservoir_weight = weight;
             return true;
         }
-        debug_assert!(self.weight_sum < f32::MAX);
+        debug_assert!(self.weight_sum < Float::MAX);
         false
     }
 
@@ -396,7 +396,7 @@ impl<T> WeightedReservoirSampler<T> {
     where
         T: Clone
     {
-        debug_assert!(self.weight_sum + other.weight_sum < f32::MAX);
+        debug_assert!(self.weight_sum + other.weight_sum < Float::MAX);
         if other.has_sample() && self.add_sample(other.reservoir.clone(), other.weight_sum) {
             self.reservoir_weight = other.reservoir_weight;
         }

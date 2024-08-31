@@ -44,7 +44,7 @@ impl RandomWalkIntegrator {
         lambda: &mut SampledWavelengths,
         sampler: &mut Sampler,
         depth: i32,
-        scratch_buffer: &mut Bump,
+        _scratch_buffer: &mut Bump,
         options: &Options,
         rng: &mut SmallRng,
     ) -> SampledSpectrum {
@@ -86,7 +86,7 @@ impl RandomWalkIntegrator {
             lambda,
             sampler,
             depth + 1,
-            scratch_buffer,
+            _scratch_buffer,
             options,
             rng,
         ) / (1.0 / (4.0 * PI))

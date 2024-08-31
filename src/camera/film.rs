@@ -50,8 +50,8 @@ pub trait AbstractFilm {
 
 #[derive(Debug, Clone)]
 pub enum Film {
-    RgbFilm(RgbFilm),
-    Debug(DebugFilm),
+    RgbFilm(Box<RgbFilm>),
+    Debug(Box<DebugFilm>),
 }
 
 impl Film {
@@ -65,22 +65,22 @@ impl Film {
         options: &Options,
     ) -> Film {
         match name {
-            "rgb" => Film::RgbFilm(RgbFilm::create(
+            "rgb" => Film::RgbFilm(Box::new(RgbFilm::create(
                 parameters,
                 exposure_time,
                 filter,
                 parameters.color_space.clone(),
                 loc,
                 options,
-            )),
-            "debug" => Film::Debug(DebugFilm::create(
+            ))),
+            "debug" => Film::Debug(Box::new(DebugFilm::create(
                 parameters,
                 exposure_time,
                 filter,
                 parameters.color_space.clone(),
                 loc,
                 options,
-            )),
+            ))),
             _ => panic!("{} unknown film type {}", loc, name)
         }
     }
@@ -537,10 +537,23 @@ impl AbstractFilm for RgbFilm {
 
         let pixel = self.pixels.get_mut(p_film);
         for c in 0..3 {
-            pixel.rgb_sum[c] += (weight * rgb[c]) as f64;
+            #[cfg(feature = "use_f64")] {
+                pixel.rgb_sum[c] += weight * rgb[c];
+            }
+            #[cfg(not(feature = "use_f64"))]
+            {
+                pixel.rgb_sum[c] += (weight * rgb[c]) as f64;
+            }
         }
 
-        pixel.weight_sum += weight as f64;
+        #[cfg(feature = "use_f64")]
+        {
+            pixel.weight_sum += weight;
+        }
+        #[cfg(not(feature = "use_f64"))]
+        {
+            pixel.weight_sum += weight as f64;
+        }
     }
 
     fn add_splat(&mut self, p: Point2f, l: &SampledSpectrum, lambda: &SampledWavelengths) {
@@ -575,7 +588,14 @@ impl AbstractFilm for RgbFilm {
                 if wt != 0.0 {
                     let pixel = self.pixels.get_mut(pi);
                     for c in 0..3 {
-                        pixel.rgb_splat[c] += (wt * rgb[c]) as f64;
+                        #[cfg(feature = "use_f64")]
+                        {
+                            pixel.rgb_splat[c] += wt * rgb[c];
+                        }
+                        #[cfg(not(feature = "use_f64"))]
+                        {
+                            pixel.rgb_splat[c] += (wt * rgb[c]) as f64;
+                        }
                     }
                 }
             }

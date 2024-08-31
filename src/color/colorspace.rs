@@ -74,7 +74,14 @@ impl RgbColorSpace {
 
     pub fn to_rgb_coeffs(&self, rgb: &Rgb) -> RgbSigmoidPolynomial {
         debug_assert!(rgb.r >= 0.0 && rgb.g >= 0.0 && rgb.b >= 0.0);
-        RgbSigmoidPolynomial::from_array(rgb_to_spectra::get_rgb_to_spec(&self.gamut, rgb))
+        #[cfg(feature = "use_f64")]
+        {
+            RgbSigmoidPolynomial::from_array_f64(rgb_to_spectra::get_rgb_to_spec(&self.gamut, rgb))
+        }
+        #[cfg(not(feature = "use_f64"))]
+        {
+            RgbSigmoidPolynomial::from_array(rgb_to_spectra::get_rgb_to_spec(&self.gamut, rgb))
+        }
     }
 
     pub fn convert_rgb_colorspace(&self, to: &RgbColorSpace) -> Mat3 {

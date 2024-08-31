@@ -160,7 +160,7 @@ fn main() {
 
     let mut string_interner = StringInterner::new();
     let mut cached_spectra = HashMap::new();
-    let mut texture_cache = Arc::new(Mutex::new(HashMap::new()));
+    let texture_cache = Arc::new(Mutex::new(HashMap::new()));
     let mut gamma_encoding_cache = ColorEncodingCache::new();
 
     let scene = Box::new(BasicScene::default());
@@ -185,7 +185,7 @@ fn main() {
 
     let scene = scene_builder.done();
     let start_time = Instant::now();
-    render_cpu(scene, &options, &mut string_interner, &mut cached_spectra, &mut texture_cache, &mut gamma_encoding_cache);
+    render_cpu(scene, &options, &mut string_interner, &mut cached_spectra, &texture_cache, &mut gamma_encoding_cache);
     let elapsed = start_time.elapsed();
     println!(
         "Finished rendering in {}.{:03} seconds",

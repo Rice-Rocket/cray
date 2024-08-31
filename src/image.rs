@@ -416,17 +416,17 @@ impl Image {
                     let count = self.n_channels() * (extent.max.x - extent.min.x) as usize;
                     for y in extent.min.y..extent.max.y {
                         let offset = self.pixel_offset(Point2i::new(extent.min.x, y));
-                        #[cfg(use_f64)]
+                        #[cfg(feature = "use_f64")]
                         {
                             for i in 0..count {
-                                self.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.from_linear(
+                                self.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.from_linear_f32(
                                     &buf[buf_offset..buf_offset + 1],
                                     &mut self.data.as_u8_mut()[offset + i..offset + i + 1],
                                 );
                                 buf_offset += 1;
                             }
                         }
-                        #[cfg(not(use_f64))]
+                        #[cfg(not(feature = "use_f64"))]
                         {
                             self.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.from_linear(
                                 &buf[buf_offset..buf_offset + count],
@@ -437,7 +437,7 @@ impl Image {
                     }
                 } else {
                     self.for_extent(extent, WrapMode::Clamp.into(), |image, offset: usize| {
-                        image.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.from_linear(
+                        image.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.from_linear_f32(
                             &buf[buf_offset..buf_offset + 1],
                             &mut image.data.as_u8_mut()[offset..offset + 1],
                         );
@@ -470,17 +470,17 @@ impl Image {
                     let count = self.n_channels() * (extent.max.x - extent.min.x) as usize;
                     for y in extent.min.y..extent.max.y {
                         let offset = self.pixel_offset(Point2i::new(extent.min.x, y));
-                        #[cfg(use_f64)]
+                        #[cfg(feature = "use_f64")]
                         {
                             for i in 0..count {
-                                self.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.to_linear(
+                                self.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.to_linear_f32(
                                     &self.data.as_u8()[offset + i..offset + i + 1],
                                     &mut buf[buf_offset..buf_offset + 1],
                                 );
                                 buf_offset += 1;
                             }
                         }
-                        #[cfg(not(use_f64))]
+                        #[cfg(not(feature = "use_f64"))]
                         {
                             self.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.to_linear(
                                 &self.data.as_u8()[offset..offset + count],
@@ -491,7 +491,7 @@ impl Image {
                     }
                 } else {
                     self.for_extent(extent, wrap_mode, |image, offset: usize| {
-                        image.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.to_linear(
+                        image.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0.to_linear_f32(
                             &image.data.as_u8()[offset..offset + 1],
                             &mut buf[buf_offset..buf_offset + 1],
                         );
@@ -583,10 +583,10 @@ impl Image {
                     debug_assert!(in_offset + 3 * self.n_channels() < in_buf.len());
 
                     for _c in 0..self.n_channels() {
-                        x_buf[x_buf_offset] = rsw.weight[0] * in_buf[in_offset]
-                            + rsw.weight[1] * in_buf[in_offset + self.n_channels()]
-                            + rsw.weight[2] * in_buf[in_offset + 2 * self.n_channels()]
-                            + rsw.weight[3] * in_buf[in_offset + 3 * self.n_channels()];
+                        x_buf[x_buf_offset] = rsw.weight[0] as f32 * in_buf[in_offset]
+                            + rsw.weight[1] as f32 * in_buf[in_offset + self.n_channels()]
+                            + rsw.weight[2] as f32 * in_buf[in_offset + 2 * self.n_channels()]
+                            + rsw.weight[3] as f32 * in_buf[in_offset + 3 * self.n_channels()];
                         x_buf_offset += 1;
                         in_offset += 1;
                     }
@@ -608,10 +608,10 @@ impl Image {
 
                     let mut out_offset = self.n_channels() * (x + y * nx_out) as usize;
                     for _c in 0..self.n_channels() {
-                        out_buf[out_offset] = Float::max(0.0, rsw.weight[0] * x_buf[x_buf_offset]
-                            + rsw.weight[1] * x_buf[x_buf_offset + step]
-                            + rsw.weight[2] * x_buf[x_buf_offset + 2 * step]
-                            + rsw.weight[3] * x_buf[x_buf_offset + 3 * step]);
+                        out_buf[out_offset] = f32::max(0.0, rsw.weight[0] as f32 * x_buf[x_buf_offset]
+                            + rsw.weight[1] as f32 * x_buf[x_buf_offset + step]
+                            + rsw.weight[2] as f32 * x_buf[x_buf_offset + 2 * step]
+                            + rsw.weight[3] as f32 * x_buf[x_buf_offset + 3 * step]);
 
                         out_offset += 1;
                         x_buf_offset += 1;
@@ -780,7 +780,7 @@ impl Image {
                     data[self.pixel_offset(p) + c].into()
                 },
                 ImageData::Float32(ref data) => {
-                    data[self.pixel_offset(p) + c]
+                    data[self.pixel_offset(p) + c] as Float
                 },
             }
         } else {
@@ -809,7 +809,7 @@ impl Image {
             },
             ImageData::Float32(ref data) => {
                 for i in 0..self.n_channels() {
-                    cv[i] = data[pixel_offset + i];
+                    cv[i] = data[pixel_offset + i] as Float;
                 }
             },
         }
@@ -843,13 +843,13 @@ impl Image {
             ImageData::Float16(ref data) => {
                 for i in 0..desc.offset.len() {
                     let index = pixel_offset + desc.offset[i] as usize;
-                    cv[i] = data[index].to_f32();
+                    cv[i] = data[index].to_f32() as Float;
                 }
             },
             ImageData::Float32(ref data) => {
                 for i in 0..desc.offset.len() {
                     let index = pixel_offset + desc.offset[i] as usize;
-                    cv[i] = data[index];
+                    cv[i] = data[index] as Float;
                 }
             },
         }
@@ -923,8 +923,8 @@ impl Image {
                 self.color_encoding.as_ref().expect("U256 pixel format requires color encoding").0
                     .from_linear(&[value], &mut data[index..index + 1])
             },
-            ImageData::Float16(ref mut data) => data[index] = f16::from_f32(value),
-            ImageData::Float32(ref mut data) => data[index] = value,
+            ImageData::Float16(ref mut data) => data[index] = f16::from_f32(value as f32),
+            ImageData::Float32(ref mut data) => data[index] = value as f32,
         }
     }
 
@@ -939,12 +939,12 @@ impl Image {
             },
             ImageData::Float16(ref mut data) => {
                 for i in 0..values.values.len() {
-                    data[index + i] = f16::from_f32(values[i]);
+                    data[index + i] = f16::from_f32(values[i] as f32);
                 }
             },
             ImageData::Float32(ref mut data) => {
                 for i in 0..values.values.len() {
-                    data[index + i] = values[i];
+                    data[index + i] = values[i] as f32;
                 }
             },
         }
@@ -961,11 +961,19 @@ impl Image {
             },
             ImageData::Float16(ref mut data) => {
                 for i in 0..values.len() {
-                    data[index + i] = f16::from_f32(values[i]);
+                    data[index + i] = f16::from_f32(values[i] as f32);
                 }
             },
             ImageData::Float32(ref mut data) => {
-                data[index..(values.len() + index)].copy_from_slice(values);
+                #[cfg(feature = "use_f64")]
+                {
+                    let vs: Vec<_> = values.iter().map(|x| *x as f32).collect();
+                    data[index..(values.len() + index)].copy_from_slice(&vs);
+                }
+                #[cfg(not(feature = "use_f64"))]
+                {
+                    data[index..(values.len() + index)].copy_from_slice(values);
+                }
             },
         }
     }
@@ -1249,7 +1257,7 @@ impl Image {
             for x in 0..image.resolution.x {
                 for y in 0..image.resolution.y {
                     let v = channel.sample_data.value_by_flat_index((y * image.resolution.x + x) as usize);
-                    image.set_channel(Point2i::new(x, y), i, v.to_f32());
+                    image.set_channel(Point2i::new(x, y), i, v.to_f32() as Float);
                 }
                 bar.inc(1);
             }
@@ -1326,9 +1334,9 @@ impl Image {
             1 => unimplemented!(),
             2 => unimplemented!(),
             3 => {
-                let get_pixels = |p: Vec2<usize>| {
+                let get_pixels = |p: Vec2<usize>| -> (f32, f32, f32) {
                     let c = self.get_channels(Point2i::new(p.x() as i32, p.y() as i32));
-                    (c.values[0], c.values[1], c.values[2])
+                    (c.values[0] as f32, c.values[1] as f32, c.values[2] as f32)
                 };
 
                 let layer = Layer::new(
@@ -1358,9 +1366,9 @@ impl Image {
                 }
             },
             4 => {
-                let get_pixels = |p: Vec2<usize>| {
+                let get_pixels = |p: Vec2<usize>| -> (f32, f32, f32, f32) {
                     let c = self.get_channels(Point2i::new(p.x() as i32, p.y() as i32));
-                    (c.values[0], c.values[1], c.values[2], c.values[3])
+                    (c.values[0] as f32, c.values[1] as f32, c.values[2] as f32, c.values[3] as f32)
                 };
 
                 let layer = Layer::new(

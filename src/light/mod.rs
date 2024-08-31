@@ -125,7 +125,15 @@ impl Light {
                         todo!("implement empty filename case");
                     } else {
                         let image_and_metadata = Image::read(&PathBuf::from(&filename), None).unwrap();
-                        // TODO: Check for NaN pixels
+                        for y in 0..image_and_metadata.image.resolution().y {
+                            for x in 0..image_and_metadata.image.resolution().x {
+                                for c in 0..image_and_metadata.image.n_channels() {
+                                    if image_and_metadata.image.get_channel(Point2i::new(x, y), c).is_nan() {
+                                        panic!("Image '{}' contains NaN values", truncate_filename(&filename));
+                                    }
+                                }
+                            }
+                        }
                         image_and_metadata
                     };
 

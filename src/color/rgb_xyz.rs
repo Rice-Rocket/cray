@@ -319,6 +319,12 @@ impl RgbSigmoidPolynomial {
         RgbSigmoidPolynomial { c0: c[0], c1: c[1], c2: c[2] }
     }
 
+    #[inline]
+    #[cfg(feature = "use_f64")]
+    pub const fn from_array_f64(c: [f32; 3]) -> RgbSigmoidPolynomial {
+        RgbSigmoidPolynomial { c0: c[0] as Float, c1: c[1] as Float, c2: c[2] as Float }
+    }
+
     pub fn get(&self, lambda: Float) -> Float {
         Self::s(poly(lambda, &[self.c2, self.c1, self.c0]))
     }
@@ -391,6 +397,10 @@ pub trait AbstractColorEncoding {
     #[allow(clippy::wrong_self_convention)]
     fn from_linear(&self, vin: &[Float], vout: &mut [u8]);
     fn to_float_linear(&self, v: Float) -> Float;
+
+    fn to_linear_f32(&self, vin: &[u8], vout: &mut [f32]);
+    #[allow(clippy::wrong_self_convention)]
+    fn from_linear_f32(&self, vin: &[f32], vout: &mut [u8]);
 }
 
 #[derive(Debug, Clone)]
@@ -494,6 +504,22 @@ impl AbstractColorEncoding for ColorEncoding {
             ColorEncoding::Gamma(e) => e.to_float_linear(v),
         }
     }
+
+    fn to_linear_f32(&self, vin: &[u8], vout: &mut [f32]) {
+        match self {
+            ColorEncoding::Linear(e) => e.to_linear_f32(vin, vout),
+            ColorEncoding::SRgb(e) => e.to_linear_f32(vin, vout),
+            ColorEncoding::Gamma(e) => e.to_linear_f32(vin, vout),
+        }
+    }
+
+    fn from_linear_f32(&self, vin: &[f32], vout: &mut [u8]) {
+        match self {
+            ColorEncoding::Linear(e) => e.from_linear_f32(vin, vout),
+            ColorEncoding::SRgb(e) => e.from_linear_f32(vin, vout),
+            ColorEncoding::Gamma(e) => e.from_linear_f32(vin, vout),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -517,6 +543,20 @@ impl AbstractColorEncoding for LinearColorEncoding {
     fn to_float_linear(&self, v: Float) -> Float {
         v
     }
+
+    fn to_linear_f32(&self, vin: &[u8], vout: &mut [f32]) {
+        debug_assert!(vin.len() == vout.len());
+        for i in 0..vin.len() {
+            vout[i] = vin[i] as f32 / 255.0;
+        }
+    }
+
+    fn from_linear_f32(&self, vin: &[f32], vout: &mut [u8]) {
+        debug_assert!(vin.len() == vout.len());
+        for i in 0..vin.len() {
+            vout[i] = (vin[i] * 255.0 + 0.5).clamp(0.0, 255.0) as u8
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -539,6 +579,20 @@ impl AbstractColorEncoding for SRgbColorEncoding {
 
     fn to_float_linear(&self, v: Float) -> Float {
         srgb_to_linear(v)
+    }
+
+    fn to_linear_f32(&self, vin: &[u8], vout: &mut [f32]) {
+        debug_assert!(vin.len() == vout.len());
+        for i in 0..vin.len() {
+            vout[i] = srgb_8_to_linear(vin[i]) as f32;
+        }
+    }
+
+    fn from_linear_f32(&self, vin: &[f32], vout: &mut [u8]) {
+        debug_assert!(vin.len() == vout.len());
+        for i in 0..vin.len() {
+            vout[i] = linear_to_srgb_8(vin[i] as Float, 0.0);
+        }
     }
 }
 
@@ -591,6 +645,24 @@ impl AbstractColorEncoding for GammaColorEncoding {
 
     fn to_float_linear(&self, v: Float) -> Float {
         Float::powf(v, self.gamma)
+    }
+
+    fn to_linear_f32(&self, vin: &[u8], vout: &mut [f32]) {
+        debug_assert!(vin.len() == vout.len());
+        for i in 0..vin.len() {
+            vout[i] = self.apply_lut[vin[i] as usize] as f32;
+        }
+    }
+
+    fn from_linear_f32(&self, vin: &[f32], vout: &mut [u8]) {
+        debug_assert!(vin.len() == vout.len());
+        for i in 0..vin.len() {
+            vout[i] = self.inverse_lut[f32::clamp(
+                vin[i] * (self.inverse_lut.len() - 1) as f32,
+                0.0,
+                (self.inverse_lut.len() - 1) as f32,
+            ) as usize] as u8;
+        }
     }
 }
 

@@ -47,8 +47,8 @@ pub trait AbstractShape {
 
 #[derive(Debug, Clone)]
 pub enum Shape {
-    Sphere(Sphere),
-    Triangle(Triangle),
+    Sphere(Box<Sphere>),
+    Triangle(Box<Triangle>),
 }
 
 impl Shape {
@@ -71,7 +71,7 @@ impl Shape {
                     parameters,
                     loc,
                 );
-                vec![Arc::new(Shape::Sphere(sphere))]
+                vec![Arc::new(Shape::Sphere(Box::new(sphere)))]
             },
             "trianglemesh" => {
                 let trianglemesh = Arc::new(Triangle::create_mesh(

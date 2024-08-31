@@ -15,7 +15,7 @@ pub enum Gamut {
     Rec2020,
 }
 
-pub fn get_rgb_to_spec(gamut: &Gamut, rgb: &Rgb) -> [Float; 3] {
+pub fn get_rgb_to_spec(gamut: &Gamut, rgb: &Rgb) -> [f32; 3] {
     match gamut {
         Gamut::SRgb => Lazy::force(&SRGB_RGB2SPEC).fetch(<[f32; 3]>::from(rgb)),
         Gamut::Xyz => Lazy::force(&XYZ_RGB2SPEC).fetch(<[f32; 3]>::from(rgb)),

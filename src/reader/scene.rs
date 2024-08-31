@@ -506,6 +506,7 @@ impl BasicScene {
         self.textures.clone()
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn create_lights(
         &mut self,
         textures: &NamedTextures,
