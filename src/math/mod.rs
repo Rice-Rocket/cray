@@ -17,6 +17,7 @@ pub mod tile;
 pub mod vec2d;
 pub mod scattering;
 
+use fast_polynomial::poly;
 pub use mat::{TMat2, TMat3, TMat4};
 pub use vect::{Vec2, Vec3, Vec4, Point2, Point3, Point4, Normal2, Normal3, Dot};
 pub use bounds::{direction::DirectionCone, Bounds2f, Bounds3f, Bounds2i, Bounds3i, Bounds2u, Bounds3u, Bounds2, Bounds3};
@@ -128,6 +129,16 @@ pub fn bits_to_float(ui: FloatAsBits) -> Float {
         rf = f;
     }
     rf
+}
+
+#[inline]
+pub fn mix_bits(mut v: u64) -> u64 {
+    v ^= (v >> 31);
+    v *= 0x7fb5d329728ea185;
+    v ^= (v >> 27);
+    v *= 0x81dadef4bc2dd44d;
+    v ^= (v >> 33);
+    v
 }
 
 pub fn next_float_up(mut v: Float) -> Float {
@@ -332,6 +343,236 @@ pub fn difference_of_products_float_vec(a: Float, b: Vec3f, c: Float, d: Vec3f) 
     difference + error
 }
 
+/// Default x_eps and f_eps = 1e-6
+pub fn newton_bisection<T, F: Fn(Float, &mut T, &mut T) -> (Float, Float)>(
+    mut x0: Float,
+    mut x1: Float,
+    f: F,
+    x_eps: Float,
+    f_eps: Float,
+    fhat0: &mut T,
+    fhat1: &mut T,
+) -> Float {
+    let fx0 = f(x0, fhat0, fhat1).0;
+    let fx1 = f(x1, fhat0, fhat1).0;
+
+    if fx0.abs() < f_eps { return x0 };
+    if fx1.abs() < f_eps { return x1 };
+
+    let mut start_is_negative = fx0 < 0.0;
+    let mut x_mid = x0 + (x1 - x0) * -fx0 / (fx1 - fx0);
+
+    loop {
+        if !(x0 < x_mid && x_mid < x1) {
+            x_mid = (x0 + x1) / 2.0;
+        }
+
+        let fxmid = f(x_mid, fhat0, fhat1);
+        debug_assert!(!fxmid.0.is_nan());
+
+        if start_is_negative == (fxmid.0 < 0.0) {
+            x0 = x_mid;
+        } else {
+            x1 = x_mid;
+        }
+
+        if (x1 - x0) < x_eps || fxmid.0.abs() < f_eps {
+            return x_mid;
+        }
+
+        x_mid -= fxmid.0 / fxmid.1;
+    }
+}
+
+pub fn catmull_rom_weights(nodes: &[Float], x: Float, offset: &mut i32, weights: &mut [Float]) -> bool {
+    debug_assert!(weights.len() >= 4);
+
+    if nodes.is_empty() {
+        return false;
+    }
+
+    if !(x >= *nodes.first().unwrap() && x <= *nodes.last().unwrap()) {
+        return false;
+    }
+
+    let idx = find_interval(nodes.len(), |i| nodes[i] <= x);
+    *offset = (idx - 1) as i32;
+    let x0 = nodes[idx];
+    let x1 = nodes[idx + 1];
+
+    let t = (x - x0) / (x1 - x0);
+    let t2 = t * t;
+    let t3 = t2 * t;
+
+    weights[1] = 2.0 * t3 - 3.0 * t2 + 1.0;
+    weights[2] = -2.0 * t3 + 3.0 * t2;
+
+    if idx > 0 {
+        let w0 = (t3 - 2.0 * t2 + t) * (x1 - x0) / (x1 - nodes[idx - 1]);
+        weights[0] = -w0;
+        weights[2] += w0;
+    } else {
+        let w0 = t3 - 2.0 * t2 + t;
+        weights[0] = 0.0;
+        weights[1] -= w0;
+        weights[2] += w0;
+    }
+
+    if idx + 2 < nodes.len() {
+        let w3 = (t3 - t2) * (x1 - x0) / (nodes[idx + 2] - x0);
+        weights[1] -= w3;
+        weights[3] = w3;
+    } else {
+        let w3 = t3 - t2;
+        weights[1] -= w3;
+        weights[2] += w3;
+        weights[3] = 0.0;
+    }
+
+    true
+}
+
+pub fn sample_catmull_rom_2d(
+    nodes1: &[Float],
+    nodes2: &[Float],
+    values: &[Float],
+    cdf: &[Float],
+    alpha: Float,
+    mut u: Float,
+    f_val: Option<&mut Float>,
+    pdf: Option<&mut Float>,
+) -> Float {
+    let mut offset = 0;
+    let mut weights = [0.0; 4];
+    if !catmull_rom_weights(nodes1, alpha, &mut offset, &mut weights) {
+        return 0.0;
+    }
+
+    let interpolate = |arr: &[Float], idx: usize| {
+        let mut v = 0.0;
+        for i in 0..4 {
+            if weights[i] != 0.0 {
+                v += arr[(offset as usize + i) * nodes2.len() + idx] * weights[i];
+            }
+        }
+        v
+    };
+
+    let maximum = interpolate(cdf, nodes2.len() - 1);
+    u *= maximum;
+    let idx = find_interval(nodes2.len(), |i: usize| interpolate(cdf, i) <= u);
+
+    let f0 = interpolate(values, idx);
+    let f1 = interpolate(values, idx + 1);
+    let x0 = nodes2[idx];
+    let x1 = nodes2[idx + 1];
+    let width = x1 - x0;
+
+    u = (u - interpolate(cdf, idx)) / width;
+
+    let d0 = if idx > 0 {
+        width * (f1 - interpolate(values, idx - 1)) / (x1 - nodes2[idx - 1])
+    } else {
+        f1 - f0
+    };
+
+    let d1 = if idx + 2 < nodes2.len() {
+        width * (interpolate(values, idx + 2) - f0) / (nodes2[idx + 2] - x0)
+    } else {
+        f1 - f0
+    };
+
+    let mut fhat0 = 0.0;
+    let mut fhat1 = 0.0;
+    let t = newton_bisection(
+        0.0,
+        1.0,
+        |t: Float, fhat0: &mut Float, fhat1: &mut Float| -> (Float, Float) {
+            *fhat0 = poly(t, &[0.0, f0, 0.5 * d0, (1.0 / 3.0) * (-2.0 * d0 - d1) + f1 - f0, 0.25 * (d0 + d1) + 0.5 * (f0 - f1)]);
+            *fhat1 = poly(t, &[f0, d0, -2.0 * d0 - d1 + 3.0 * (f1 - f0), d0 + d1 + 2.0 * (f0 - f1)]);
+            (*fhat0 - u, *fhat1)
+        },
+        1e-6,
+        1e-6,
+        &mut fhat0,
+        &mut fhat1,
+    );
+
+    if let Some(v) = f_val {
+        *v = fhat1;
+    }
+
+    if let Some(pdf) = pdf {
+        *pdf = fhat1 / maximum;
+    }
+
+    x0 + width * t
+}
+
+pub fn integrate_catmull_rom(nodes: &[Float], f: &[Float], cdf: &mut [Float]) -> Float {
+    debug_assert!(nodes.len() == f.len());
+    let mut sum = 0.0;
+    cdf[0] = 0.0;
+
+    for i in 0..nodes.len() - 1 {
+        let x0 = nodes[i];
+        let x1 = nodes[i + 1];
+        let f0 = f[i];
+        let f1 = f[i + 1];
+        let width = x1 - x0;
+
+        let d0 = if i > 0 { width * (f1 - f[i - 1]) / (x1 - nodes[i - 1]) } else { f1 - f0 };
+        let d1 = if i + 2 < nodes.len() { width * (f[i + 2] - f0) / (nodes[i + 2] - x0) } else { f1 - f0 };
+
+        sum += width * ((f0 + f1) / 2.0 + (d0 - d1) / 12.0);
+        cdf[i + 1] = sum;
+    }
+
+    sum
+}
+
+pub fn invert_catmull_rom(nodes: &[Float], f: &[Float], u: Float) -> Float {
+    if u <= *f.first().unwrap() {
+        return *nodes.first().unwrap();
+    } else if u >= *f.last().unwrap() {
+        return *nodes.last().unwrap();
+    }
+
+    let i = find_interval(f.len(), |i| f[i] <= u);
+
+    let x0 = nodes[i];
+    let x1 = nodes[i + 1];
+    let f0 = f[i];
+    let f1 = f[i + 1];
+    let width = x1 - x0;
+
+    let d0 = if i > 0 { width * (f1 - f[i - 1]) / (x1 - nodes[i - 1]) } else { f1 - f0 };
+    let d1 = if i + 2 < nodes.len() { width * (f[i + 2] - f0) / nodes[i + 2] - x0 } else { f1 - f0 };
+
+    let t = newton_bisection(
+        0.0,
+        1.0,
+        |t, _, _| {
+            let t2 = t * t;
+            let t3 = t2 * t;
+
+            let fhat0 = (2.0 * t3 - 3.0 * t2 + 1.0) * f0 + (-2.0 * t3 + 3.0 * t2) * f1
+                + (t3 - 2.0 * t2 + t) * d0 + (t3 - t2) * d1;
+
+            let fhat1 = (6.0 * t2 - 6.0 * t) * f0 + (-6.0 * t2 + 6.0 * t) * f1
+                + (3.0 * t2 - 4.0 * t + 1.0) * d0 + (3.0 * t2 - 2.0 * t) * d1;
+
+            (fhat0 - u, fhat1)
+        },
+        1e-6,
+        1e-6,
+        &mut (),
+        &mut (),
+    );
+
+    x0 + t * width
+}
+
 pub mod safe {
     use crate::{math::{NumericConsts, Float}, NumericFloat, NumericOrd};
 
@@ -405,6 +646,8 @@ pub type Normal3fi = Normal3<Interval>;
 
 #[cfg(test)]
 mod tests {
+    use float_cmp::assert_approx_eq;
+
     use super::*;
 
     #[test]
@@ -412,5 +655,69 @@ mod tests {
         assert!((erf(0.0)).abs() < Float::EPSILON);
         assert!((erf(-0.5) + 0.5205).abs() < Float::EPSILON);
         assert!((erf(0.5) - 0.5205).abs() < Float::EPSILON);
+    }
+
+    #[test]
+    fn test_newton_bisection() {
+        assert_approx_eq!(Float, 1.0, newton_bisection(
+            0.0,
+            10.0,
+            |x, _, _| -> (Float, Float) {
+                (-1.0 + x, 1.0)
+            },
+            1e-6,
+            1e-6,
+            &mut (),
+            &mut (),
+        ));
+        assert_approx_eq!(Float, PI / 2.0, newton_bisection(
+            0.0,
+            2.0,
+            |x, _, _| -> (Float, Float) {
+                (x.cos(), -x.sin())
+            },
+            1e-6,
+            1e-6,
+            &mut (),
+            &mut (),
+        ));
+        assert!(1e-5 > Float::abs(PI / 2.0 - newton_bisection(
+            0.0,
+            2.0,
+            |x, _, _| -> (Float, Float) {
+                (x.cos(), 10.0 * x.sin())
+            },
+            1e-6,
+            1e-6,
+            &mut (),
+            &mut (),
+        )));
+        assert!(1e-6 > Float::abs(Float::sin(newton_bisection(
+            0.1,
+            10.1,
+            |x, _, _| -> (Float, Float) {
+                (x.sin(), x.cos())
+            },
+            1e-6,
+            1e-6,
+            &mut (),
+            &mut (),
+        ))));
+        
+        let f = |x: Float| -> (Float, Float) {
+            (
+                Float::powf(sqr(x.sin()), 0.05) - 0.3,
+                0.1 * x.cos() * x.sin() / Float::powf(sqr(x.sin()), 0.95),
+            )
+        };
+        assert!(1e-2 > Float::abs(f(newton_bisection(
+            0.01,
+            9.42477798,
+            |x, _, _| f(x),
+            1e-6,
+            1e-6,
+            &mut (),
+            &mut (),
+        )).0))
     }
 }

@@ -2,6 +2,7 @@ use crate::{abs_cos_theta, color::sampled::SampledSpectrum, same_hemisphere, sam
 
 use super::{AbstractBxDF, BSDFSample, BxDFFlags, BxDFReflTransFlags, TransportMode};
 
+#[derive(Debug, Clone)]
 pub struct DiffuseBxDF {
     r: SampledSpectrum,
 }

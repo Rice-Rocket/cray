@@ -1,3 +1,5 @@
+use rand::rngs::SmallRng;
+use rand::{Rng, SeedableRng};
 use vec2d::Vec2D;
 
 use crate::numeric::DifferenceOfProducts;
@@ -325,6 +327,90 @@ impl<T> SampledGrid<T> {
         }
 
         max_value
+    }
+}
+
+pub struct WeightedReservoirSampler<T> {
+    rng: SmallRng,
+    weight_sum: Float,
+    reservoir_weight: Float,
+    reservoir: T,
+}
+
+impl<T> WeightedReservoirSampler<T> {
+    pub fn new(seed: u64, reservoir: T) -> WeightedReservoirSampler<T> {
+        WeightedReservoirSampler::<T> {
+            rng: SmallRng::seed_from_u64(seed),
+            weight_sum: 0.0,
+            reservoir_weight: 0.0,
+            reservoir,
+        }
+    }
+
+    pub fn add_sample(&mut self, sample: T, weight: Float) -> bool {
+        self.weight_sum += weight;
+        let p = weight / self.weight_sum;
+        if self.rng.gen::<Float>() < p {
+            self.reservoir = sample;
+            self.reservoir_weight = weight;
+            return true;
+        }
+        debug_assert!(self.weight_sum < f32::MAX);
+        false
+    }
+
+    pub fn add_from_callback<F: Fn() -> T>(&mut self, f: F, weight: Float) -> bool {
+        self.weight_sum += weight;
+        let p = weight / self.weight_sum;
+        if self.rng.gen::<Float>() < p {
+            self.reservoir = f();
+            self.reservoir_weight = weight;
+            return true;
+        }
+        debug_assert!(self.weight_sum < f32::MAX);
+        false
+    }
+
+    pub fn has_sample(&self) -> bool {
+        self.weight_sum > 0.0
+    }
+
+    pub fn get_sample(&self) -> &T {
+        &self.reservoir
+    }
+
+    pub fn sample_probability(&self) -> Float {
+        self.reservoir_weight / self.weight_sum
+    }
+
+    pub fn weight_sum(&self) -> Float {
+        self.weight_sum
+    }
+
+    pub fn reset(&mut self) {
+        self.reservoir_weight = 0.0;
+        self.weight_sum = 0.0;
+    }
+
+    pub fn merge(&mut self, other: &WeightedReservoirSampler<T>)
+    where
+        T: Clone
+    {
+        debug_assert!(self.weight_sum + other.weight_sum < f32::MAX);
+        if other.has_sample() && self.add_sample(other.reservoir.clone(), other.weight_sum) {
+            self.reservoir_weight = other.reservoir_weight;
+        }
+    }
+}
+
+impl<T: Default> Default for WeightedReservoirSampler<T> {
+    fn default() -> Self {
+        Self {
+            rng: SmallRng::seed_from_u64(0),
+            weight_sum: 0.0,
+            reservoir_weight: 0.0,
+            reservoir: T::default(),
+        }
     }
 }
 

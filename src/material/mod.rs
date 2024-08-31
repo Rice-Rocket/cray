@@ -3,7 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use diffuse::DiffuseMaterial;
 use rand::{rngs::SmallRng, Rng};
 
-use crate::{bsdf::BSDF, bxdf::{AbstractBxDF, BxDF}, color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, image::{Image, WrapMode, WrapMode2D}, interaction::SurfaceInteraction, reader::{paramdict::{NamedTextures, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractFloatTexture, AbstractSpectrumTexture, FloatTexture, SpectrumTexture, TextureEvalContext}, Float, Frame, Normal3f, Point2f, Point3f, Vec2f, Vec3f};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{AbstractBxDF, BxDF}, color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, image::{Image, WrapMode, WrapMode2D}, interaction::SurfaceInteraction, reader::{paramdict::{NamedTextures, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractFloatTexture, AbstractSpectrumTexture, FloatTexture, SpectrumTexture, TextureEvalContext}, Float, Frame, Normal3f, Point2f, Point3f, Vec2f, Vec3f};
 
 pub mod diffuse;
 
@@ -23,6 +23,13 @@ pub trait AbstractMaterial {
         ctx: &MaterialEvalContext,
         lambda: &mut SampledWavelengths,
     ) -> BSDF;
+
+    fn get_bssrdf<T: AbstractTextureEvaluator>(
+        &self,
+        tex_eval: &T,
+        ctx: &MaterialEvalContext,
+        lambda: &mut SampledWavelengths,
+    ) -> Option<BSSRDF>;
 
     fn can_evaluate_textures<T: AbstractTextureEvaluator>(&self, tex_eval: &T) -> bool;
 
@@ -137,6 +144,17 @@ impl AbstractMaterial for SingleMaterial {
     ) -> BSDF {
         match self {
             SingleMaterial::Diffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
+        }
+    }
+
+    fn get_bssrdf<T: AbstractTextureEvaluator>(
+        &self,
+        tex_eval: &T,
+        ctx: &MaterialEvalContext,
+        lambda: &mut SampledWavelengths,
+    ) -> Option<BSSRDF> {
+        match self {
+            SingleMaterial::Diffuse(m) => m.get_bssrdf(tex_eval, ctx, lambda),
         }
     }
 

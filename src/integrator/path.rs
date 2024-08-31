@@ -134,6 +134,7 @@ impl AbstractRayIntegrator for PathIntegrator {
             }
 
             if depth == self.max_depth {
+                depth += 1;
                 break;
             }
 

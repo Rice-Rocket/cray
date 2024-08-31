@@ -5,7 +5,7 @@ use std::sync::Arc;
 use rand::rngs::SmallRng;
 use vect::Dot;
 
-use crate::{bsdf::BSDF, bxdf::{diffuse::DiffuseBxDF, BxDF, BxDFFlags}, camera::{AbstractCamera, Camera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, light::{AbstractLight, Light}, material::{self, AbstractMaterial, Material, MaterialEvalContext, UniversalTextureEvaluator}, math::*, media::{Medium, MediumInterface}, numeric::DifferenceOfProducts, options::Options, phase::PhaseFunction, sampler::{AbstractSampler as _, Sampler}};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{diffuse::DiffuseBxDF, BxDF, BxDFFlags}, camera::{AbstractCamera, Camera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, light::{AbstractLight, Light}, material::{self, AbstractMaterial, Material, MaterialEvalContext, UniversalTextureEvaluator}, math::*, media::{Medium, MediumInterface}, numeric::DifferenceOfProducts, options::Options, phase::PhaseFunction, sampler::{AbstractSampler as _, Sampler}};
 
 #[derive(Debug, Clone, Default)]
 pub struct Interaction {
@@ -67,8 +67,55 @@ impl Interaction {
             self.medium.clone()
         }
     }
+
+    pub fn is_surface_interaction(&self) -> bool {
+        self.n != Normal3f::ZERO
+    }
+
+    pub fn is_medium_interaction(&self) -> bool {
+        !self.is_surface_interaction()
+    }
 }
 
+#[derive(Debug, Clone)]
+pub enum GeneralInteraction {
+    Surface(SurfaceInteraction),
+    Medium(MediumInteraction),
+}
+
+impl GeneralInteraction {
+    #[inline]
+    pub fn intr(&self) -> &Interaction {
+        match self {
+            GeneralInteraction::Surface(i) => &i.interaction,
+            GeneralInteraction::Medium(i) => &i.interaction,
+        }
+    }
+    
+    #[inline]
+    pub fn intr_mut(&mut self) -> &mut Interaction {
+        match self {
+            GeneralInteraction::Surface(i) => &mut i.interaction,
+            GeneralInteraction::Medium(i) => &mut i.interaction,
+        }
+    }
+
+    #[inline]
+    pub fn as_surface(&self) -> &SurfaceInteraction {
+        match self {
+            GeneralInteraction::Surface(i) => i,
+            GeneralInteraction::Medium(_) => panic!("assumed surface interaction but was medium interaction."),
+        }
+    }
+
+    #[inline]
+    pub fn as_medium(&self) -> &MediumInteraction {
+        match self {
+            GeneralInteraction::Surface(_) => panic!("assumed medium interaction but was surface interaction."),
+            GeneralInteraction::Medium(i) => i,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct SurfaceInteractionShading {
@@ -78,7 +125,6 @@ pub struct SurfaceInteractionShading {
     pub dndu: Normal3f,
     pub dndv: Normal3f,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct SurfaceInteraction {
@@ -268,6 +314,35 @@ impl SurfaceInteraction {
         };
 
         Some(bsdf)
+    }
+
+    pub fn get_bssrdf(
+        &self,
+        ray: &RayDifferential,
+        lambda: &mut SampledWavelengths,
+        camera: &Camera,
+        rng: &mut SmallRng,
+    ) -> Option<BSSRDF> {
+        let mut material = self.material.as_ref().map(|m| m.clone())?;
+        let mut is_mixed = matches!(material.as_ref(), Material::Mix(_));
+        let mut material_eval_context = MaterialEvalContext::from(self);
+
+        while is_mixed {
+            match material.as_ref() {
+                Material::Mix(m) => {
+                    material = m.choose_material(&UniversalTextureEvaluator, &material_eval_context, rng);
+                },
+                _ => is_mixed = false,
+            };
+        }
+
+        let material = match material.as_ref() {
+            Material::Interface => return None,
+            Material::Single(m) => m,
+            Material::Mix(m) => unreachable!(),
+        };
+
+        material.get_bssrdf(&UniversalTextureEvaluator, &material_eval_context, lambda)
     }
 
     pub fn compute_differentials(
@@ -481,7 +556,31 @@ impl SurfaceInteraction {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct MediumInteraction {
     pub interaction: Interaction,
     pub phase: PhaseFunction,
+}
+
+impl MediumInteraction {
+    pub fn new(
+        pi: Point3fi,
+        wo: Vec3f,
+        time: Float,
+        medium: Option<Arc<Medium>>,
+        phase: PhaseFunction,
+    ) -> MediumInteraction {
+        MediumInteraction {
+            interaction: Interaction {
+                pi,
+                time,
+                wo,
+                n: Normal3f::ZERO,
+                uv: Point2f::ZERO,
+                medium,
+                medium_interface: None,
+            },
+            phase,
+        }
+    }
 }

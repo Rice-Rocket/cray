@@ -22,6 +22,7 @@ pub mod light;
 pub mod sampler;
 pub mod bxdf;
 pub mod bsdf;
+pub mod bssrdf;
 pub mod phase;
 pub mod integrator;
 pub mod render;

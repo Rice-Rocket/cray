@@ -55,6 +55,7 @@ impl AbstractRayIntegrator for SimpleVolumetricPathIntegrator {
                             false
                         } else if mode == Some(1) {
                             if depth >= self.max_depth {
+                                depth += 1;
                                 terminated = true;
                                 return false;
                             }
@@ -102,7 +103,7 @@ impl AbstractRayIntegrator for SimpleVolumetricPathIntegrator {
             if let Some(bsdf) = si.intr.get_bsdf(ray, lambda, camera, sampler, options, rng) {
                 let uc = sampler.get_1d();
                 let u = sampler.get_2d();
-                if bsdf.sample_f(-ray.ray.direction, uc, u, TransportMode::Radiance, BxDFReflTransFlags::empty()).is_some() {
+                if bsdf.sample_f(-ray.ray.direction, uc, u, TransportMode::Radiance, BxDFReflTransFlags::ALL).is_some() {
                     panic!("SimpleVolumetricPathIntegrator doesn't support surface scattering");
                 } else {
                     break;

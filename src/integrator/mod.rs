@@ -10,6 +10,7 @@ use simple_path::SimplePathIntegrator;
 use simple_vol_path::SimpleVolumetricPathIntegrator;
 use thread_local::ThreadLocal;
 use tracing::error;
+use vol_path::VolumetricPathIntegrator;
 
 use crate::{camera::{film::{AbstractFilm, Film, VisibleSurface}, filter::get_camera_sample, AbstractCamera, Camera}, color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, interaction::Interaction, light::{sampler::{uniform::UniformLightSampler, LightSampler}, AbstractLight, Light, LightType}, numeric::HasNan, options::Options, primitive::{AbstractPrimitive, Primitive}, reader::paramdict::ParameterDictionary, sampler::{AbstractSampler, Sampler}, shape::ShapeIntersection, tile::Tile, Float, Normal3f, Point2i, Ray, RayDifferential, Vec3f};
 
@@ -17,6 +18,7 @@ pub mod random_walk;
 pub mod simple_path;
 pub mod path;
 pub mod simple_vol_path;
+pub mod vol_path;
 
 pub trait AbstractIntegrator {
     fn render(&mut self, options: &Options);
@@ -48,6 +50,9 @@ impl Integrator {
                 parameters, camera, sampler, aggregate, lights,
             )),
             "simplevolpath" => Integrator::ImageTile(ImageTileIntegrator::create_simple_vol_path_integrator(
+                parameters, camera, sampler, aggregate, lights,
+            )),
+            "volpath" => Integrator::ImageTile(ImageTileIntegrator::create_vol_path_integrator(
                 parameters, camera, sampler, aggregate, lights,
             )),
             "debug" => Integrator::Debug(DebugIntegrator::create(
@@ -233,6 +238,35 @@ impl ImageTileIntegrator {
     ) -> ImageTileIntegrator {
         let max_depth = parameters.get_one_int("maxdepth", 5);
         let ray_integrator = RayIntegrator::SimpleVolumetricPath(SimpleVolumetricPathIntegrator { max_depth });
+
+        ImageTileIntegrator::new(
+            aggregate,
+            lights,
+            camera,
+            sampler,
+            ray_integrator,
+        )
+    }
+
+    pub fn create_vol_path_integrator(
+        parameters: &mut ParameterDictionary,
+        camera: Camera,
+        sampler: Sampler,
+        aggregate: Arc<Primitive>,
+        lights: Arc<[Arc<Light>]>,
+    ) -> ImageTileIntegrator {
+        let max_depth = parameters.get_one_int("maxdepth", 5);
+        let regularize = parameters.get_one_bool("regularize", false);
+
+        // TODO: Change default to BVH
+        let light_strategy = parameters.get_one_string("lightsampler", "uniform");
+        let light_sampler = LightSampler::create(&light_strategy, lights.clone());
+
+        let ray_integrator = RayIntegrator::VolumetricPath(VolumetricPathIntegrator::new(
+            max_depth,
+            light_sampler,
+            regularize,
+        ));
 
         ImageTileIntegrator::new(
             aggregate,
@@ -524,6 +558,7 @@ pub enum RayIntegrator {
     SimplePath(SimplePathIntegrator),
     Path(PathIntegrator),
     SimpleVolumetricPath(SimpleVolumetricPathIntegrator),
+    VolumetricPath(VolumetricPathIntegrator),
 }
 
 impl AbstractRayIntegrator for RayIntegrator {
@@ -570,6 +605,16 @@ impl AbstractRayIntegrator for RayIntegrator {
                 rng,
             ),
             RayIntegrator::SimpleVolumetricPath(r) => r.li(
+                base,
+                camera,
+                ray,
+                lambda,
+                sampler,
+                scratch_buffer,
+                options,
+                rng,
+            ),
+            RayIntegrator::VolumetricPath(r) => r.li(
                 base,
                 camera,
                 ray,

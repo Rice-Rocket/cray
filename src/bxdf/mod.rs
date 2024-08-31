@@ -1,8 +1,10 @@
 use diffuse::DiffuseBxDF;
+use normalized_fresnel::NormalizedFresnelBxDF;
 
 use crate::{abs_cos_theta, color::sampled::SampledSpectrum, sampling::{sample_uniform_hemisphere, uniform_hemisphere_pdf}, Float, Point2f, Vec3f, PI};
 
 pub mod diffuse;
+pub mod normalized_fresnel;
 
 pub trait AbstractBxDF {
     fn f(&self, wo: Vec3f, wi: Vec3f, mode: TransportMode) -> SampledSpectrum;
@@ -86,14 +88,17 @@ pub trait AbstractBxDF {
     fn regularize(&mut self);
 }
 
+#[derive(Debug, Clone)]
 pub enum BxDF {
     Diffuse(DiffuseBxDF),
+    NormalizedFresnel(NormalizedFresnelBxDF),
 }
 
 impl AbstractBxDF for BxDF {
     fn f(&self, wo: Vec3f, wi: Vec3f, mode: TransportMode) -> SampledSpectrum {
         match self {
             BxDF::Diffuse(v) => v.f(wo, wi, mode),
+            BxDF::NormalizedFresnel(v) => v.f(wo, wi, mode),
         }
     }
 
@@ -107,6 +112,7 @@ impl AbstractBxDF for BxDF {
     ) -> Option<BSDFSample> {
         match self {
             BxDF::Diffuse(v) => v.sample_f(wo, uc, u, mode, sample_flags),
+            BxDF::NormalizedFresnel(v) => v.sample_f(wo, uc, u, mode, sample_flags),
         }
     }
 
@@ -119,18 +125,21 @@ impl AbstractBxDF for BxDF {
     ) -> Float {
         match self {
             BxDF::Diffuse(v) => v.pdf(wo, wi, mode, sample_flags),
+            BxDF::NormalizedFresnel(v) => v.pdf(wo, wi, mode, sample_flags),
         }
     }
 
     fn flags(&self) -> BxDFFlags {
         match self {
             BxDF::Diffuse(v) => v.flags(),
+            BxDF::NormalizedFresnel(v) => v.flags(),
         }
     }
 
     fn regularize(&mut self) {
         match self {
             BxDF::Diffuse(v) => v.regularize(),
+            BxDF::NormalizedFresnel(v) => v.regularize(),
         }
     }
 }
