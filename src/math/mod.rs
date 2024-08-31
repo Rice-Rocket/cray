@@ -133,11 +133,11 @@ pub fn bits_to_float(ui: FloatAsBits) -> Float {
 
 #[inline]
 pub fn mix_bits(mut v: u64) -> u64 {
-    v ^= (v >> 31);
-    v *= 0x7fb5d329728ea185;
-    v ^= (v >> 27);
-    v *= 0x81dadef4bc2dd44d;
-    v ^= (v >> 33);
+    v ^= v.wrapping_shr(31);
+    v = v.wrapping_mul(0x7fb5d329728ea185);
+    v ^= v.wrapping_shr(27);
+    v = v.wrapping_mul(0x81dadef4bc2dd44d);
+    v ^= v.wrapping_shr(33);
     v
 }
 
