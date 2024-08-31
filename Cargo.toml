@@ -34,6 +34,7 @@ rayon = "1.10.0"
 indicatif = { version = "0.17.8", features = [ "rayon" ] }
 console = "0.15.8"
 termion = "4.0.2"
+flate2 = "1.0.33" 
 
 [dev-dependencies]
 # For comparison

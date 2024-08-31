@@ -1,5 +1,6 @@
-use std::{collections::HashMap, env, fs, path::Path, slice, sync::{Arc, Mutex}};
+use std::{collections::HashMap, env, fs, io::Read, path::Path, slice, sync::{Arc, Mutex}};
 
+use flate2::read::GzDecoder;
 use string_interner::{DefaultBackend, StringInterner};
 
 use crate::{color::{rgb_xyz::ColorEncodingCache, spectrum::Spectrum}, file::set_search_directory, mipmap::MIPMap, options::Options, texture::TexInfo, Float};
@@ -76,22 +77,28 @@ pub fn parse_str<T: ParserTarget>(
 
                 let data = fs::read_to_string(path).unwrap();
 
-                let raw = data.as_bytes();
+                let data_clone = data.clone();
+                let raw = data_clone.as_bytes();
                 let raw_len = raw.len();
                 let raw_ptr = raw.as_ptr();
 
                 includes.push(data);
 
-                if let Some(ext) = path.extension().and_then(|ext| ext.to_str()) {
-                    if ext.ends_with(".gz") {
-                        todo!("gzip compression");
-                    }
-                }
+                let parser = if path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.ends_with(".gz")) {
+                    let mut decoder = GzDecoder::new(raw);
+                    let mut s = String::new();
+                    decoder.read_to_string(&mut s).unwrap();
+                    Parser::new(unsafe {
+                        let byte_slice = slice::from_raw_parts(s.as_ptr(), s.len());
+                        std::str::from_utf8_unchecked(byte_slice)
+                    })
+                } else {
+                    Parser::new(unsafe {
+                        let byte_slice = slice::from_raw_parts(raw_ptr, raw_len);
+                        std::str::from_utf8_unchecked(byte_slice)
+                    })
+                };
 
-                let parser = Parser::new(unsafe {
-                    let byte_slice = slice::from_raw_parts(raw_ptr, raw_len);
-                    std::str::from_utf8_unchecked(byte_slice)
-                });
                 parsers.push(parser);
             },
             Element::Import(_) => todo!("Support import directive"),
