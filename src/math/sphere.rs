@@ -286,6 +286,29 @@ pub fn equal_area_sphere_to_square(d: Vec3f) -> Point2f {
     )
 }
 
+pub fn spherical_quad_area(a: Point3f, b: Point3f, c: Point3f, d: Point3f) -> Float {
+    let axb = a.cross(b);
+    let bxc = b.cross(c);
+    let cxd = c.cross(d);
+    let dxa = d.cross(a);
+
+    if axb.length_squared() == 0.0 || bxc.length_squared() == 0.0 || cxd.length_squared() == 0.0 || dxa.length_squared() == 0.0 {
+        return 0.0;
+    }
+
+    let axb = axb.normalize();
+    let bxc = bxc.normalize();
+    let cxd = cxd.normalize();
+    let dxa = dxa.normalize();
+
+    let alpha = dxa.angle_between(-axb);
+    let beta = axb.angle_between(-bxc);
+    let gamma = bxc.angle_between(-cxd);
+    let delta = cxd.angle_between(-dxa);
+
+    Float::abs(alpha + beta + gamma + delta - 2.0 * PI)
+}
+
 
 pub struct OctahedralVec3 {
     x: u16,

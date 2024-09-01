@@ -1,9 +1,9 @@
-use std::{collections::HashMap, env, fs, io::Read, path::Path, slice, sync::{Arc, Mutex}};
+use std::{collections::HashMap, env, fs::{self, File}, io::{BufReader, Read}, path::Path, slice, sync::{Arc, Mutex}};
 
-use flate2::read::GzDecoder;
+use flate2::bufread::GzDecoder;
 use string_interner::{DefaultBackend, StringInterner};
 
-use crate::{color::{rgb_xyz::ColorEncodingCache, spectrum::Spectrum}, file::set_search_directory, mipmap::MIPMap, options::Options, texture::TexInfo, Float};
+use crate::{clear_log, color::{rgb_xyz::ColorEncodingCache, spectrum::Spectrum}, file::set_search_directory, log, mipmap::MIPMap, options::Options, texture::TexInfo, Float};
 
 use super::{error::{Error, Result}, param::{Param, ParamList}, target::{FileLoc, ParserTarget}, token::{Directive, Token}, tokenizer::Tokenizer};
 
@@ -48,6 +48,7 @@ pub fn parse_str<T: ParserTarget>(
         let element = match parser.parse_next() {
             Ok(element) => element,
             Err(Error::EndOfFile) => {
+                clear_log!();
                 parsers.pop();
                 continue;
             },
@@ -60,8 +61,8 @@ pub fn parse_str<T: ParserTarget>(
         // TODO: Track FileLoc in tokenizer and pass it in here
         let loc = FileLoc::default();
         match element {
-            Element::Include(path) => {
-                let path = Path::new(path);
+            Element::Include(path_name) => {
+                let path = Path::new(path_name);
                 let full_path;
 
                 let path = if path.is_absolute() {
@@ -75,29 +76,45 @@ pub fn parse_str<T: ParserTarget>(
                     full_path.as_path()
                 };
 
-                let data = fs::read_to_string(path).unwrap();
+                let f = File::open(path).unwrap();
+                let mut bufreader = BufReader::new(f);
 
-                let data_clone = data.clone();
-                let raw = data_clone.as_bytes();
-                let raw_len = raw.len();
-                let raw_ptr = raw.as_ptr();
+                let parser = if path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.ends_with("gz")) {
+                    log!("Decoding included scene file '{}'", path_name);
 
-                includes.push(data);
-
-                let parser = if path.extension().and_then(|ext| ext.to_str()).is_some_and(|ext| ext.ends_with(".gz")) {
-                    let mut decoder = GzDecoder::new(raw);
+                    let mut decoder = GzDecoder::new(bufreader);
                     let mut s = String::new();
                     decoder.read_to_string(&mut s).unwrap();
+
+                    let raw = s.as_bytes();
+                    let raw_ptr = raw.as_ptr();
+                    let raw_len = raw.len();
+
+                    includes.push(s);
+
+                    clear_log!();
+
                     Parser::new(unsafe {
-                        let byte_slice = slice::from_raw_parts(s.as_ptr(), s.len());
+                        let byte_slice = slice::from_raw_parts(raw_ptr, raw_len);
                         std::str::from_utf8_unchecked(byte_slice)
                     })
                 } else {
+                    let mut s = String::new();
+                    bufreader.read_to_string(&mut s).unwrap();
+
+                    let raw = s.as_bytes();
+                    let raw_ptr = raw.as_ptr();
+                    let raw_len = raw.len();
+                    
+                    includes.push(s);
+
                     Parser::new(unsafe {
                         let byte_slice = slice::from_raw_parts(raw_ptr, raw_len);
                         std::str::from_utf8_unchecked(byte_slice)
                     })
                 };
+
+                log!("Parsing included scene file '{}'", path_name);
 
                 parsers.push(parser);
             },

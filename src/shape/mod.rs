@@ -1,5 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
+use bilinear_patch::BilinearPatch;
 use sphere::Sphere;
 use triangle::Triangle;
 
@@ -8,6 +9,7 @@ use crate::{interaction::{Interaction, SurfaceInteraction}, options::Options, re
 pub mod sphere;
 pub mod mesh;
 pub mod triangle;
+pub mod bilinear_patch;
 
 pub trait AbstractShape {
     /// Spatial extent of the shape
@@ -49,6 +51,7 @@ pub trait AbstractShape {
 pub enum Shape {
     Sphere(Box<Sphere>),
     Triangle(Box<Triangle>),
+    BilinearPatch(Box<BilinearPatch>),
 }
 
 impl Shape {
@@ -82,6 +85,15 @@ impl Shape {
                 ));
                 Triangle::create_triangles(trianglemesh)
             },
+            "bilinearmesh" => {
+                let mesh = Arc::new(BilinearPatch::create_mesh(
+                    &render_from_object,
+                    reverse_orientation,
+                    parameters,
+                    loc,
+                ));
+                BilinearPatch::create_patches(mesh)
+            },
             _ => panic!("unknown shape {}", name),
         }
     }
@@ -92,6 +104,7 @@ impl AbstractShape for Shape {
         match self {
             Shape::Sphere(s) => s.bounds(),
             Shape::Triangle(s) => s.bounds(),
+            Shape::BilinearPatch(s) => s.bounds(),
         }
     }
 
@@ -99,6 +112,7 @@ impl AbstractShape for Shape {
         match self {
             Shape::Sphere(s) => s.normal_bounds(),
             Shape::Triangle(s) => s.normal_bounds(),
+            Shape::BilinearPatch(s) => s.normal_bounds(),
         }
     }
 
@@ -106,6 +120,7 @@ impl AbstractShape for Shape {
         match self {
             Shape::Sphere(s) => s.intersect(ray, t_max),
             Shape::Triangle(s) => s.intersect(ray, t_max),
+            Shape::BilinearPatch(s) => s.intersect(ray, t_max),
         }
     }
 
@@ -113,6 +128,7 @@ impl AbstractShape for Shape {
         match self {
             Shape::Sphere(s) => s.intersect_predicate(ray, t_max),
             Shape::Triangle(s) => s.intersect_predicate(ray, t_max),
+            Shape::BilinearPatch(s) => s.intersect_predicate(ray, t_max),
         }
     }
 
@@ -120,6 +136,7 @@ impl AbstractShape for Shape {
         match self {
             Shape::Sphere(s) => s.area(),
             Shape::Triangle(s) => s.area(),
+            Shape::BilinearPatch(s) => s.area(),
         }
     }
 
@@ -127,6 +144,7 @@ impl AbstractShape for Shape {
         match self {
             Shape::Sphere(s) => s.sample(u),
             Shape::Triangle(s) => s.sample(u),
+            Shape::BilinearPatch(s) => s.sample(u),
         }
     }
 
@@ -134,6 +152,7 @@ impl AbstractShape for Shape {
         match self {
             Shape::Sphere(s) => s.pdf(interaction),
             Shape::Triangle(s) => s.pdf(interaction),
+            Shape::BilinearPatch(s) => s.pdf(interaction),
         }
     }
 
@@ -141,6 +160,7 @@ impl AbstractShape for Shape {
         match self {
             Shape::Sphere(s) => s.sample_with_context(ctx, u),
             Shape::Triangle(s) => s.sample_with_context(ctx, u),
+            Shape::BilinearPatch(s) => s.sample_with_context(ctx, u),
         }
     }
 
@@ -148,6 +168,7 @@ impl AbstractShape for Shape {
         match self {
             Shape::Sphere(s) => s.pdf_with_context(ctx, wi),
             Shape::Triangle(s) => s.pdf_with_context(ctx, wi),
+            Shape::BilinearPatch(s) => s.pdf_with_context(ctx, wi),
         }
     }
 }

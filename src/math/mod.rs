@@ -27,7 +27,7 @@ pub use sphere::OctahedralVec3;
 pub use dim::Dimension;
 pub use interval::{Interval, FloatInterval};
 
-pub use numeric::{NumericConsts, NumericNegative, NumericFloat, NumericField, NumericOrd};
+pub use numeric::{NumericConsts, NumericNegative, NumericFloat, NumericField, NumericOrd, DifferenceOfProducts};
 pub use ray::{Ray, RayDifferential, AuxiliaryRays};
 
 
@@ -256,6 +256,32 @@ pub fn logistic_cdf(x: Float, s: Float) -> Float {
 #[inline]
 pub fn trimmed_logistic(x: Float, s: Float, a: Float, b: Float) -> Float {
     logistic(x, s) / (logistic_cdf(b, s) - logistic_cdf(a, s))
+}
+
+pub fn quadratic(a: Float, b: Float, c: Float) -> Option<(Float, Float)> {
+    if a == 0.0 {
+        if b == 0.0 {
+            return None;
+        }
+
+        return Some((-c / b, -c / b));
+    }
+
+    let discrim = Float::difference_of_products(b, b, 4.0 * a, c);
+    if discrim < 0.0 {
+        return None;
+    }
+
+    let root_discrim = Float::sqrt(discrim);
+
+    let q = -0.5 * (b + Float::copysign(root_discrim, b));
+    let t0 = q / a;
+    let t1 = c / q;
+    if t0 > t1 {
+        Some((t1, t0))
+    } else {
+        Some((t0, t1))
+    }
 }
 
 #[inline]

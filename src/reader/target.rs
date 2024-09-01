@@ -7,7 +7,7 @@ use crate::{color::{rgb_xyz::ColorEncodingCache, spectrum::Spectrum}, mipmap::MI
 
 use super::{param::ParamList, paramdict::ParsedParameter};
 
-pub type ParsedParameterVector = ArrayVec<ParsedParameter, 8>;
+pub type ParsedParameterVector = ArrayVec<ParsedParameter, 16>;
 
 impl<'a> From<ParamList<'a>> for ParsedParameterVector {
     fn from(param_list: ParamList<'a>) -> Self {

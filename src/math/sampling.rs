@@ -555,6 +555,156 @@ pub fn sample_bilinear(u: Point2f, w: &[Float]) -> Point2f {
     Point2f { x, y }
 }
 
+pub fn invert_bilinear(p: Point2f, vert: &[Point2f]) -> Point2f {
+    let a = vert[0];
+    let b = vert[1];
+    let c = vert[2];
+    let d = vert[3];
+    let e = b - a;
+    let f = d - a;
+    let g = (a - b) + (c - d);
+    let h = p - a;
+
+    let orthogonal = |a: Point2f, b: Point2f| {
+        Float::difference_of_products(a.x, b.y, a.y, b.x)
+    };
+
+    let k2 = orthogonal(g, f);
+    let k1 = orthogonal(e, f) + orthogonal(h, g);
+    let k0 = orthogonal(h, e);
+
+    if Float::abs(k2) < 0.001 {
+        if Float::abs(e.x * k1 - g.x * k0) < 1e-5 {
+            return Point2f::new((h.y * k1 + f.y * k0) / (e.y * k1 - g.y * k0), -k0 / k1);
+        } else {
+            return Point2f::new((h.x * k1 + f.x * k0) / (e.x * k1 - g.x * k0), -k0 / k1);
+        }
+    }
+
+    let Some((v0, v1)) = quadratic(k2, k1, k0) else {
+        return Point2f::ZERO;
+    };
+
+    let u = (h.x - f.x * v0) / (e.x + g.x * v0);
+    if !(0.0..=1.0).contains(&u) || !(0.0..=1.0).contains(&v0) {
+        Point2f::new((h.x - f.x * v1) / (e.x + g.x * v1), v1)
+    } else {
+        Point2f::new(u, v0)
+    }
+}
+
+pub fn invert_spherical_rectangle_sample(
+    p_ref: Point3f,
+    s: Point3f,
+    ex: Vec3f,
+    ey: Vec3f,
+    p_rect: Point3f,
+) -> Point2f {
+    let exl = ex.length();
+    let eyl = ey.length();
+    let mut r = Frame::from_xy(ex / exl, ey / eyl);
+
+    let d = s - p_ref;
+    let d_local = r.localize(d.into());
+    let mut z0 = d_local.z;
+
+    if z0 > 0.0 {
+        r.z = -r.z;
+        z0 *= -1.0;
+    }
+    let z0sq = sqr(z0);
+    let x0 = d_local.x;
+    let y0 = d_local.y;
+    let x1 = x0 + exl;
+    let y1 = y0 + eyl;
+    let y0sq = sqr(y0);
+    let y1sq = sqr(y1);
+
+    let v00 = Vec3f::new(x0, y0, z0);
+    let v01 = Vec3f::new(x0, y1, z0);
+    let v10 = Vec3f::new(x1, y0, z0);
+    let v11 = Vec3f::new(x1, y1, z0);
+
+    let n0 = v00.cross(v10).normalize();
+    let n1 = v10.cross(v11).normalize();
+    let n2 = v11.cross(v01).normalize();
+    let n3 = v01.cross(v00).normalize();
+
+    let g0 = (-n0).angle_between(n1);
+    let g1 = (-n1).angle_between(n2);
+    let g2 = (-n2).angle_between(n3);
+    let g3 = (-n3).angle_between(n0);
+
+    let b0 = n0.z;
+    let b1 = n2.z;
+    let b0sq = sqr(b0);
+    let b1sq = sqr(b1);
+
+    let solid_angle = g0 + g1 + g2 + g3 - 2.0 * PI;
+
+    // TODO: this (rarely) goes differently than sample. figure out why...
+    if solid_angle < 1e-3 {
+        let pq = p_rect - s;
+        return Point2f::new(pq.dot(ex) / ex.length_squared(), pq.dot(ey) / ey.length_squared());
+    }
+
+    let v = r.localize((p_rect - p_ref).into());
+    let mut xu = v.x;
+    let yv = v.y;
+
+    xu = Float::clamp(xu, x0, x1);
+    if xu == 0.0 {
+        xu = 1e-10;
+    }
+
+    let invcusq = 1.0 + z0sq / sqr(xu);
+    let fusq = invcusq - b0sq;
+    let fu = Float::copysign(Float::sqrt(fusq), xu);
+
+    let sqrt = safe::sqrt(Float::difference_of_products(b0, b0, b1, b1) + fusq);
+    let mut au = Float::atan2(
+        -(b1 * fu) - Float::copysign(b0 * sqrt, fu * b0),
+        b0 * b1 - sqrt * Float::abs(fu),
+    );
+    if au > 0.0 {
+        au -= 2.0 * PI;
+    }
+
+    if fu == 0.0 {
+        au = PI;
+    }
+
+    let u0 = (au + g2 + g3) / solid_angle;
+
+    let ddsq = sqr(xu) + z0sq;
+    let dd = Float::sqrt(ddsq);
+    let h0 = y0 / Float::sqrt(ddsq + y0sq);
+    let h1 = y1 / Float::sqrt(ddsq + y1sq);
+    let yvsq = sqr(yv);
+
+    let u1  = [
+        (Float::difference_of_products(h0, h0, h0, h1) - Float::abs(h0 - h1) 
+            * Float::sqrt(yvsq * (ddsq + yvsq)) / (ddsq + yvsq)) / sqr(h0 - h1),
+        (Float::difference_of_products(h0, h0, h0, h1) + Float::abs(h0 - h1) 
+            * Float::sqrt(yvsq * (ddsq + yvsq)) / (ddsq + yvsq)) / sqr(h0 - h1),
+    ];
+
+    // TODO: yuck is there a better way to figure out which is the right
+    // solution?
+    let hv = [lerp(h0, h1, u1[0]), lerp(h0, h1, u1[1])];
+    let hvsq = [sqr(hv[0]), sqr(hv[1])];
+    let yz = [
+        (hv[0] * dd) / Float::sqrt(1.0 - hvsq[0]),
+        (hv[1] * dd) / Float::sqrt(1.0 - hvsq[1]),
+    ];
+
+    if Float::abs(yz[0] - yv) < Float::abs(yz[1] - yv) {
+        Point2f::new(Float::clamp(u0, 0.0, 1.0), u1[0])
+    } else {
+        Point2f::new(Float::clamp(u0, 0.0, 1.0), u1[1])
+    }
+}
+
 pub fn bilinear_pdf(p: Point2f, w: &[Float]) -> Float {
     debug_assert_eq!(4, w.len());
     if p.x < 0.0 || p.x > 1.0 || p.y < 0.0 || p.y > 1.0 {
@@ -697,6 +847,82 @@ pub fn invert_spherical_triangle_sample(v: &[Point3f; 3], p: Point3f, w: Vec3f) 
 
     let u1 = (1.0 - w.dot(b)) / (1.0 - cp.dot(b));
     Point2f::new(u0.clamp(0.0, 1.0), u1.clamp(0.0, 1.0))
+}
+
+pub fn sample_spherical_rectangle(
+    p_ref: Point3f,
+    s: Point3f,
+    ex: Vec3f,
+    ey: Vec3f,
+    u: Point2f,
+    pdf: Option<&mut Float>,
+) -> Point3f {
+    let exl = ex.length();
+    let eyl = ey.length();
+    let mut r = Frame::from_xy(ex / exl, ey / eyl);
+    let d_local = r.localize((s - p_ref).into());
+    let mut z0 = d_local.z;
+    
+    if z0 > 0.0 {
+        r.z = -r.z;
+        z0 *= -1.0;
+    }
+
+    let x0 = d_local.x;
+    let y0 = d_local.y;
+    let x1 = x0 + exl;
+    let y1 = y0 + eyl;
+
+    let v00 = Vec3f::new(x0, y0, z0);
+    let v01 = Vec3f::new(x0, y1, z0);
+    let v10 = Vec3f::new(x1, y0, z0);
+    let v11 = Vec3f::new(x1, y1, z0);
+    let n0 = v00.cross(v10).normalize();
+    let n1 = v10.cross(v11).normalize();
+    let n2 = v11.cross(v01).normalize();
+    let n3 = v01.cross(v00).normalize();
+
+    let g0 = (-n0).angle_between(n1);
+    let g1 = (-n1).angle_between(n2);
+    let g2 = (-n2).angle_between(n3);
+    let g3 = (-n3).angle_between(n0);
+
+    let solid_angle = g0 + g1 + g2 + g3 - 2.0 * PI;
+    if solid_angle <= 0.0 {
+        if let Some(pdf) = pdf {
+            *pdf = 0.0;
+        }
+        return Point3f::from(s + u[0] * ex + u[1] * ey);
+    }
+    if let Some(pdf) = pdf {
+        *pdf = Float::max(0.0, 1.0 / solid_angle);
+    }
+    if solid_angle < 1e-3 {
+        return Point3f::from(s + u[0] * ex + u[1] * ey);
+    }
+
+    let b0 = n0.z;
+    let b1 = n2.z;
+    let au = u[0] * (g0 + g1 - 2.0 * PI) + (u[0] - 1.0) * (g2 + g3);
+    let fu = (Float::cos(au) * b0 - b1) / Float::sin(au);
+    let cu = Float::copysign(1.0 / Float::sqrt(sqr(fu) + sqr(b0)), fu);
+    let cu = Float::clamp(cu, -(1.0 - Float::EPSILON), 1.0 - Float::EPSILON);
+
+    let xu = -(cu * z0) / safe::sqrt(1.0 - sqr(cu));
+    let xu = Float::clamp(xu, x0, x1);
+
+    let dd = Float::sqrt(sqr(xu) + sqr(z0));
+    let h0 = y0 / Float::sqrt(sqr(dd) + sqr(y0));
+    let h1 = y1 / Float::sqrt(sqr(dd) + sqr(y1));
+    let hv = h0 + u[1] * (h1 - h0);
+    let hvsq = sqr(hv);
+    let yv = if hvsq < 1.0 - 1e-6 {
+        (hv * dd) / Float::sqrt(1.0 - hvsq)
+    } else {
+        y1
+    };
+
+    p_ref + r.from_local(Vec3f::new(xu, yv, z0))
 }
 
 pub fn sample_exponential(x: Float, a: Float) -> Float {

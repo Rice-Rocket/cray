@@ -3,7 +3,7 @@ macro_rules! log {
     ($($arg:tt)*) => {
         print!("\r{}", termion::clear::CurrentLine);
         print!($($arg)*);
-        std::io::stdout().flush();
+        std::io::Write::flush(&mut std::io::stdout());
     }
 }
 
