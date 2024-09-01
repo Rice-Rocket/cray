@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bumpalo::Bump;
 use rand::{rngs::SmallRng, Rng};
 
-use crate::{bsdf::BSDF, bssrdf::{AbstractBSSRDF, SubsurfaceInteraction}, bxdf::{BxDFReflTransFlags, TransportMode}, camera::{film::VisibleSurface, Camera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, float_to_bits, interaction::{GeneralInteraction, Interaction, MediumInteraction, SurfaceInteraction}, light::{sampler::{AbstractLightSampler, LightSampler}, AbstractLight, LightSampleContext}, media::{sample_t_maj, MediumProperties}, mix_bits, options::Options, phase::AbstractPhaseFunction, sampler::{AbstractSampler, Sampler}, sampling::{sample_discrete, WeightedReservoirSampler}, Dot, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, RayDifferential, Vec3f};
+use crate::{bsdf::BSDF, bssrdf::{AbstractBSSRDF, SubsurfaceInteraction}, bxdf::{BxDFReflTransFlags, TransportMode}, camera::{film::VisibleSurface, Camera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, float_to_bits, interaction::{GeneralInteraction, Interaction, MediumInteraction, SurfaceInteraction}, light::{sampler::{AbstractLightSampler, LightSampler}, AbstractLight, LightSampleContext}, media::{sample_t_maj, MediumProperties}, hashing::mix_bits, options::Options, phase::AbstractPhaseFunction, sampler::{AbstractSampler, Sampler}, sampling::{sample_discrete, WeightedReservoirSampler}, Dot, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, RayDifferential, Vec3f};
 
 use super::{AbstractRayIntegrator, IntegratorBase};
 

@@ -1208,9 +1208,8 @@ impl BasicSceneBuilder {
         string_interner: &mut StringInterner<DefaultBackend>,
         options: &Options,
     ) -> BasicSceneBuilder {
-        // TODO: Change default to zsobol
         let sampler = SceneEntity {
-            name: string_interner.get_or_intern("independent"),
+            name: string_interner.get_or_intern("zsobol"),
             loc: FileLoc::default(),
             parameters: ParameterDictionary::default(),
         };
@@ -1224,9 +1223,8 @@ impl BasicSceneBuilder {
             ),
         };
 
-        // TODO: Change default to volpath
         let integrator = SceneEntity {
-            name: string_interner.get_or_intern("path"),
+            name: string_interner.get_or_intern("volpath"),
             loc: FileLoc::default(),
             parameters: ParameterDictionary::default(),
         };

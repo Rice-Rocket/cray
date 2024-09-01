@@ -16,8 +16,13 @@ pub mod sampling;
 pub mod tile;
 pub mod vec2d;
 pub mod scattering;
+pub mod lowdiscrepancy;
+pub mod sobol;
+#[macro_use]
+pub mod hashing;
 
 use fast_polynomial::poly;
+use hexf::hexf32;
 pub use mat::{TMat2, TMat3, TMat4};
 pub use vect::{Vec2, Vec3, Vec4, Point2, Point3, Point4, Normal2, Normal3, Dot};
 pub use bounds::{direction::DirectionCone, Bounds2f, Bounds3f, Bounds2i, Bounds3i, Bounds2u, Bounds3u, Bounds2, Bounds3};
@@ -54,6 +59,7 @@ pub const FRAC_PI_4: Float = 0.78539816339744830961;
 /// √2
 pub const SQRT_2: Float = 1.41421356237309504880;
 pub const MACHINE_EPSILON: Float = Float::EPSILON * 0.5;
+pub const ONE_MINUS_EPSILON: Float = hexf32!("0x1.fffffep-1") as Float;
 
 /// Computse the linear interpolation between `a` and `b` at input `t`.
 pub fn lerp<T: std::ops::Add<T, Output = T> + std::ops::Sub<T, Output = T> + std::ops::Mul<T, Output = T> + Copy>(
@@ -129,16 +135,6 @@ pub fn bits_to_float(ui: FloatAsBits) -> Float {
         rf = f;
     }
     rf
-}
-
-#[inline]
-pub fn mix_bits(mut v: u64) -> u64 {
-    v ^= v.wrapping_shr(31);
-    v = v.wrapping_mul(0x7fb5d329728ea185);
-    v ^= v.wrapping_shr(27);
-    v = v.wrapping_mul(0x81dadef4bc2dd44d);
-    v ^= v.wrapping_shr(33);
-    v
 }
 
 pub fn next_float_up(mut v: Float) -> Float {
@@ -287,6 +283,16 @@ pub fn quadratic(a: Float, b: Float, c: Float) -> Option<(Float, Float)> {
 #[inline]
 pub fn sin_cos(x: Float) -> (Float, Float) {
     Float::sin_cos(x)
+}
+
+pub fn round_up_pow_2(mut v: i32) -> i32 {
+    v -= 1;
+    v |= v.wrapping_shr(1);
+    v |= v.wrapping_shr(2);
+    v |= v.wrapping_shr(4);
+    v |= v.wrapping_shr(8);
+    v |= v.wrapping_shr(16);
+    v + 1
 }
 
 #[inline]
