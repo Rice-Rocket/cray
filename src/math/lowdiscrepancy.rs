@@ -84,6 +84,8 @@ pub fn sobol_sample<R: AbstractScrambler>(mut a: u64, dimension: usize, randomiz
     let mut v = 0u32;
     let mut i = dimension * SOBOL_MATRIX_SIZE as usize;
     // let v = sobol_reduce_randomize(a, i, 0);
+    
+    // TODO: Improve this algorithm by using trailing_zeros()
     while a != 0 {
         if a & 1 != 0 {
             v ^= *unsafe { SOBOL_MATRICES_32.get_unchecked(i) };

@@ -310,6 +310,7 @@ pub fn spherical_quad_area(a: Point3f, b: Point3f, c: Point3f, d: Point3f) -> Fl
 }
 
 
+#[derive(Default, Debug, Clone, Copy)]
 pub struct OctahedralVec3 {
     x: u16,
     y: u16,

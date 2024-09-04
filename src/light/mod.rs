@@ -6,7 +6,7 @@ use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use point::PointLight;
 use uniform_infinite::UniformInfiniteLight;
 
-use crate::{bounds::Union, camera::CameraTransform, clear_log, color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, cos_theta, equal_area_square_to_sphere, file::resolve_filename, image::Image, interaction::{Interaction, SurfaceInteraction}, log, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc, utils::truncate_filename}, shape::Shape, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point2i, Point3f, Point3fi, Ray, Vec2f, Vec3f, PI};
+use crate::{bounds::Union, camera::CameraTransform, clear_log, color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, cos_theta, equal_area_square_to_sphere, file::resolve_filename, image::Image, interaction::{Interaction, SurfaceInteraction}, log, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc, utils::truncate_filename}, safe, shape::Shape, sqr, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Dot, Float, Normal3f, Point2f, Point2i, Point3f, Point3fi, Ray, Vec2f, Vec3f, PI};
 
 pub mod sampler;
 pub mod point;
@@ -416,7 +416,7 @@ impl LightType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct LightBounds {
     pub bounds: Bounds3f,
     pub phi: Float,
@@ -464,10 +464,10 @@ impl LightBounds {
 
     pub fn union(&self, other: &LightBounds) -> LightBounds {
         if self.phi == 0.0 {
-            return other.clone();
+            return *other;
         }
         if other.phi == 0.0 {
-            return self.clone();
+            return *self;
         }
 
         let cone = DirectionCone::new(self.w, self.cos_theta_o).union(DirectionCone::new(other.w, other.cos_theta_o));
@@ -481,6 +481,77 @@ impl LightBounds {
             cos_theta_o,
             cos_theta_e,
             two_sided: self.two_sided || other.two_sided,
+        }
+    }
+
+    pub fn centroid(&self) -> Point3f {
+        (self.bounds.min + self.bounds.max) / 2.0
+    }
+
+    pub fn importance(&self, p: Point3f, n: Normal3f) -> Float {
+        let pc = (self.bounds.min + self.bounds.max) / 2.0;
+        let mut d2 = p.distance_squared(pc);
+        d2 = Float::max(d2, self.bounds.diagonal().length() / 2.0);
+
+        let cos_sub_clamped = |sin_theta_a: Float, cos_theta_a: Float, sin_theta_b: Float, cos_theta_b: Float| -> Float {
+            if cos_theta_a > cos_theta_b {
+                return 1.0;
+            }
+
+            cos_theta_a * cos_theta_b + sin_theta_a * sin_theta_b
+        };
+
+        let sin_sub_clamped = |sin_theta_a: Float, cos_theta_a: Float, sin_theta_b: Float, cos_theta_b: Float| -> Float {
+            if cos_theta_a > cos_theta_b {
+                return 0.0;
+            }
+
+            sin_theta_a * cos_theta_b - cos_theta_a * sin_theta_b
+        };
+
+        let wi = (p - pc).normalize();
+        let mut cos_theta_w = self.w.dot(wi);
+        if self.two_sided {
+            cos_theta_w = cos_theta_w.abs();
+        }
+        let sin_theta_w = safe::sqrt(1.0 - sqr(cos_theta_w));
+
+        let cos_theta_b = DirectionCone::bound_subtended_directions(self.bounds, p).cos_theta;
+        let sin_theta_b = safe::sqrt(1.0 - sqr(cos_theta_b));
+
+        let sin_theta_o = safe::sqrt(1.0 - sqr(self.cos_theta_o));
+        let cos_theta_x = cos_sub_clamped(sin_theta_w, cos_theta_w, sin_theta_o, self.cos_theta_o);
+        let sin_theta_x = sin_sub_clamped(sin_theta_w, cos_theta_w, sin_theta_o, self.cos_theta_o);
+        let cos_theta_p = cos_sub_clamped(sin_theta_x, cos_theta_x, sin_theta_b, cos_theta_b);
+
+        if cos_theta_p <= self.cos_theta_e {
+            return 0.0;
+        }
+
+        let mut importance = self.phi * cos_theta_p / d2;
+        debug_assert!(importance >= -1e-3);
+
+        if n != Normal3f::ZERO {
+            let cos_theta_i = wi.dot(n).abs();
+            let sin_theta_i = safe::sqrt(1.0 - sqr(cos_theta_i));
+            let cos_theta_pi = cos_sub_clamped(sin_theta_i, cos_theta_i, sin_theta_b, cos_theta_b);
+            importance *= cos_theta_pi;
+        }
+        
+        importance = Float::max(importance, 0.0);
+        importance
+    }
+}
+
+impl Default for LightBounds {
+    fn default() -> Self {
+        Self {
+            bounds: Default::default(),
+            phi: 0.0,
+            w: Default::default(),
+            cos_theta_o: Default::default(),
+            cos_theta_e: Default::default(),
+            two_sided: Default::default(),
         }
     }
 }

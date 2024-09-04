@@ -765,8 +765,6 @@ impl BasicScene {
                         &materials[material_index as usize]
                     };
 
-                    // FIX: MediumInterface should instead have Optional inside and outside
-                    // This should fix the issue of mediums not rendering
                     let mi = Arc::new(MediumInterface::new(
                         find_medium(&sh.inside_medium).cloned(),
                         find_medium(&sh.outside_medium).cloned(),

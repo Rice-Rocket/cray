@@ -211,7 +211,7 @@ impl ImageTileIntegrator {
         let regularize = parameters.get_one_bool("regularize", false);
 
         // TODO: Change default to BVH
-        let light_strategy = parameters.get_one_string("lightsampler", "uniform");
+        let light_strategy = parameters.get_one_string("lightsampler", "bvh");
         let light_sampler = LightSampler::create(&light_strategy, lights.clone());
 
         let pixel_sample_evaluator = RayIntegrator::Path(PathIntegrator::new(
@@ -259,7 +259,7 @@ impl ImageTileIntegrator {
         let regularize = parameters.get_one_bool("regularize", false);
 
         // TODO: Change default to BVH
-        let light_strategy = parameters.get_one_string("lightsampler", "uniform");
+        let light_strategy = parameters.get_one_string("lightsampler", "bvh");
         let light_sampler = LightSampler::create(&light_strategy, lights.clone());
 
         let ray_integrator = RayIntegrator::VolumetricPath(VolumetricPathIntegrator::new(

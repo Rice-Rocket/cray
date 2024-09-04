@@ -176,6 +176,21 @@ impl AbstractLight for DiffuseAreaLight {
     }
 
     fn bounds(&self) -> Option<LightBounds> {
-        todo!()
+        let mut phi = 0.0;
+
+        // TODO: handle image textures
+
+        phi = self.l_emit.max_value();
+        phi *= self.scale * self.area * PI;
+
+        let nb = self.shape.normal_bounds();
+        Some(LightBounds {
+            bounds: self.shape.bounds(),
+            phi,
+            w: nb.w,
+            cos_theta_o: nb.cos_theta,
+            cos_theta_e: 0.0, // cos(pi / 2)
+            two_sided: self.two_sided,
+        })
     }
 }
