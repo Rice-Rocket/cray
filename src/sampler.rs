@@ -379,10 +379,10 @@ impl AbstractSampler for ZSobolSampler {
         let sample_hash = ihash21(self.dimension, self.seed);
 
         match self.randomize {
-            RandomizeStrategy::None => sobol_sample(sample_index, 0, NoScrambler),
-            RandomizeStrategy::PermuteDigits => sobol_sample(sample_index, 0, BinaryPermuteScrambler { permutation: sample_hash }),
-            RandomizeStrategy::FastOwen => sobol_sample(sample_index, 0, FastOwenScrambler { seed: sample_hash }),
-            RandomizeStrategy::Owen => sobol_sample(sample_index, 0, OwenScrambler { seed: sample_hash }),
+            RandomizeStrategy::None => sobol_sample::<_, 0>(sample_index, NoScrambler),
+            RandomizeStrategy::PermuteDigits => sobol_sample::<_, 0>(sample_index, BinaryPermuteScrambler { permutation: sample_hash }),
+            RandomizeStrategy::FastOwen => sobol_sample::<_, 0>(sample_index, FastOwenScrambler { seed: sample_hash }),
+            RandomizeStrategy::Owen => sobol_sample::<_, 0>(sample_index, OwenScrambler { seed: sample_hash }),
         }
     }
 
@@ -395,20 +395,20 @@ impl AbstractSampler for ZSobolSampler {
 
         match self.randomize {
             RandomizeStrategy::None => Point2f::new(
-                sobol_sample(sample_index, 0, NoScrambler),
-                sobol_sample(sample_index, 1, NoScrambler),
+                sobol_sample::<_, 0>(sample_index, NoScrambler),
+                sobol_sample::<_, 1>(sample_index, NoScrambler),
             ),
             RandomizeStrategy::PermuteDigits => Point2f::new(
-                sobol_sample(sample_index, 0, BinaryPermuteScrambler { permutation: sample_hash.0 }),
-                sobol_sample(sample_index, 1, BinaryPermuteScrambler { permutation: sample_hash.1 }),
+                sobol_sample::<_, 0>(sample_index, BinaryPermuteScrambler { permutation: sample_hash.0 }),
+                sobol_sample::<_, 1>(sample_index, BinaryPermuteScrambler { permutation: sample_hash.1 }),
             ),
             RandomizeStrategy::FastOwen => Point2f::new(
-                sobol_sample(sample_index, 0, FastOwenScrambler { seed: sample_hash.0 }),
-                sobol_sample(sample_index, 1, FastOwenScrambler { seed: sample_hash.1 }),
+                sobol_sample::<_, 0>(sample_index, FastOwenScrambler { seed: sample_hash.0 }),
+                sobol_sample::<_, 1>(sample_index, FastOwenScrambler { seed: sample_hash.1 }),
             ),
             RandomizeStrategy::Owen => Point2f::new(
-                sobol_sample(sample_index, 0, OwenScrambler { seed: sample_hash.0 }),
-                sobol_sample(sample_index, 1, OwenScrambler { seed: sample_hash.1 }),
+                sobol_sample::<_, 0>(sample_index, OwenScrambler { seed: sample_hash.0 }),
+                sobol_sample::<_, 1>(sample_index, OwenScrambler { seed: sample_hash.1 }),
             ),
         }
     }

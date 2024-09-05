@@ -65,34 +65,21 @@ impl AbstractScrambler for OwenScrambler {
     }
 }
 
-// TODO: Determine whether tail recursion or the while loop is faster
-#[inline(always)]
-fn sobol_reduce_randomize(a: u64, i: usize, v: u32) -> u32 {
-    match a {
-        0 => v,
-        _ => sobol_reduce_randomize(a >> 1, i + 1, if a & 1 != 0 {
-            unsafe { v ^ *SOBOL_MATRICES_32.get_unchecked(i) }
-        } else { v }) ,
-    }
-}
-
 #[inline]
-pub fn sobol_sample<R: AbstractScrambler>(mut a: u64, dimension: usize, randomizer: R) -> Float {
-    debug_assert!(dimension < N_SOBOL_DIMENSIONS as usize);
+pub fn sobol_sample<R: AbstractScrambler, const D: usize>(mut a: u64, randomizer: R) -> Float {
+    debug_assert!(D < N_SOBOL_DIMENSIONS as usize);
     debug_assert!(a < (1u64 << SOBOL_MATRIX_SIZE));
 
     let mut v = 0u32;
-    let mut i = dimension * SOBOL_MATRIX_SIZE as usize;
-    // let v = sobol_reduce_randomize(a, i, 0);
-    
-    // TODO: Improve this algorithm by using trailing_zeros()
-    while a != 0 {
-        if a & 1 != 0 {
-            v ^= *unsafe { SOBOL_MATRICES_32.get_unchecked(i) };
-        }
+    let i = unsafe { SOBOL_MATRICES_32.as_ptr().add(D * SOBOL_MATRIX_SIZE as usize) };
 
-        a >>= 1;
-        i += 1;
+    while a != 0 {
+        // Index into sobol matrices with the number of trailing zeros 
+        // in the binary representation of `a`
+        v ^= unsafe { *i.add(a.trailing_zeros() as usize) };
+
+        // Clear the least significant 1 bit
+        a &= a - 1;
     }
 
     Float::min(randomizer.scramble(v) as Float * hexf32!("0x1.0p-32") as Float, ONE_MINUS_EPSILON)
