@@ -117,7 +117,7 @@ impl AbstractLight for ImageInfiniteLight {
     }
 
     fn bounds(&self) -> Option<LightBounds> {
-        todo!()
+        None
     }
 }
 

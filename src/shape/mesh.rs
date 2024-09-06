@@ -1,6 +1,9 @@
-use std::{fs::File, io::BufReader};
+use std::{fs::{self, File}, io::{self, BufReader}};
 
-use crate::{transform::{ApplyTransform, Transform}, Normal3f, Point2f, Point3f, Vec3f};
+use itertools::Itertools;
+use ply_rs::{parser::Parser, ply};
+
+use crate::{transform::{ApplyTransform, Transform}, Float, Normal3f, Point2f, Point3f, Vec3f};
 
 #[derive(Debug, Clone)]
 pub struct TriangleMesh {
@@ -161,6 +164,147 @@ impl TriQuadMesh {
         // https://stackoverflow.com/questions/47048037/how-to-iterate-stream-a-gzip-file-containing-a-single-csv
         // Would just need to make a gzdecoder and pass it to BufReader instead of f, if we end in .gz.
 
-        todo!()
+        let f = fs::File::open(filename).expect("Unable to read PLY file");
+        let mut f = io::BufReader::new(f);
+
+        let vertex_parser = Parser::<PlyVertex>::new();
+        let face_parser = Parser::<PlyFace>::new();
+
+        let header = vertex_parser.read_header(&mut f).unwrap();
+
+        let mut vertex_list = Vec::new();
+        let mut face_list = Vec::new();
+
+        for (_, element) in &header.elements {
+            match element.name.as_ref() {
+                "vertex" => vertex_list = vertex_parser.read_payload_for_element(&mut f, element, &header).unwrap(),
+                "face" => face_list = face_parser.read_payload_for_element(&mut f, element, &header).unwrap(),
+                _ => panic!("Unexpected element: {}", element.name),
+            }
+        }
+
+        let (p, n, uv): (Vec<Point3f>, Vec<Normal3f>, Vec<Point2f>) = vertex_list.into_iter().map(|v| {
+            let p = Point3f::new(v.x, v.y, v.z);
+            let n = Normal3f::new(v.nx, v.ny, v.nz);
+            let uv = Point2f::new(v.u, v.v);
+            (p, n, uv)
+        }).multiunzip();
+
+        let mut tri_indices = Vec::new();
+        let mut quad_indices = Vec::new();
+        let mut face_indices = Vec::new();
+        for f in &face_list {
+            assert!(!f.face_indices.is_empty() && f.vertex_indices.is_empty()
+                || f.face_indices.is_empty() && !f.vertex_indices.is_empty());
+
+            if f.vertex_indices.len() == 3 {
+                debug_assert!(f.face_indices.is_empty());
+                tri_indices.push(f.vertex_indices[0]);
+                tri_indices.push(f.vertex_indices[1]);
+                tri_indices.push(f.vertex_indices[2]);
+            } else if f.vertex_indices.len() == 4 {
+                debug_assert!(f.face_indices.is_empty());
+                quad_indices.push(f.vertex_indices[0]);
+                quad_indices.push(f.vertex_indices[1]);
+                quad_indices.push(f.vertex_indices[2]);
+                quad_indices.push(f.vertex_indices[3]);
+            } else if f.face_indices.is_empty() {
+                panic!("Only tris and quads are supported");
+            }
+
+            if !f.face_indices.is_empty() {
+                debug_assert!(f.vertex_indices.is_empty());
+                face_indices.push(f.face_indices[0]);
+            }
+        }
+        
+        for idx in &tri_indices {
+            assert!(*idx >= 0);
+            assert!(idx < &(p.len() as i32));
+        }
+
+        for idx in &quad_indices {
+            assert!(*idx >= 0);
+            assert!(idx < &(p.len() as i32));
+        }
+
+        TriQuadMesh {
+            p,
+            n,
+            uv,
+            face_indices,
+            tri_indices,
+            quad_indices,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct PlyVertex {
+    x: Float,
+    y: Float,
+    z: Float,
+    nx: Float,
+    ny: Float,
+    nz: Float,
+    u: Float,
+    v: Float,
+}
+
+impl ply::PropertyAccess for PlyVertex {
+    fn new() -> Self {
+        PlyVertex {
+            x: 0.0,
+            y: 0.0,
+            z: 0.0,
+            nx: 0.0,
+            ny: 0.0,
+            nz: 0.0,
+            u: 0.0,
+            v: 0.0,
+        }
+    }
+
+    fn set_property(&mut self, key: String, property: ply::Property) {
+        match (key.as_ref(), property) {
+            ("x", ply::Property::Float(v)) => self.x = v as Float,
+            ("y", ply::Property::Float(v)) => self.y = v as Float,
+            ("z", ply::Property::Float(v)) => self.z = v as Float,
+            ("nx", ply::Property::Float(v)) => self.nx = v as Float,
+            ("ny", ply::Property::Float(v)) => self.ny = v as Float,
+            ("nz", ply::Property::Float(v)) => self.nz = v as Float,
+            ("u", ply::Property::Float(v)) => self.u = v as Float,
+            ("v", ply::Property::Float(v)) => self.v = v as Float,
+            ("s", ply::Property::Float(v)) => self.u = v as Float,
+            ("t", ply::Property::Float(v)) => self.v = v as Float,
+            ("texture_u", ply::Property::Float(v)) => self.u = v as Float,
+            ("texture_v", ply::Property::Float(v)) => self.v = v as Float,
+            ("texture_s", ply::Property::Float(v)) => self.u = v as Float,
+            ("texture_t", ply::Property::Float(v)) => self.v = v as Float,
+            (k, _) => panic!("Vertex: Unexpected key/value combination: key: {}", k),
+        }
+    }
+}
+
+struct PlyFace {
+    vertex_indices: Vec<i32>,
+    face_indices: Vec<i32>,
+}
+
+impl ply::PropertyAccess for PlyFace {
+    fn new() -> Self {
+        PlyFace {
+            vertex_indices: Vec::new(),
+            face_indices: Vec::new(),
+        }
+    }
+
+    fn set_property(&mut self, key: String, property: ply::Property) {
+        match (key.as_ref(), property) {
+            ("vertex_indices", ply::Property::ListInt(v)) => self.vertex_indices = v,
+            ("vertex_index", ply::Property::ListInt(v)) => self.vertex_indices = v,
+            ("face_indices", ply::Property::ListInt(v)) => self.face_indices = v,
+            (k, _) => panic!("Face: Unexpected key/value combination: key: {}", k),
+        }
     }
 }

@@ -1,10 +1,11 @@
 use std::{collections::HashMap, sync::Arc};
 
 use bilinear_patch::BilinearPatch;
+use mesh::{BilinearPatchMesh, TriQuadMesh, TriangleMesh};
 use sphere::Sphere;
 use triangle::Triangle;
 
-use crate::{interaction::{Interaction, SurfaceInteraction}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
+use crate::{file::resolve_filename, interaction::{Interaction, SurfaceInteraction}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
 
 pub mod sphere;
 pub mod mesh;
@@ -93,6 +94,42 @@ impl Shape {
                     loc,
                 ));
                 BilinearPatch::create_patches(mesh)
+            },
+            "plymesh" => {
+                let filename = resolve_filename(options, &parameters.get_one_string("filename", ""));
+                let ply_mesh = TriQuadMesh::read_ply(&filename);
+
+                // TODO: Handle displacement texture
+
+                let mut tri_quad_shapes = Vec::new();
+                if !ply_mesh.tri_indices.is_empty() {
+                    let mesh = Arc::new(TriangleMesh::new(
+                        &render_from_object,
+                        reverse_orientation,
+                        ply_mesh.tri_indices.into_iter().map(|x| x as usize).collect(),
+                        ply_mesh.p.clone(),
+                        Vec::new(),
+                        ply_mesh.n.clone(),
+                        ply_mesh.uv.clone(),
+                        ply_mesh.face_indices.clone().into_iter().map(|x| x as usize).collect(),
+                    ));
+                    tri_quad_shapes = Triangle::create_triangles(mesh);
+                }
+
+                if !ply_mesh.quad_indices.is_empty() {
+                    let quad_mesh = Arc::new(BilinearPatchMesh::new(
+                        &render_from_object,
+                        reverse_orientation,
+                        ply_mesh.quad_indices.into_iter().map(|x| x as usize).collect(),
+                        ply_mesh.p,
+                        ply_mesh.n,
+                        ply_mesh.uv,
+                        ply_mesh.face_indices.into_iter().map(|x| x as usize).collect(),
+                    ));
+                    let patches = BilinearPatch::create_patches(quad_mesh);
+                    tri_quad_shapes.extend(patches);
+                }
+                tri_quad_shapes
             },
             _ => panic!("unknown shape {}", name),
         }

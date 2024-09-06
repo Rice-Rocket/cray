@@ -101,6 +101,6 @@ impl AbstractLight for UniformInfiniteLight {
     }
 
     fn bounds(&self) -> Option<LightBounds> {
-        todo!()
+        None
     }
 }
