@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use conductor::ConductorMaterial;
+use dielectric::DielectricMaterial;
 use diffuse::DiffuseMaterial;
 use rand::{rngs::SmallRng, Rng};
 
@@ -8,6 +9,7 @@ use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{AbstractBxDF, BxDF}, color::{samp
 
 pub mod diffuse;
 pub mod conductor;
+pub mod dielectric;
 
 pub trait AbstractMaterial {
     type ConcreteBxDF: AbstractBxDF;
@@ -100,6 +102,7 @@ impl Material {
 pub enum SingleMaterial {
     Diffuse(DiffuseMaterial),
     Conductor(ConductorMaterial),
+    Dielectric(DielectricMaterial),
 }
 
 impl SingleMaterial {
@@ -127,6 +130,13 @@ impl SingleMaterial {
                 cached_spectra,
                 textures,
             )),
+            "dielectric" => SingleMaterial::Dielectric(DielectricMaterial::create(
+                parameters,
+                normal_map,
+                loc,
+                cached_spectra,
+                textures,
+            )),
             _ => panic!("material {} unknown", name),
         }
     }
@@ -144,6 +154,7 @@ impl AbstractMaterial for SingleMaterial {
         match self {
             SingleMaterial::Diffuse(m) => BxDF::Diffuse(m.get_bxdf(tex_eval, ctx, lambda)),
             SingleMaterial::Conductor(m) => BxDF::Conductor(m.get_bxdf(tex_eval, ctx, lambda)),
+            SingleMaterial::Dielectric(m) => BxDF::Dielectric(m.get_bxdf(tex_eval, ctx, lambda)),
         }
     }
 
@@ -156,6 +167,7 @@ impl AbstractMaterial for SingleMaterial {
         match self {
             SingleMaterial::Diffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
             SingleMaterial::Conductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            SingleMaterial::Dielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
         }
     }
 
@@ -168,6 +180,7 @@ impl AbstractMaterial for SingleMaterial {
         match self {
             SingleMaterial::Diffuse(m) => m.get_bssrdf(tex_eval, ctx, lambda),
             SingleMaterial::Conductor(m) => m.get_bssrdf(tex_eval, ctx, lambda),
+            SingleMaterial::Dielectric(m) => m.get_bssrdf(tex_eval, ctx, lambda),
         }
     }
 
@@ -175,6 +188,7 @@ impl AbstractMaterial for SingleMaterial {
         match self {
             SingleMaterial::Diffuse(m) => m.can_evaluate_textures(tex_eval),
             SingleMaterial::Conductor(m) => m.can_evaluate_textures(tex_eval),
+            SingleMaterial::Dielectric(m) => m.can_evaluate_textures(tex_eval),
         }
     }
 
@@ -182,6 +196,7 @@ impl AbstractMaterial for SingleMaterial {
         match self {
             SingleMaterial::Diffuse(m) => m.get_normal_map(),
             SingleMaterial::Conductor(m) => m.get_normal_map(),
+            SingleMaterial::Dielectric(m) => m.get_normal_map(),
         }
     }
 
@@ -189,6 +204,7 @@ impl AbstractMaterial for SingleMaterial {
         match self {
             SingleMaterial::Diffuse(m) => m.get_displacement(),
             SingleMaterial::Conductor(m) => m.get_displacement(),
+            SingleMaterial::Dielectric(m) => m.get_displacement(),
         }
     }
 
@@ -196,6 +212,7 @@ impl AbstractMaterial for SingleMaterial {
         match self {
             SingleMaterial::Diffuse(m) => m.has_subsurface_scattering(),
             SingleMaterial::Conductor(m) => m.has_subsurface_scattering(),
+            SingleMaterial::Dielectric(m) => m.has_subsurface_scattering(),
         }
     }
 }

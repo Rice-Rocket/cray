@@ -1,4 +1,5 @@
 use conductor::ConductorBxDF;
+use dielectric::DielectricBxDF;
 use diffuse::DiffuseBxDF;
 use normalized_fresnel::NormalizedFresnelBxDF;
 
@@ -6,6 +7,7 @@ use crate::{abs_cos_theta, color::sampled::SampledSpectrum, sampling::{sample_un
 
 pub mod diffuse;
 pub mod conductor;
+pub mod dielectric;
 pub mod normalized_fresnel;
 
 pub trait AbstractBxDF {
@@ -94,6 +96,7 @@ pub trait AbstractBxDF {
 pub enum BxDF {
     Diffuse(DiffuseBxDF),
     Conductor(ConductorBxDF),
+    Dielectric(DielectricBxDF),
     NormalizedFresnel(NormalizedFresnelBxDF),
 }
 
@@ -102,6 +105,7 @@ impl AbstractBxDF for BxDF {
         match self {
             BxDF::Diffuse(v) => v.f(wo, wi, mode),
             BxDF::Conductor(v) => v.f(wo, wi, mode),
+            BxDF::Dielectric(v) => v.f(wo, wi, mode),
             BxDF::NormalizedFresnel(v) => v.f(wo, wi, mode),
         }
     }
@@ -117,6 +121,7 @@ impl AbstractBxDF for BxDF {
         match self {
             BxDF::Diffuse(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::Conductor(v) => v.sample_f(wo, uc, u, mode, sample_flags),
+            BxDF::Dielectric(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::NormalizedFresnel(v) => v.sample_f(wo, uc, u, mode, sample_flags),
         }
     }
@@ -131,6 +136,7 @@ impl AbstractBxDF for BxDF {
         match self {
             BxDF::Diffuse(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::Conductor(v) => v.pdf(wo, wi, mode, sample_flags),
+            BxDF::Dielectric(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::NormalizedFresnel(v) => v.pdf(wo, wi, mode, sample_flags),
         }
     }
@@ -139,6 +145,7 @@ impl AbstractBxDF for BxDF {
         match self {
             BxDF::Diffuse(v) => v.flags(),
             BxDF::Conductor(v) => v.flags(),
+            BxDF::Dielectric(v) => v.flags(),
             BxDF::NormalizedFresnel(v) => v.flags(),
         }
     }
@@ -147,6 +154,7 @@ impl AbstractBxDF for BxDF {
         match self {
             BxDF::Diffuse(v) => v.regularize(),
             BxDF::Conductor(v) => v.regularize(),
+            BxDF::Dielectric(v) => v.regularize(),
             BxDF::NormalizedFresnel(v) => v.regularize(),
         }
     }

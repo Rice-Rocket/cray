@@ -1471,13 +1471,23 @@ impl ParserTarget for BasicSceneBuilder {
 
     fn transform(&mut self, transform: [Float; 16], loc: FileLoc) {
         self.graphics_state.for_active_transforms(|t: &mut Transform| {
-            *t = Transform::new_with_inverse(Mat4::from(transform)).transpose();
+            let m = Mat4::from(transform);
+            if let Some(m_inv) = m.try_inverse() {
+                *t = Transform::new(m, m_inv).transpose();
+            } else {
+                panic!("{}: matrix {:?} is not inversible", loc, transform);
+            }
         })
     }
 
     fn concat_transform(&mut self, transform: [Float; 16], loc: FileLoc) {
         self.graphics_state.for_active_transforms(|t: &mut Transform| {
-            *t = t.apply(Transform::new_with_inverse(Mat4::from(transform)).transpose())
+            let m = Mat4::from(transform);
+            if let Some(m_inv) = m.try_inverse() {
+                *t = t.apply(Transform::new(m, m_inv).transpose())
+            } else {
+                panic!("{}: matrix {:?} is not inversible", loc, transform);
+            }
         })
     }
 

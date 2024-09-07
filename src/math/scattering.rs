@@ -7,6 +7,29 @@ pub fn reflect(wo: Vec3f, n: Normal3f) -> Vec3f {
     -wo + 2.0 * wo.dot(n) * n
 }
 
+#[inline]
+pub fn refract(wi: Vec3f, mut n: Normal3f, mut eta: Float) -> Option<(Vec3f, Float)> {
+    let mut cos_theta_i = n.dot(wi);
+    if cos_theta_i < 0.0 {
+        eta = 1.0 / eta;
+        cos_theta_i = -cos_theta_i;
+        n = -n;
+    }
+
+    let sin2_theta_i = Float::max(0.0, 1.0 - sqr(cos_theta_i));
+    let sin2_theta_t = sin2_theta_i / sqr(eta);
+
+    if sin2_theta_t >= 1.0 {
+        return None;
+    }
+
+    let cos_theta_t = Float::sqrt(1.0 - sin2_theta_t);
+
+    let wt = -wi / eta + (cos_theta_i / eta - cos_theta_t) * n;
+    Some((wt, eta))
+}
+
+#[inline]
 pub fn henyey_greenstein(cos_theta: Float, g: Float) -> Float {
     let g = Float::clamp(g, -0.99, 0.99);
     let denom = 1.0 + sqr(g) + 2.0 * g * cos_theta;
@@ -32,6 +55,7 @@ pub fn sample_henyey_greenstein(wo: Vec3f, g: Float, u: Point2f) -> (Float, Vec3
     (pdf, wi)
 }
 
+#[inline]
 pub fn fresnel_moment_1(eta: Float) -> Float {
     let eta2 = eta * eta;
     let eta3 = eta2 * eta;
@@ -47,6 +71,7 @@ pub fn fresnel_moment_1(eta: Float) -> Float {
     }
 }
 
+#[inline]
 pub fn fresnel_moment_2(eta: Float) -> Float {
     let eta2 = eta * eta;
     let eta3 = eta2 * eta;
@@ -66,6 +91,7 @@ pub fn fresnel_moment_2(eta: Float) -> Float {
     }
 }
 
+#[inline]
 pub fn fr_dielectric(mut cos_theta_i: Float, mut eta: Float) -> Float {
     cos_theta_i = cos_theta_i.clamp(-1.0, 1.0);
 
@@ -107,6 +133,29 @@ pub fn fresnel_complex_spectral(cos_theta_i: Float, eta: SampledSpectrum, k: Sam
         s[i] = fresnel_complex(cos_theta_i, Complex::new(eta[i], k[i]));
     }
     SampledSpectrum::new(s)
+}
+
+#[inline]
+pub fn fresnel_dielectric(cos_theta_i: Float, mut eta: Float) -> Float {
+    let mut cos_theta_i = Float::clamp(cos_theta_i, -1.0, 1.0);
+
+    if cos_theta_i < 0.0 {
+        eta = 1.0 / eta;
+        cos_theta_i = -cos_theta_i;
+    }
+
+    let sin2_theta_i = 1.0 - sqr(cos_theta_i);
+    let sin2_theta_t = sin2_theta_i / sqr(eta);
+    if sin2_theta_t >= 1.0 {
+        return 1.0;
+    }
+
+    let cos_theta_t = safe::sqrt(1.0 - sin2_theta_t);
+
+    let r_parl = (eta * cos_theta_i - cos_theta_t) / (eta * cos_theta_i + cos_theta_t);
+    let r_perp = (cos_theta_i - eta * cos_theta_t) / (cos_theta_i + eta * cos_theta_t);
+
+    0.5 * (r_parl * r_parl + r_perp * r_perp)
 }
 
 #[derive(Debug, Clone, Default)]

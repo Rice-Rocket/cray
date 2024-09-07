@@ -138,14 +138,13 @@ impl ImageInfiniteLight {
         log!("Creating image infinite light from file '{}'...", truncate_filename(filename));
 
         let channel_desc = image.get_channel_desc(&["R", "G", "B"]);
-        if channel_desc.is_none(){
+        if channel_desc.is_none() {
             panic!("{} Image used for ImageInfiniteLight doesn't have RGB channels", filename);
         }
         let channel_desc = channel_desc.unwrap();
         assert!(channel_desc.size() == 3);
         assert!(channel_desc.is_identity());
-        if image.resolution().x != image.resolution().y
-        {
+        if image.resolution().x != image.resolution().y {
             panic!("{} Image resolution is non-square; it is unlikely that it is an environment map", filename);
         }
 
@@ -155,16 +154,14 @@ impl ImageInfiniteLight {
 
         let average: Float = d.data.iter().sum::<Float>() / d.data.len() as Float;
         d.data.iter_mut().for_each(|v| *v = Float::max(*v - average, 0.0));
-        if d.data.iter().all(|v| v.is_zero())
-        {
+        if d.data.iter().all(|v| v.is_zero()) {
             d.data.iter_mut().for_each(|v| *v = 1.0 );
         }
         let compensated_distribution = PiecewiseConstant2D::new_from_2d(&d, domain);
 
         clear_log!();
 
-        ImageInfiniteLight
-        {
+        ImageInfiniteLight {
             base,
             image,
             image_color_space,
