@@ -4,12 +4,14 @@ use conductor::ConductorMaterial;
 use dielectric::DielectricMaterial;
 use diffuse::DiffuseMaterial;
 use rand::{rngs::SmallRng, Rng};
+use thin_dielectric::ThinDielectricMaterial;
 
 use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{AbstractBxDF, BxDF}, color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, image::{Image, WrapMode, WrapMode2D}, interaction::SurfaceInteraction, reader::{paramdict::{NamedTextures, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractFloatTexture, AbstractSpectrumTexture, FloatTexture, SpectrumTexture, TextureEvalContext}, Float, Frame, Normal3f, Point2f, Point3f, Vec2f, Vec3f};
 
 pub mod diffuse;
 pub mod conductor;
 pub mod dielectric;
+pub mod thin_dielectric;
 
 pub trait AbstractMaterial {
     type ConcreteBxDF: AbstractBxDF;
@@ -103,6 +105,7 @@ pub enum SingleMaterial {
     Diffuse(DiffuseMaterial),
     Conductor(ConductorMaterial),
     Dielectric(DielectricMaterial),
+    ThinDielectric(ThinDielectricMaterial),
 }
 
 impl SingleMaterial {
@@ -137,6 +140,13 @@ impl SingleMaterial {
                 cached_spectra,
                 textures,
             )),
+            "thindielectric" => SingleMaterial::ThinDielectric(ThinDielectricMaterial::create(
+                parameters,
+                normal_map,
+                loc,
+                cached_spectra,
+                textures,
+            )),
             _ => panic!("material {} unknown", name),
         }
     }
@@ -155,6 +165,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Diffuse(m) => BxDF::Diffuse(m.get_bxdf(tex_eval, ctx, lambda)),
             SingleMaterial::Conductor(m) => BxDF::Conductor(m.get_bxdf(tex_eval, ctx, lambda)),
             SingleMaterial::Dielectric(m) => BxDF::Dielectric(m.get_bxdf(tex_eval, ctx, lambda)),
+            SingleMaterial::ThinDielectric(m) => BxDF::ThinDielectric(m.get_bxdf(tex_eval, ctx, lambda)),
         }
     }
 
@@ -168,6 +179,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Diffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
             SingleMaterial::Conductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
             SingleMaterial::Dielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            SingleMaterial::ThinDielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
         }
     }
 
@@ -181,6 +193,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Diffuse(m) => m.get_bssrdf(tex_eval, ctx, lambda),
             SingleMaterial::Conductor(m) => m.get_bssrdf(tex_eval, ctx, lambda),
             SingleMaterial::Dielectric(m) => m.get_bssrdf(tex_eval, ctx, lambda),
+            SingleMaterial::ThinDielectric(m) => m.get_bssrdf(tex_eval, ctx, lambda),
         }
     }
 
@@ -189,6 +202,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Diffuse(m) => m.can_evaluate_textures(tex_eval),
             SingleMaterial::Conductor(m) => m.can_evaluate_textures(tex_eval),
             SingleMaterial::Dielectric(m) => m.can_evaluate_textures(tex_eval),
+            SingleMaterial::ThinDielectric(m) => m.can_evaluate_textures(tex_eval),
         }
     }
 
@@ -197,6 +211,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Diffuse(m) => m.get_normal_map(),
             SingleMaterial::Conductor(m) => m.get_normal_map(),
             SingleMaterial::Dielectric(m) => m.get_normal_map(),
+            SingleMaterial::ThinDielectric(m) => m.get_normal_map(),
         }
     }
 
@@ -205,6 +220,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Diffuse(m) => m.get_displacement(),
             SingleMaterial::Conductor(m) => m.get_displacement(),
             SingleMaterial::Dielectric(m) => m.get_displacement(),
+            SingleMaterial::ThinDielectric(m) => m.get_displacement(),
         }
     }
 
@@ -213,6 +229,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Diffuse(m) => m.has_subsurface_scattering(),
             SingleMaterial::Conductor(m) => m.has_subsurface_scattering(),
             SingleMaterial::Dielectric(m) => m.has_subsurface_scattering(),
+            SingleMaterial::ThinDielectric(m) => m.has_subsurface_scattering(),
         }
     }
 }
