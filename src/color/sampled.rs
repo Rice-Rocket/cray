@@ -90,6 +90,15 @@ impl SampledSpectrum {
         SampledSpectrum::new(result)
     }
 
+    pub fn sqrt(&self) -> SampledSpectrum {
+        let mut result = [0.0; NUM_SPECTRUM_SAMPLES];
+        for (i, res) in result.iter_mut().enumerate() {
+            *res = self.values[i].sqrt();
+        }
+        debug_assert!(!result.has_nan());
+        SampledSpectrum::new(result)
+    }
+
     pub fn lerp(&self, other: &SampledSpectrum, t: Float) -> SampledSpectrum {
         (1.0 - t) * self + t * other
     }

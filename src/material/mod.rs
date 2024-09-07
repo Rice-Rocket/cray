@@ -1,11 +1,13 @@
 use std::{collections::HashMap, sync::Arc};
 
+use conductor::ConductorMaterial;
 use diffuse::DiffuseMaterial;
 use rand::{rngs::SmallRng, Rng};
 
 use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{AbstractBxDF, BxDF}, color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, image::{Image, WrapMode, WrapMode2D}, interaction::SurfaceInteraction, reader::{paramdict::{NamedTextures, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractFloatTexture, AbstractSpectrumTexture, FloatTexture, SpectrumTexture, TextureEvalContext}, Float, Frame, Normal3f, Point2f, Point3f, Vec2f, Vec3f};
 
 pub mod diffuse;
+pub mod conductor;
 
 pub trait AbstractMaterial {
     type ConcreteBxDF: AbstractBxDF;
@@ -97,6 +99,7 @@ impl Material {
 #[derive(Debug, Clone)]
 pub enum SingleMaterial {
     Diffuse(DiffuseMaterial),
+    Conductor(ConductorMaterial),
 }
 
 impl SingleMaterial {
@@ -117,6 +120,13 @@ impl SingleMaterial {
                 cached_spectra,
                 loc,
             )),
+            "conductor" => SingleMaterial::Conductor(ConductorMaterial::create(
+                parameters,
+                normal_map,
+                loc,
+                cached_spectra,
+                textures,
+            )),
             _ => panic!("material {} unknown", name),
         }
     }
@@ -133,6 +143,7 @@ impl AbstractMaterial for SingleMaterial {
     ) -> Self::ConcreteBxDF {
         match self {
             SingleMaterial::Diffuse(m) => BxDF::Diffuse(m.get_bxdf(tex_eval, ctx, lambda)),
+            SingleMaterial::Conductor(m) => BxDF::Conductor(m.get_bxdf(tex_eval, ctx, lambda)),
         }
     }
 
@@ -144,6 +155,7 @@ impl AbstractMaterial for SingleMaterial {
     ) -> BSDF {
         match self {
             SingleMaterial::Diffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            SingleMaterial::Conductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
         }
     }
 
@@ -155,30 +167,35 @@ impl AbstractMaterial for SingleMaterial {
     ) -> Option<BSSRDF> {
         match self {
             SingleMaterial::Diffuse(m) => m.get_bssrdf(tex_eval, ctx, lambda),
+            SingleMaterial::Conductor(m) => m.get_bssrdf(tex_eval, ctx, lambda),
         }
     }
 
     fn can_evaluate_textures<T: AbstractTextureEvaluator>(&self, tex_eval: &T) -> bool {
         match self {
             SingleMaterial::Diffuse(m) => m.can_evaluate_textures(tex_eval),
+            SingleMaterial::Conductor(m) => m.can_evaluate_textures(tex_eval),
         }
     }
 
     fn get_normal_map(&self) -> Option<Arc<Image>> {
         match self {
             SingleMaterial::Diffuse(m) => m.get_normal_map(),
+            SingleMaterial::Conductor(m) => m.get_normal_map(),
         }
     }
 
     fn get_displacement(&self) -> Option<Arc<FloatTexture>> {
         match self {
             SingleMaterial::Diffuse(m) => m.get_displacement(),
+            SingleMaterial::Conductor(m) => m.get_displacement(),
         }
     }
 
     fn has_subsurface_scattering(&self) -> bool {
         match self {
             SingleMaterial::Diffuse(m) => m.has_subsurface_scattering(),
+            SingleMaterial::Conductor(m) => m.has_subsurface_scattering(),
         }
     }
 }

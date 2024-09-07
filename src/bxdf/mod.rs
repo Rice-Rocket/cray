@@ -1,9 +1,11 @@
+use conductor::ConductorBxDF;
 use diffuse::DiffuseBxDF;
 use normalized_fresnel::NormalizedFresnelBxDF;
 
 use crate::{abs_cos_theta, color::sampled::SampledSpectrum, sampling::{sample_uniform_hemisphere, uniform_hemisphere_pdf}, Float, Point2f, Vec3f, PI};
 
 pub mod diffuse;
+pub mod conductor;
 pub mod normalized_fresnel;
 
 pub trait AbstractBxDF {
@@ -91,6 +93,7 @@ pub trait AbstractBxDF {
 #[derive(Debug, Clone)]
 pub enum BxDF {
     Diffuse(DiffuseBxDF),
+    Conductor(ConductorBxDF),
     NormalizedFresnel(NormalizedFresnelBxDF),
 }
 
@@ -98,6 +101,7 @@ impl AbstractBxDF for BxDF {
     fn f(&self, wo: Vec3f, wi: Vec3f, mode: TransportMode) -> SampledSpectrum {
         match self {
             BxDF::Diffuse(v) => v.f(wo, wi, mode),
+            BxDF::Conductor(v) => v.f(wo, wi, mode),
             BxDF::NormalizedFresnel(v) => v.f(wo, wi, mode),
         }
     }
@@ -112,6 +116,7 @@ impl AbstractBxDF for BxDF {
     ) -> Option<BSDFSample> {
         match self {
             BxDF::Diffuse(v) => v.sample_f(wo, uc, u, mode, sample_flags),
+            BxDF::Conductor(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::NormalizedFresnel(v) => v.sample_f(wo, uc, u, mode, sample_flags),
         }
     }
@@ -125,6 +130,7 @@ impl AbstractBxDF for BxDF {
     ) -> Float {
         match self {
             BxDF::Diffuse(v) => v.pdf(wo, wi, mode, sample_flags),
+            BxDF::Conductor(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::NormalizedFresnel(v) => v.pdf(wo, wi, mode, sample_flags),
         }
     }
@@ -132,6 +138,7 @@ impl AbstractBxDF for BxDF {
     fn flags(&self) -> BxDFFlags {
         match self {
             BxDF::Diffuse(v) => v.flags(),
+            BxDF::Conductor(v) => v.flags(),
             BxDF::NormalizedFresnel(v) => v.flags(),
         }
     }
@@ -139,6 +146,7 @@ impl AbstractBxDF for BxDF {
     fn regularize(&mut self) {
         match self {
             BxDF::Diffuse(v) => v.regularize(),
+            BxDF::Conductor(v) => v.regularize(),
             BxDF::NormalizedFresnel(v) => v.regularize(),
         }
     }

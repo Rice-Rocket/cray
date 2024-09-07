@@ -255,6 +255,7 @@ dependencies = [
  "indicatif",
  "itertools",
  "num",
+ "num-complex",
  "once_cell",
  "ordered-float",
  "pdqselect",
