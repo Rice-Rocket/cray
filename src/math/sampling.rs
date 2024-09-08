@@ -149,6 +149,168 @@ impl PiecewiseConstant2D {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct SummedAreaTable {
+    sum: Vec2D<Float>,
+}
+
+impl SummedAreaTable {
+    pub fn new(values: &Vec2D<Float>) -> SummedAreaTable {
+        let mut sum = Vec2D::from_bounds(values.extent());
+        *sum.get_xy_mut(0, 0) = values.get_xy(0, 0);
+
+        for x in 1..sum.width() {
+            *sum.get_xy_mut(x, 0) = values.get_xy(x, 0) + sum.get_xy(x - 1, 0);
+        }
+        for y in 1..sum.height() {
+            *sum.get_xy_mut(0, y) = values.get_xy(0, y) + sum.get_xy(0, y - 1);
+        }
+
+        for y in 1..sum.height() {
+            for x in 1..sum.width() {
+                *sum.get_xy_mut(x, y) = values.get_xy(x, y) 
+                    + sum.get_xy(x - 1, y) + sum.get_xy(x, y - 1) - sum.get_xy(x - 1, y - 1);
+            }
+        }
+
+        SummedAreaTable { sum }
+    }
+
+    pub fn integral(&self, extent: Bounds2f) -> Float {
+        let s = self.lookup(extent.max.x, extent.max.y)
+            - self.lookup(extent.min.x, extent.max.y)
+            + self.lookup(extent.min.x, extent.min.y)
+            - self.lookup(extent.max.x, extent.min.y);
+        Float::max(s / (self.sum.width() as Float * self.sum.height() as Float), 0.0)
+    }
+
+    fn lookup(&self, mut x: Float, mut y: Float) -> Float {
+        x *= self.sum.width() as Float;
+        y *= self.sum.height() as Float;
+        let x0 = x as i32;
+        let y0 = y as i32;
+
+        let v00 = self.lookup_int(x0, y0);
+        let v10 = self.lookup_int(x0 + 1, y0);
+        let v01 = self.lookup_int(x0, y0 + 1);
+        let v11 = self.lookup_int(x0 + 1, y0 + 1);
+        let dx = x - x.floor();
+        let dy = y - y.floor();
+
+        (1.0 - dx) * (1.0 - dy) * v00
+            + (1.0 - dx) * dy * v01
+            + dx * (1.0 - dy) * v10
+            + dx * dy * v11
+    }
+
+    fn lookup_int(&self, mut x: i32, mut y: i32) -> Float {
+        if x == 0 || y == 0 {
+            return 0.0;
+        }
+
+        x = (x - 1).min(self.sum.width() - 1);
+        y = (y - 1).min(self.sum.height() - 1);
+        self.sum.get_xy(x, y)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WindowedPiecewiseConstant2D {
+    sat: SummedAreaTable,
+    f: Vec2D<Float>,
+}
+
+impl WindowedPiecewiseConstant2D {
+    pub fn new(f: Vec2D<Float>) -> WindowedPiecewiseConstant2D {
+        WindowedPiecewiseConstant2D {
+            sat: SummedAreaTable::new(&f),
+            f,
+        }
+    }
+
+    pub fn sample(&self, u: Point2f, b: Bounds2f, pdf: &mut Float) -> Option<Point2f> {
+        let b_int = self.sat.integral(b);
+
+        if b_int == 0.0 {
+            return None;
+        }
+
+        let px = |x: Float| -> Float {
+            let mut bx = b;
+            bx.max.x = x;
+            self.sat.integral(bx) / b_int
+        };
+
+        let mut p = Point2f::ZERO;
+        p.x = Self::sample_bisection(px, u[0], b.min.x, b.max.x, self.f.width());
+
+        let nx = self.f.width() as Float;
+        let mut b_cond = Bounds2f::new(
+            Point2f::new((p.x * nx).floor() / nx, b.min.y),
+            Point2f::new((p.x * nx).ceil() / nx, b.max.y),
+        );
+
+        if b_cond.min.x == b_cond.max.x {
+            b_cond.max.x += 1.0 / nx;
+        }
+
+        let cond_integral = self.sat.integral(b_cond);
+
+        if cond_integral == 0.0 {
+            return None;
+        }
+
+        let py = |y: Float| -> Float {
+            let mut by = b_cond;
+            by.max.y = y;
+            self.sat.integral(by) / cond_integral
+        };
+
+        p.y = Self::sample_bisection(py, u[1], b.min.y, b.max.y, self.f.height());
+
+        *pdf = self.eval(p) / b_int;
+        Some(p)
+    }
+
+    pub fn pdf(&self, p: Point2f, b: Bounds2f) -> Float {
+        let f_int = self.sat.integral(b);
+        if f_int == 0.0 {
+            return 0.0;
+        }
+
+        self.eval(p) / f_int
+    }
+
+    fn sample_bisection<F>(p: F, u: Float, mut min: Float, mut max: Float, n: i32) -> Float
+    where
+        F: Fn(Float) -> Float
+    {
+        while (n as Float * max).ceil() - (n as Float * min).floor() > 1.0 {
+            debug_assert!(p(min) <= u);
+            debug_assert!(p(max) >= u);
+            let mid = (min + max) / 2.0;
+            
+            if p(mid) > u {
+                max = mid;
+            } else {
+                min = mid;
+            }
+        }
+
+        let t = (u - p(min)) / (p(max) - p(min));
+        Float::clamp(lerp(min, max, t), min, max)
+    }
+
+    fn eval(&self, p: Point2f) -> Float {
+        let pi = Point2i::new(
+            ((p.x * self.f.width() as Float) as i32).min(self.f.width() - 1),
+            ((p.y * self.f.height() as Float) as i32).min(self.f.height() - 1),
+        );
+
+        self.f.get(pi)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SampledGrid<T> {
     values: Vec<T>,

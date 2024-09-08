@@ -36,6 +36,11 @@ where
         &mut self.data[(y * width + x) as usize]
     }
 
+    pub fn get_xy_mut(&mut self, x: i32, y: i32) -> &mut T {
+        let width = self.width();
+        &mut self.data[(y * width + x) as usize]
+    }
+
     pub fn set(&mut self, p: Point2i, val: T) {
         let (x, y) = self.xy(p);
         let width = self.width();

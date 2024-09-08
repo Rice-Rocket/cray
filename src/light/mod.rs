@@ -4,6 +4,7 @@ use diffuse_area::DiffuseAreaLight;
 use image_infinite::ImageInfiniteLight;
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use point::PointLight;
+use portal_image_infinite::PortalImageInfiniteLight;
 use tracing::warn;
 use uniform_infinite::UniformInfiniteLight;
 
@@ -14,6 +15,7 @@ pub mod point;
 pub mod diffuse_area;
 pub mod uniform_infinite;
 pub mod image_infinite;
+pub mod portal_image_infinite;
 
 pub trait AbstractLight {
     fn phi(&self, lambda: &SampledWavelengths) -> SampledSpectrum;
@@ -54,6 +56,7 @@ pub enum Light {
     DiffuseArea(DiffuseAreaLight),
     UniformInfinite(UniformInfiniteLight),
     ImageInfinite(ImageInfiniteLight),
+    PortalImageInfinite(PortalImageInfiniteLight),
 }
 
 impl Light {
@@ -85,7 +88,7 @@ impl Light {
                 );
 
                 let mut scale = parameters.get_one_float("scale", 1.0);
-                let portal = parameters.get_point3f_array("portal");
+                let mut portal = parameters.get_point3f_array("portal");
                 let filename = resolve_filename(
                     options,
                     parameters.get_one_string("filename", "").as_str(),
@@ -206,7 +209,18 @@ impl Light {
                     clear_log!();
 
                     if !portal.is_empty() {
-                        todo!("implement portals");
+                        for p in portal.iter_mut() {
+                            *p = camera_transform.render_from_world_p(*p);
+                        }
+
+                        Light::PortalImageInfinite(PortalImageInfiniteLight::new(
+                            render_from_light,
+                            Arc::new(image),
+                            color_space,
+                            scale,
+                            &filename,
+                            portal,
+                        ))
                     } else {
                         Light::ImageInfinite(ImageInfiniteLight::new(
                             render_from_light,
@@ -255,6 +269,7 @@ impl AbstractLight for Light {
             Light::DiffuseArea(l) => l.phi(lambda),
             Light::UniformInfinite(l) => l.phi(lambda),
             Light::ImageInfinite(l) => l.phi(lambda),
+            Light::PortalImageInfinite(l) => l.phi(lambda),
         }
     }
 
@@ -264,6 +279,7 @@ impl AbstractLight for Light {
             Light::DiffuseArea(l) => l.light_type(),
             Light::UniformInfinite(l) => l.light_type(),
             Light::ImageInfinite(l) => l.light_type(),
+            Light::PortalImageInfinite(l) => l.light_type(),
         }
     }
 
@@ -279,6 +295,7 @@ impl AbstractLight for Light {
             Light::DiffuseArea(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
             Light::UniformInfinite(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
             Light::ImageInfinite(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
+            Light::PortalImageInfinite(l) => l.sample_li(ctx, u, lambda, allow_incomplete_pdf),
         }
     }
 
@@ -288,6 +305,7 @@ impl AbstractLight for Light {
             Light::DiffuseArea(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
             Light::UniformInfinite(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
             Light::ImageInfinite(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
+            Light::PortalImageInfinite(l) => l.pdf_li(ctx, wi, allow_incomplete_pdf),
         }
     }
 
@@ -304,6 +322,7 @@ impl AbstractLight for Light {
             Light::DiffuseArea(l) => l.l(p, n, uv, w, lambda),
             Light::UniformInfinite(l) => l.l(p, n, uv, w, lambda),
             Light::ImageInfinite(l) => l.l(p, n, uv, w, lambda),
+            Light::PortalImageInfinite(l) => l.l(p, n, uv, w, lambda),
         }
     }
 
@@ -313,6 +332,7 @@ impl AbstractLight for Light {
             Light::DiffuseArea(l) => l.le(ray, lambda),
             Light::UniformInfinite(l) => l.le(ray, lambda),
             Light::ImageInfinite(l) => l.le(ray, lambda),
+            Light::PortalImageInfinite(l) => l.le(ray, lambda),
         }
     }
 
@@ -322,6 +342,7 @@ impl AbstractLight for Light {
             Light::DiffuseArea(l) => l.preprocess(scene_bounds),
             Light::UniformInfinite(l) => l.preprocess(scene_bounds),
             Light::ImageInfinite(l) => l.preprocess(scene_bounds),
+            Light::PortalImageInfinite(l) => l.preprocess(scene_bounds),
         }
     }
 
@@ -331,6 +352,7 @@ impl AbstractLight for Light {
             Light::DiffuseArea(l) => l.bounds(),
             Light::UniformInfinite(l) => l.bounds(),
             Light::ImageInfinite(l) => l.bounds(),
+            Light::PortalImageInfinite(l) => l.bounds(),
         }
     }
 }

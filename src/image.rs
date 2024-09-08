@@ -391,9 +391,9 @@ impl Image {
                 }
             }
         } else {
-            for y in extent.min.y..extent.max.y {
-                for x in 0..nx {
-                    let p = Point2i::new(extent.min.x + x, y);
+            for y in intersection.min.y..intersection.max.y {
+                for x in intersection.min.x..intersection.max.x {
+                    let p = Point2i::new(x, y);
                     assert!(wrap_mode.remap(p, self.resolution).is_some());
                     let mut offset = self.pixel_offset(p);
                     for _c in 0..nc {
@@ -630,11 +630,11 @@ impl Image {
         let mut wt = vec![ResampleWeight::default(); new_res];
         let filter_radius = 2.0;
         let tau = 2.0;
-        for (i, w) in wt.iter_mut().enumerate().take(new_res) {
+        for (i, w) in wt.iter_mut().enumerate() {
             let center = (i as Float + 0.5) * old_res as Float / new_res as Float;
             w.first_pixel = ((center - filter_radius + 0.5).floor() as i32).max(0);
             for j in 0..4 {
-                let pos = w.first_pixel as Float + 0.5;
+                let pos = w.first_pixel as Float + j as Float + 0.5;
                 w.weight[j] = windowed_sinc(pos - center, filter_radius, tau);
             }
 
@@ -642,8 +642,6 @@ impl Image {
             for j in 0..4 {
                 w.weight[j] *= inv_sum_wts;
             }
-        }
-        for i in 0..new_res {
         }
 
         wt
@@ -665,24 +663,34 @@ impl Image {
 
         assert!(image.data.format().is_32bit());
 
-        let n_levels = 1 + ((i32::max(image.resolution.x, image.resolution.y) as Float).log2() as i32);
+        let n_levels = 1 + (image.resolution.x.max(image.resolution.y)).ilog2();
         let mut pyramid = Vec::with_capacity(n_levels as usize);
 
         for i in 0..(n_levels - 1) {
             pyramid.push(Image::new(orig_format, image.resolution, &image.channel_names, orig_encoding.clone()));
 
             let next_resolution = Point2i::new(
-                i32::max(1, (image.resolution.x + 1) / 2),
-                i32::max(1, (image.resolution.y + 1) / 2),
+                i32::max(1, image.resolution.x / 2),
+                i32::max(1, image.resolution.y / 2),
             );
             let mut next_image = Image::new(image.data.format(), next_resolution, &image.channel_names, orig_encoding.clone());
 
-            let src_deltas = [
+            let mut src_deltas = [
                 0,
                 n_channels,
                 n_channels * image.resolution.x as usize,
                 n_channels * (image.resolution.x as usize + 1),
             ];
+
+            if image.resolution.x == 1 {
+                src_deltas[1] = 0;
+                src_deltas[3] -= n_channels;
+            }
+
+            if image.resolution.y == 1 {
+                src_deltas[2] = 0;
+                src_deltas[3] -= n_channels * image.resolution.x as usize;
+            }
 
             (0..next_resolution.y).for_each(|y| {
                 let mut src_offset = image.pixel_offset(Point2i::new(0, 2 * y));

@@ -427,7 +427,7 @@ impl ParameterDictionary {
                 | Point2fParam::TYPE_NAME
                 | Vec2fParam::TYPE_NAME
                 | Point3fParam::TYPE_NAME
-                | Vec2fParam::TYPE_NAME
+                | Vec3fParam::TYPE_NAME
                 | Normal3fParam::TYPE_NAME
                 | "rgb"
                 | "blackbody" => {
@@ -451,8 +451,8 @@ impl ParameterDictionary {
                         panic!("{} Expecting string or numeric-valued parameter for spectrum parameter.", p.loc)
                     }
                 }
-                _ => {
-                    panic!("{} Unknown parameter type!", p.loc)
+                param => {
+                    panic!("{} Unknown parameter type {}", p.loc, param)
                 }
             }
         }
