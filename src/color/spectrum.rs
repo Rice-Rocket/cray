@@ -5,7 +5,7 @@ use tracing::warn;
 
 use crate::{color::cie::CIE_Y_INTEGRAL, file::read_float_file, math::*};
 
-use super::{cie::{Cie, NUM_CIES_SAMPLES}, colorspace::RgbColorSpace, named_spectrum::{NamedSpectrum, CIE_S0, CIE_S1, CIE_S2, CIE_S_LAMBDA}, rgb_xyz::{Rgb, RgbSigmoidPolynomial}, sampled::{SampledSpectrum, NUM_SPECTRUM_SAMPLES}, wavelengths::SampledWavelengths};
+use super::{cie::{Cie, NUM_CIES_SAMPLES}, colorspace::RgbColorSpace, named_spectrum::{NamedSpectrum, CIE_S0, CIE_S1, CIE_S2, CIE_S_LAMBDA}, rgb_xyz::{Rgb, RgbSigmoidPolynomial, Xyz}, sampled::{SampledSpectrum, NUM_SPECTRUM_SAMPLES}, wavelengths::SampledWavelengths};
 
 /// Minimum wavelength of visible light. Nanometers
 pub const LAMBDA_MIN: Float = 360.0;
@@ -584,4 +584,12 @@ pub fn spectrum_to_photometric(mut s: &Spectrum) -> Float {
     }
 
     y
+}
+
+pub fn spectrum_to_xyz(mut s: &Spectrum) -> Xyz {
+    Xyz::new(
+        inner_product(Spectrum::get_cie(Cie::X), s),
+        inner_product(Spectrum::get_cie(Cie::Y), s),
+        inner_product(Spectrum::get_cie(Cie::Z), s),
+    ) / CIE_Y_INTEGRAL
 }

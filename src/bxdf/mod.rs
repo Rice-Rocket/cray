@@ -1,6 +1,7 @@
 use conductor::ConductorBxDF;
 use dielectric::DielectricBxDF;
 use diffuse::DiffuseBxDF;
+use layered::{CoatedConductorBxDF, CoatedDiffuseBxDF};
 use normalized_fresnel::NormalizedFresnelBxDF;
 use thin_dielectric::ThinDielectricBxDF;
 
@@ -11,6 +12,7 @@ pub mod conductor;
 pub mod dielectric;
 pub mod normalized_fresnel;
 pub mod thin_dielectric;
+pub mod layered;
 
 pub trait AbstractBxDF {
     fn f(&self, wo: Vec3f, wi: Vec3f, mode: TransportMode) -> SampledSpectrum;
@@ -100,6 +102,8 @@ pub enum BxDF {
     Conductor(ConductorBxDF),
     Dielectric(DielectricBxDF),
     ThinDielectric(ThinDielectricBxDF),
+    CoatedDiffuse(CoatedDiffuseBxDF),
+    CoatedConductor(CoatedConductorBxDF),
     NormalizedFresnel(NormalizedFresnelBxDF),
 }
 
@@ -110,6 +114,8 @@ impl AbstractBxDF for BxDF {
             BxDF::Conductor(v) => v.f(wo, wi, mode),
             BxDF::Dielectric(v) => v.f(wo, wi, mode),
             BxDF::ThinDielectric(v) => v.f(wo, wi, mode),
+            BxDF::CoatedDiffuse(v) => v.f(wo, wi, mode),
+            BxDF::CoatedConductor(v) => v.f(wo, wi, mode),
             BxDF::NormalizedFresnel(v) => v.f(wo, wi, mode),
         }
     }
@@ -127,6 +133,8 @@ impl AbstractBxDF for BxDF {
             BxDF::Conductor(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::Dielectric(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::ThinDielectric(v) => v.sample_f(wo, uc, u, mode, sample_flags),
+            BxDF::CoatedDiffuse(v) => v.sample_f(wo, uc, u, mode, sample_flags),
+            BxDF::CoatedConductor(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::NormalizedFresnel(v) => v.sample_f(wo, uc, u, mode, sample_flags),
         }
     }
@@ -143,6 +151,8 @@ impl AbstractBxDF for BxDF {
             BxDF::Conductor(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::Dielectric(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::ThinDielectric(v) => v.pdf(wo, wi, mode, sample_flags),
+            BxDF::CoatedDiffuse(v) => v.pdf(wo, wi, mode, sample_flags),
+            BxDF::CoatedConductor(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::NormalizedFresnel(v) => v.pdf(wo, wi, mode, sample_flags),
         }
     }
@@ -153,6 +163,8 @@ impl AbstractBxDF for BxDF {
             BxDF::Conductor(v) => v.flags(),
             BxDF::Dielectric(v) => v.flags(),
             BxDF::ThinDielectric(v) => v.flags(),
+            BxDF::CoatedDiffuse(v) => v.flags(),
+            BxDF::CoatedConductor(v) => v.flags(),
             BxDF::NormalizedFresnel(v) => v.flags(),
         }
     }
@@ -163,6 +175,8 @@ impl AbstractBxDF for BxDF {
             BxDF::Conductor(v) => v.regularize(),
             BxDF::Dielectric(v) => v.regularize(),
             BxDF::ThinDielectric(v) => v.regularize(),
+            BxDF::CoatedDiffuse(v) => v.regularize(),
+            BxDF::CoatedConductor(v) => v.regularize(),
             BxDF::NormalizedFresnel(v) => v.regularize(),
         }
     }

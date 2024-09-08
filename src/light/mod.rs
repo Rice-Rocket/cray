@@ -4,9 +4,10 @@ use diffuse_area::DiffuseAreaLight;
 use image_infinite::ImageInfiniteLight;
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use point::PointLight;
+use tracing::warn;
 use uniform_infinite::UniformInfiniteLight;
 
-use crate::{bounds::Union, camera::CameraTransform, clear_log, color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, cos_theta, equal_area_square_to_sphere, file::resolve_filename, image::Image, interaction::{Interaction, SurfaceInteraction}, log, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc, utils::truncate_filename}, safe, shape::Shape, sqr, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Dot, Float, Normal3f, Point2f, Point2i, Point3f, Point3fi, Ray, Vec2f, Vec3f, PI};
+use crate::{bounds::Union, camera::CameraTransform, clear_log, color::{colorspace::{NamedColorSpace, RgbColorSpace}, sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, spectrum_to_xyz, DenselySampledSpectrum, RgbIlluminantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, cos_theta, equal_area_square_to_sphere, file::resolve_filename, image::{Image, ImageAndMetadata, ImageMetadata, PixelFormat}, interaction::{Interaction, SurfaceInteraction}, log, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc, utils::truncate_filename}, safe, shape::Shape, sqr, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Dot, Float, Normal3f, Point2f, Point2i, Point3f, Point3fi, Ray, Vec2f, Vec3f, PI};
 
 pub mod sampler;
 pub mod point;
@@ -122,7 +123,31 @@ impl Light {
                     ))
                 } else {
                     let image_and_metadata = if filename.is_empty() {
-                        todo!("implement empty filename case");
+                        if let Spectrum::RgbIlluminant(_) = l[0].as_ref() {} else {
+                            warn!("{}: Converting non-RGB 'L' parameter to RGB so that image infinite light can be used", loc);
+                        };
+
+                        let xyz = spectrum_to_xyz(&l[0]);
+                        let rgb = RgbColorSpace::get_named(NamedColorSpace::SRgb).to_rgb(&xyz);
+
+                        let mut im = ImageAndMetadata {
+                            image: Image::new(
+                                PixelFormat::Float32,
+                                Point2i::new(1, 1),
+                                &["R".to_string(), "G".to_string(), "B".to_string()],
+                                None,
+                            ),
+                            metadata: ImageMetadata {
+                                color_space: Some(RgbColorSpace::get_named(NamedColorSpace::SRgb).clone()),
+                                ..Default::default()
+                            },
+                        };
+
+                        for c in 0..3 {
+                            im.image.set_channel(Point2i::new(0, 0), c, rgb[c]);
+                        }
+
+                        im
                     } else {
                         let image_and_metadata = Image::read(&PathBuf::from(&filename), None).unwrap();
                         for y in 0..image_and_metadata.image.resolution().y {

@@ -1,5 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
+use coated_conductor::CoatedConductorMaterial;
+use coated_diffuse::CoatedDiffuseMaterial;
 use conductor::ConductorMaterial;
 use dielectric::DielectricMaterial;
 use diffuse::DiffuseMaterial;
@@ -12,6 +14,8 @@ pub mod diffuse;
 pub mod conductor;
 pub mod dielectric;
 pub mod thin_dielectric;
+pub mod coated_diffuse;
+pub mod coated_conductor;
 
 pub trait AbstractMaterial {
     type ConcreteBxDF: AbstractBxDF;
@@ -106,6 +110,8 @@ pub enum SingleMaterial {
     Conductor(ConductorMaterial),
     Dielectric(DielectricMaterial),
     ThinDielectric(ThinDielectricMaterial),
+    CoatedDiffuse(CoatedDiffuseMaterial),
+    CoatedConductor(CoatedConductorMaterial),
 }
 
 impl SingleMaterial {
@@ -147,6 +153,20 @@ impl SingleMaterial {
                 cached_spectra,
                 textures,
             )),
+            "coateddiffuse" => SingleMaterial::CoatedDiffuse(CoatedDiffuseMaterial::create(
+                parameters,
+                normal_map,
+                loc,
+                cached_spectra,
+                textures,
+            )),
+            "coatedconductor" => SingleMaterial::CoatedConductor(CoatedConductorMaterial::create(
+                parameters,
+                normal_map,
+                loc,
+                cached_spectra,
+                textures,
+            )),
             _ => panic!("material {} unknown", name),
         }
     }
@@ -166,6 +186,8 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Conductor(m) => BxDF::Conductor(m.get_bxdf(tex_eval, ctx, lambda)),
             SingleMaterial::Dielectric(m) => BxDF::Dielectric(m.get_bxdf(tex_eval, ctx, lambda)),
             SingleMaterial::ThinDielectric(m) => BxDF::ThinDielectric(m.get_bxdf(tex_eval, ctx, lambda)),
+            SingleMaterial::CoatedDiffuse(m) => BxDF::CoatedDiffuse(m.get_bxdf(tex_eval, ctx, lambda)),
+            SingleMaterial::CoatedConductor(m) => BxDF::CoatedConductor(m.get_bxdf(tex_eval, ctx, lambda)),
         }
     }
 
@@ -180,6 +202,8 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Conductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
             SingleMaterial::Dielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
             SingleMaterial::ThinDielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            SingleMaterial::CoatedDiffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            SingleMaterial::CoatedConductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
         }
     }
 
@@ -194,6 +218,8 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Conductor(m) => m.get_bssrdf(tex_eval, ctx, lambda),
             SingleMaterial::Dielectric(m) => m.get_bssrdf(tex_eval, ctx, lambda),
             SingleMaterial::ThinDielectric(m) => m.get_bssrdf(tex_eval, ctx, lambda),
+            SingleMaterial::CoatedDiffuse(m) => m.get_bssrdf(tex_eval, ctx, lambda),
+            SingleMaterial::CoatedConductor(m) => m.get_bssrdf(tex_eval, ctx, lambda),
         }
     }
 
@@ -203,6 +229,8 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Conductor(m) => m.can_evaluate_textures(tex_eval),
             SingleMaterial::Dielectric(m) => m.can_evaluate_textures(tex_eval),
             SingleMaterial::ThinDielectric(m) => m.can_evaluate_textures(tex_eval),
+            SingleMaterial::CoatedDiffuse(m) => m.can_evaluate_textures(tex_eval),
+            SingleMaterial::CoatedConductor(m) => m.can_evaluate_textures(tex_eval),
         }
     }
 
@@ -212,6 +240,8 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Conductor(m) => m.get_normal_map(),
             SingleMaterial::Dielectric(m) => m.get_normal_map(),
             SingleMaterial::ThinDielectric(m) => m.get_normal_map(),
+            SingleMaterial::CoatedDiffuse(m) => m.get_normal_map(),
+            SingleMaterial::CoatedConductor(m) => m.get_normal_map(),
         }
     }
 
@@ -221,6 +251,8 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Conductor(m) => m.get_displacement(),
             SingleMaterial::Dielectric(m) => m.get_displacement(),
             SingleMaterial::ThinDielectric(m) => m.get_displacement(),
+            SingleMaterial::CoatedDiffuse(m) => m.get_displacement(),
+            SingleMaterial::CoatedConductor(m) => m.get_displacement(),
         }
     }
 
@@ -230,6 +262,8 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::Conductor(m) => m.has_subsurface_scattering(),
             SingleMaterial::Dielectric(m) => m.has_subsurface_scattering(),
             SingleMaterial::ThinDielectric(m) => m.has_subsurface_scattering(),
+            SingleMaterial::CoatedDiffuse(m) => m.has_subsurface_scattering(),
+            SingleMaterial::CoatedConductor(m) => m.has_subsurface_scattering(),
         }
     }
 }
