@@ -1,6 +1,7 @@
 use conductor::ConductorBxDF;
 use dielectric::DielectricBxDF;
 use diffuse::DiffuseBxDF;
+use diffuse_transmission::DiffuseTransmissionBxDF;
 use layered::{CoatedConductorBxDF, CoatedDiffuseBxDF};
 use normalized_fresnel::NormalizedFresnelBxDF;
 use thin_dielectric::ThinDielectricBxDF;
@@ -8,6 +9,7 @@ use thin_dielectric::ThinDielectricBxDF;
 use crate::{abs_cos_theta, color::sampled::SampledSpectrum, sampling::{sample_uniform_hemisphere, uniform_hemisphere_pdf}, Float, Point2f, Vec3f, PI};
 
 pub mod diffuse;
+pub mod diffuse_transmission;
 pub mod conductor;
 pub mod dielectric;
 pub mod normalized_fresnel;
@@ -99,6 +101,7 @@ pub trait AbstractBxDF {
 #[derive(Debug, Clone)]
 pub enum BxDF {
     Diffuse(DiffuseBxDF),
+    DiffuseTransmission(DiffuseTransmissionBxDF),
     Conductor(ConductorBxDF),
     Dielectric(DielectricBxDF),
     ThinDielectric(ThinDielectricBxDF),
@@ -111,6 +114,7 @@ impl AbstractBxDF for BxDF {
     fn f(&self, wo: Vec3f, wi: Vec3f, mode: TransportMode) -> SampledSpectrum {
         match self {
             BxDF::Diffuse(v) => v.f(wo, wi, mode),
+            BxDF::DiffuseTransmission(v) => v.f(wo, wi, mode),
             BxDF::Conductor(v) => v.f(wo, wi, mode),
             BxDF::Dielectric(v) => v.f(wo, wi, mode),
             BxDF::ThinDielectric(v) => v.f(wo, wi, mode),
@@ -130,6 +134,7 @@ impl AbstractBxDF for BxDF {
     ) -> Option<BSDFSample> {
         match self {
             BxDF::Diffuse(v) => v.sample_f(wo, uc, u, mode, sample_flags),
+            BxDF::DiffuseTransmission(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::Conductor(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::Dielectric(v) => v.sample_f(wo, uc, u, mode, sample_flags),
             BxDF::ThinDielectric(v) => v.sample_f(wo, uc, u, mode, sample_flags),
@@ -148,6 +153,7 @@ impl AbstractBxDF for BxDF {
     ) -> Float {
         match self {
             BxDF::Diffuse(v) => v.pdf(wo, wi, mode, sample_flags),
+            BxDF::DiffuseTransmission(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::Conductor(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::Dielectric(v) => v.pdf(wo, wi, mode, sample_flags),
             BxDF::ThinDielectric(v) => v.pdf(wo, wi, mode, sample_flags),
@@ -160,6 +166,7 @@ impl AbstractBxDF for BxDF {
     fn flags(&self) -> BxDFFlags {
         match self {
             BxDF::Diffuse(v) => v.flags(),
+            BxDF::DiffuseTransmission(v) => v.flags(),
             BxDF::Conductor(v) => v.flags(),
             BxDF::Dielectric(v) => v.flags(),
             BxDF::ThinDielectric(v) => v.flags(),
@@ -172,6 +179,7 @@ impl AbstractBxDF for BxDF {
     fn regularize(&mut self) {
         match self {
             BxDF::Diffuse(v) => v.regularize(),
+            BxDF::DiffuseTransmission(v) => v.regularize(),
             BxDF::Conductor(v) => v.regularize(),
             BxDF::Dielectric(v) => v.regularize(),
             BxDF::ThinDielectric(v) => v.regularize(),

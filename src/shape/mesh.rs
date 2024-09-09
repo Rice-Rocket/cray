@@ -206,8 +206,8 @@ impl TriQuadMesh {
                 debug_assert!(f.face_indices.is_empty());
                 quad_indices.push(f.vertex_indices[0]);
                 quad_indices.push(f.vertex_indices[1]);
-                quad_indices.push(f.vertex_indices[2]);
                 quad_indices.push(f.vertex_indices[3]);
+                quad_indices.push(f.vertex_indices[2]);
             } else if f.face_indices.is_empty() {
                 panic!("Only tris and quads are supported");
             }

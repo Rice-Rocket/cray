@@ -458,7 +458,7 @@ impl DebugIntegrator {
         aggregate: Arc<Primitive>,
         lights: Arc<[Arc<Light>]>,
     ) -> DebugIntegrator {
-        let show_normals = parameters.get_one_bool("normals", false);
+        let show_normals = parameters.get_one_bool("normals", true);
         let Film::Debug(_) = camera.get_film().as_ref() else {
             panic!("debug integrator must be used with debug film");
         };

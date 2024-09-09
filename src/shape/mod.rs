@@ -129,6 +129,7 @@ impl Shape {
                     let patches = BilinearPatch::create_patches(quad_mesh);
                     tri_quad_shapes.extend(patches);
                 }
+
                 tri_quad_shapes
             },
             _ => panic!("unknown shape {}", name),

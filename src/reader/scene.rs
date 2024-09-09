@@ -3,7 +3,7 @@ use std::{collections::{HashMap, HashSet}, ops::{Index, IndexMut}, path::{Path, 
 use string_interner::{symbol::SymbolU32, DefaultBackend, StringInterner};
 use tracing::{info, warn};
 
-use crate::{camera::{film::{AbstractFilm, Film}, filter::Filter, AbstractCamera, Camera, CameraTransform}, color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{ColorEncoding, ColorEncodingCache}, spectrum::Spectrum}, file::resolve_filename, image::Image, integrator::{AbstractIntegrator, Integrator}, light::Light, material::Material, media::{Medium, MediumInterface}, mipmap::MIPMap, options::{CameraRenderingSpace, Options}, primitive::{bvh::{create_accelerator, BvhAggregate, BvhSplitMethod}, geometric::GeometricPrimitive, simple::SimplePrimitive, transformed::TransformedPrimitive, Primitive}, sampler::Sampler, shape::Shape, texture::{FloatConstantTexture, FloatTexture, SpectrumTexture, TexInfo}, transform::{ApplyTransform, Transform}, Float, Mat4, Point3f, Vec3f};
+use crate::{camera::{film::{AbstractFilm, Film}, filter::Filter, AbstractCamera, Camera, CameraTransform}, clear_log, color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{ColorEncoding, ColorEncodingCache}, spectrum::Spectrum}, file::resolve_filename, image::Image, integrator::{AbstractIntegrator, Integrator}, light::Light, log, material::Material, media::{Medium, MediumInterface}, mipmap::MIPMap, options::{CameraRenderingSpace, Options}, primitive::{bvh::{create_accelerator, BvhAggregate, BvhSplitMethod}, geometric::GeometricPrimitive, simple::SimplePrimitive, transformed::TransformedPrimitive, Primitive}, sampler::Sampler, shape::Shape, texture::{FloatConstantTexture, FloatTexture, SpectrumTexture, TexInfo}, transform::{ApplyTransform, Transform}, Float, Mat4, Point3f, Vec3f};
 
 use super::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::{FileLoc, ParsedParameterVector, ParserTarget}, utils::normalize_arg};
 
@@ -800,16 +800,16 @@ impl BasicScene {
                 primitives
             };
 
-        info!("Starting shapes");
+        log!("Creating shapes...");
         let mut primitives = create_primitives_for_shapes(&mut self.shapes);
 
         self.shapes.clear();
         self.shapes.shrink_to_fit();
 
         // TODO: Animated shapes, when added.
-        info!("Finished shapes");
+        clear_log!();
 
-        info!("Starting instances");
+        log!("Creating instances...");
         // TODO: Can we use a SymbolU32 here for the key instead of String?
         let mut instance_definitions: HashMap<String, Option<Arc<Primitive>>> = HashMap::new();
         for inst in &mut self.instance_definitions {
@@ -863,9 +863,9 @@ impl BasicScene {
         self.instances.clear();
         self.instances.shrink_to_fit();
 
-        info!("Finished instances");
+        clear_log!();
 
-        info!("Starting top-level accelerator");
+        log!("Creating top-level accelerator...");
         let aggregate = Arc::new(create_accelerator(
             string_interner
                 .resolve(self.accelerator.as_ref().unwrap().name)
@@ -873,7 +873,7 @@ impl BasicScene {
             primitives,
             &mut self.accelerator.as_mut().unwrap().parameters,
         ));
-        info!("Finished top-level accelerator");
+        clear_log!();
 
         aggregate
     }
@@ -1561,7 +1561,7 @@ impl ParserTarget for BasicSceneBuilder {
     ) {
         let dict = ParameterDictionary::new(params, self.graphics_state.color_space.clone());
         // TODO: verify options
-        self.film = SceneEntity::new(name, loc, dict, string_interner);
+        self.accelerator = SceneEntity::new(name, loc, dict, string_interner);
     }
 
     fn integrator(
