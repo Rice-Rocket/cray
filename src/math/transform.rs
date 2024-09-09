@@ -595,7 +595,7 @@ impl ApplyTransform<Transform> for Transform {
     fn apply(&self, rhs: Transform) -> Transform {
         Transform {
             m: self.m * rhs.m,
-            m_inv: self.m_inv * rhs.m_inv,
+            m_inv: rhs.m_inv * self.m_inv,
         }
     }
 }

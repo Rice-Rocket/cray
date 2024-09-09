@@ -391,9 +391,7 @@ impl ImageTileIntegrator {
         let mut lambda = camera.get_film().sample_wavelengths(lu);
         let res = camera.get_film().full_resolution();
 
-        // TODO: The source of the issue is probably somewhere else, find it
-        // Issue is with screen space, camera says its -1 to 1 so here we account for that
-        let camera_sample = get_camera_sample(sampler, p_pixel - res / 2, camera.get_film().get_filter(), options);
+        let camera_sample = get_camera_sample(sampler, p_pixel, camera.get_film().get_filter(), options);
         let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
 
         let l = if let Some(mut camera_ray) = camera_ray {
