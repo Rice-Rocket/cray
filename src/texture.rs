@@ -8,11 +8,11 @@ pub trait AbstractFloatTexture {
 
 #[derive(Debug)]
 pub struct ImageTextureBase {
-    mapping: TextureMapping2D,
+    pub(crate) mapping: TextureMapping2D,
     filename: String,
-    scale: Float,
-    invert: bool,
-    mipmap: Arc<MIPMap>,
+    pub(crate) scale: Float,
+    pub(crate) invert: bool,
+    pub(crate) mipmap: Arc<MIPMap>,
 }
 
 impl ImageTextureBase {
@@ -653,8 +653,8 @@ impl AbstractSpectrumTexture for SpectrumDirectionMixTexture {
 
 #[derive(Debug)]
 pub struct SpectrumImageTexture {
-    base: ImageTextureBase,
-    spectrum_type: SpectrumType,
+    pub(crate) base: ImageTextureBase,
+    pub(crate) spectrum_type: SpectrumType,
 }
 
 impl SpectrumImageTexture {
@@ -851,7 +851,7 @@ impl AbstractTextureMapping2D for UVMapping {
         let dtdx = self.sv * ctx.dvdx;
         let dtdy = self.sv * ctx.dvdy;
 
-        let st = Point2f::new(self.su * ctx.uv[0] + self.du, self.sv * ctx.uv[1] * self.dv);
+        let st = Point2f::new(self.su * ctx.uv[0] + self.du, self.sv * ctx.uv[1] + self.dv);
         TexCoord2D {
             st,
             dsdx,

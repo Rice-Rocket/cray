@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{diffuse::DiffuseBxDF, BxDF}, color::{rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture}};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{diffuse::DiffuseBxDF, BxDF}, color::{rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractTextureMapping2D, FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Vec2f};
 
 use super::{AbstractMaterial, AbstractTextureEvaluator, MaterialEvalContext};
 
@@ -8,7 +8,16 @@ use super::{AbstractMaterial, AbstractTextureEvaluator, MaterialEvalContext};
 pub enum DebugMaterialMode {
     Normal,
     Position,
-    UV,
+    Wo,
+    NormalShading,
+    Dpdus,
+    Dpdx,
+    Dpdy,
+    Dudxy,
+    Dvdxy,
+    Uv,
+    St,
+    Texture,
 }
 
 #[derive(Debug, Clone)]
@@ -48,7 +57,16 @@ impl DebugMaterial {
         let mode = match parameters.get_one_string("mode", "normal").as_str() {
             "normal" => DebugMaterialMode::Normal,
             "position" => DebugMaterialMode::Position,
-            "uv" => DebugMaterialMode::UV,
+            "uv" => DebugMaterialMode::Uv,
+            "wo" => DebugMaterialMode::Wo,
+            "ns" => DebugMaterialMode::NormalShading,
+            "dpdus" => DebugMaterialMode::Dpdus,
+            "dpdx" => DebugMaterialMode::Dpdx,
+            "dpdy" => DebugMaterialMode::Dpdy,
+            "dudxy" => DebugMaterialMode::Dudxy,
+            "dvdxy" => DebugMaterialMode::Dvdxy,
+            "st" => DebugMaterialMode::St,
+            "texture" => DebugMaterialMode::Texture,
             s => panic!("unknown debug material mode {}", s),
         };
 
@@ -73,7 +91,35 @@ impl DebugMaterial {
         match self.mode {
             DebugMaterialMode::Normal => Rgb::new(ctx.tex_ctx.n.x, ctx.tex_ctx.n.y, ctx.tex_ctx.n.z),
             DebugMaterialMode::Position => Rgb::new(ctx.tex_ctx.p.x, ctx.tex_ctx.p.y, ctx.tex_ctx.p.z),
-            DebugMaterialMode::UV => Rgb::new(ctx.tex_ctx.uv.x, ctx.tex_ctx.uv.y, 0.0),
+            DebugMaterialMode::Uv => Rgb::new(ctx.tex_ctx.uv.x, ctx.tex_ctx.uv.y, 0.0),
+            DebugMaterialMode::Wo => Rgb::new(ctx.wo.x, ctx.wo.y, ctx.wo.z),
+            DebugMaterialMode::NormalShading => Rgb::new(ctx.ns.x, ctx.ns.y, ctx.ns.z),
+            DebugMaterialMode::Dpdus => Rgb::new(ctx.dpdus.x, ctx.dpdus.y, ctx.dpdus.z),
+            DebugMaterialMode::Dpdx => Rgb::new(ctx.tex_ctx.dpdx.x, ctx.tex_ctx.dpdx.y, ctx.tex_ctx.dpdx.z),
+            DebugMaterialMode::Dpdy => Rgb::new(ctx.tex_ctx.dpdy.x, ctx.tex_ctx.dpdy.y, ctx.tex_ctx.dpdy.z),
+            DebugMaterialMode::Dudxy => Rgb::new(ctx.tex_ctx.dudx, ctx.tex_ctx.dudy, 0.0),
+            DebugMaterialMode::Dvdxy => Rgb::new(ctx.tex_ctx.dvdx, ctx.tex_ctx.dvdy, 0.0),
+            DebugMaterialMode::St => {
+                if let SpectrumTexture::Image(imt) = self.color.as_ref() {
+                    let mut c = imt.base.mapping.map(&ctx.tex_ctx);
+                    c.st[1] = 1.0 - c.st[1];
+
+                    Rgb::new(c.st.x, c.st.y, 0.0)
+                } else {
+                    Rgb::new(0.0, 0.0, 0.0)
+                }
+            },
+            DebugMaterialMode::Texture => {
+                if let SpectrumTexture::Image(imt) = self.color.as_ref() {
+                    let mut c = imt.base.mapping.map(&ctx.tex_ctx);
+                    c.st[1] = 1.0 - c.st[1];
+
+                    let rgb = imt.base.mipmap.filter::<Rgb>(c.st, Vec2f::new(c.dsdx, c.dtdx), Vec2f::new(c.dsdy, c.dtdy)) * imt.base.scale;
+                    rgb.clamp_zero()
+                } else {
+                    Rgb::new(0.0, 0.0, 0.0)
+                }
+            },
         }
     }
 }
@@ -81,7 +127,7 @@ impl DebugMaterial {
 impl AbstractMaterial for DebugMaterial {
     type ConcreteBxDF = DiffuseBxDF;
 
-    fn get_bxdf<T: super::AbstractTextureEvaluator>(
+    fn get_bxdf<T: AbstractTextureEvaluator>(
         &self,
         tex_eval: &T,
         ctx: &MaterialEvalContext,
