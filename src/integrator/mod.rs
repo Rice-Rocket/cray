@@ -12,7 +12,7 @@ use thread_local::ThreadLocal;
 use tracing::error;
 use vol_path::VolumetricPathIntegrator;
 
-use crate::{camera::{film::{AbstractFilm, Film, VisibleSurface}, filter::get_camera_sample, AbstractCamera, Camera}, color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, interaction::Interaction, light::{sampler::{uniform::UniformLightSampler, LightSampler}, AbstractLight, Light, LightType}, numeric::HasNan, options::Options, primitive::{AbstractPrimitive, Primitive}, reader::paramdict::ParameterDictionary, sampler::{AbstractSampler, Sampler}, shape::ShapeIntersection, tile::Tile, Float, Normal3f, Point2i, Ray, RayDifferential, Vec3f};
+use crate::{camera::{film::{AbstractFilm, Film, VisibleSurface}, filter::get_camera_sample, AbstractCamera, Camera}, color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, interaction::Interaction, light::{sampler::{uniform::UniformLightSampler, LightSampler}, AbstractLight, Light, LightType}, material::{Material, MaterialEvalContext, SingleMaterial}, numeric::HasNan, options::Options, primitive::{AbstractPrimitive, Primitive}, reader::paramdict::ParameterDictionary, sampler::{AbstractSampler, Sampler}, shape::ShapeIntersection, tile::Tile, Float, Normal3f, Point2f, Point2i, Ray, RayDifferential, Vec3f};
 
 pub mod random_walk;
 pub mod simple_path;
@@ -441,11 +441,18 @@ impl ImageTileIntegrator {
     }
 }
 
+pub enum DebugMode {
+    Depth,
+    Normal,
+    UV,
+    Material,
+}
+
 pub struct DebugIntegrator {
     base: IntegratorBase,
     camera: Camera,
     sampler_prototype: Sampler,
-    show_normals: bool,
+    mode: DebugMode,
 }
 
 impl DebugIntegrator {
@@ -456,7 +463,16 @@ impl DebugIntegrator {
         aggregate: Arc<Primitive>,
         lights: Arc<[Arc<Light>]>,
     ) -> DebugIntegrator {
-        let show_normals = parameters.get_one_bool("normals", true);
+        let mode = parameters.get_one_string("mode", "normal");
+        
+        let mode = match mode.as_str() {
+            "depth" => DebugMode::Depth,
+            "normal" => DebugMode::Normal,
+            "uv" => DebugMode::UV,
+            "material" => DebugMode::Material,
+            s => panic!("unknown debug mode {}", s)
+        };
+        
         let Film::Debug(_) = camera.get_film().as_ref() else {
             panic!("debug integrator must be used with debug film");
         };
@@ -465,7 +481,7 @@ impl DebugIntegrator {
             base: IntegratorBase::new(aggregate, lights),
             camera,
             sampler_prototype: sampler,
-            show_normals,
+            mode,
         }
     }
 }
@@ -514,25 +530,48 @@ impl DebugIntegrator {
         let lambda = camera.get_film().sample_wavelengths(0.5);
         let res = camera.get_film().full_resolution();
         
-        // TODO: The source of the issue is probably somewhere else, find it
-        // Issue is with screen space, camera says its -1 to 1 so here we account for that
-        let camera_sample = get_camera_sample(sampler, p_pixel - res / 2, camera.get_film().get_filter(), options);
+        let camera_sample = get_camera_sample(sampler, p_pixel, camera.get_film().get_filter(), options);
         let camera_ray = camera.generate_ray_differential(&camera_sample, &lambda);
 
-        let (dist, normal) = if let Some(camera_ray) = camera_ray {
-            if let Some(i) = base.intersect(&camera_ray.ray.ray, Float::INFINITY) {
-                (1.0 / i.t_hit, i.intr.interaction.n)
-            } else {
-                (0.0, Normal3f::splat(-1.0))
-            }
-        } else {
-            (0.0, Normal3f::splat(-1.0))
-        };
+        let isect = camera_ray.and_then(|camera_ray| base.intersect(&camera_ray.ray.ray, Float::INFINITY));
 
-        if self.show_normals {
-            Rgb::new(normal.x, normal.y, normal.z) * 0.5 + 0.5
-        } else {
-            Rgb::new(dist, dist, dist)
+        match self.mode {
+            DebugMode::Depth => {
+                if let Some(i) = isect {
+                    let dist = 1.0 / i.t_hit;
+                    Rgb::new(dist, dist, dist)
+                } else {
+                    Rgb::new(0.0, 0.0, 0.0)
+                }
+            },
+            DebugMode::Normal => {
+                if let Some(i) = isect {
+                    let normal = i.intr.interaction.n;
+                    Rgb::new(normal.x, normal.y, normal.z) * 0.5 + 0.5
+                } else {
+                    Rgb::new(0.0, 0.0, 0.0)
+                }
+            },
+            DebugMode::UV => {
+                if let Some(i) = isect {
+                    let uv = i.intr.interaction.uv;
+                    Rgb::new(uv.x, uv.y, 0.0)
+                } else {
+                    Rgb::new(0.0, 0.0, 0.0)
+                }
+            },
+            DebugMode::Material => {
+                if let Some(mat) = isect.as_ref().and_then(|i| i.intr.material.clone()) {
+                    let Material::Single(SingleMaterial::Debug(m)) = mat.as_ref() else {
+                        panic!("can only use debug material with debug integrator in material mode");
+                    };
+
+                    let ctx = MaterialEvalContext::from(&isect.unwrap().intr);
+                    m.get_color(&ctx)
+                } else {
+                    Rgb::new(0.0, 0.0, 0.0)
+                }
+            }
         }
     }
 }

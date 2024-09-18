@@ -116,7 +116,7 @@ impl AbstractMaterial for DiffuseTransmissionMaterial {
     }
 
     fn can_evaluate_textures<T: AbstractTextureEvaluator>(&self, tex_eval: &T) -> bool {
-        tex_eval.can_evaluate(&[], &[Some(self.reflectance.clone()), Some(self.transmission.clone())])
+        tex_eval.can_evaluate(&[], &[Some(&self.reflectance), Some(&self.transmission)])
     }
 
     fn get_normal_map(&self) -> Option<Arc<Image>> {

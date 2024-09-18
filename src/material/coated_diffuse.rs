@@ -189,8 +189,8 @@ impl AbstractMaterial for CoatedDiffuseMaterial {
 
     fn can_evaluate_textures<T: AbstractTextureEvaluator>(&self, tex_eval: &T) -> bool {
         tex_eval.can_evaluate(
-            &[Some(self.u_roughness.clone()), Some(self.v_roughness.clone()), Some(self.thickness.clone()), Some(self.g.clone())],
-            &[Some(self.reflectance.clone()), Some(self.albedo.clone())],
+            &[Some(&self.u_roughness), Some(&self.v_roughness), Some(&self.thickness), Some(&self.g)],
+            &[Some(&self.reflectance), Some(&self.albedo)],
         )
     }
 

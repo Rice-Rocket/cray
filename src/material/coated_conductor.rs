@@ -254,14 +254,14 @@ impl AbstractMaterial for CoatedConductorMaterial {
     fn can_evaluate_textures<T: AbstractTextureEvaluator>(&self, tex_eval: &T) -> bool {
         tex_eval.can_evaluate(
             &[
-                Some(self.interface_u_roughness.clone()),
-                Some(self.interface_v_roughness.clone()),
-                Some(self.thickness.clone()),
-                Some(self.g.clone()),
-                Some(self.conductor_u_roughness.clone()),
-                Some(self.conductor_v_roughness.clone()),
+                Some(&self.interface_u_roughness),
+                Some(&self.interface_v_roughness),
+                Some(&self.thickness),
+                Some(&self.g),
+                Some(&self.conductor_u_roughness),
+                Some(&self.conductor_v_roughness),
             ],
-            &[Some(self.albedo.clone()), self.reflectance.clone()]
+            &[Some(&self.albedo), self.reflectance.as_ref()]
         )
     }
 

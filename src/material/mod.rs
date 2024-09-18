@@ -3,6 +3,7 @@ use std::{collections::HashMap, sync::Arc};
 use coated_conductor::CoatedConductorMaterial;
 use coated_diffuse::CoatedDiffuseMaterial;
 use conductor::ConductorMaterial;
+use debug::DebugMaterial;
 use dielectric::DielectricMaterial;
 use diffuse::DiffuseMaterial;
 use diffuse_transmission::DiffuseTransmissionMaterial;
@@ -18,6 +19,7 @@ pub mod dielectric;
 pub mod thin_dielectric;
 pub mod coated_diffuse;
 pub mod coated_conductor;
+pub mod debug;
 
 pub trait AbstractMaterial {
     type ConcreteBxDF: AbstractBxDF;
@@ -115,6 +117,7 @@ pub enum SingleMaterial {
     ThinDielectric(ThinDielectricMaterial),
     CoatedDiffuse(CoatedDiffuseMaterial),
     CoatedConductor(CoatedConductorMaterial),
+    Debug(DebugMaterial),
 }
 
 impl SingleMaterial {
@@ -177,6 +180,13 @@ impl SingleMaterial {
                 cached_spectra,
                 textures,
             )),
+            "debug" => SingleMaterial::Debug(DebugMaterial::create(
+                parameters,
+                textures,
+                normal_map,
+                cached_spectra,
+                loc,
+            )),
             _ => panic!("material {} unknown", name),
         }
     }
@@ -199,6 +209,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::ThinDielectric(m) => BxDF::ThinDielectric(m.get_bxdf(tex_eval, ctx, lambda)),
             SingleMaterial::CoatedDiffuse(m) => BxDF::CoatedDiffuse(m.get_bxdf(tex_eval, ctx, lambda)),
             SingleMaterial::CoatedConductor(m) => BxDF::CoatedConductor(m.get_bxdf(tex_eval, ctx, lambda)),
+            SingleMaterial::Debug(m) => BxDF::Diffuse(m.get_bxdf(tex_eval, ctx, lambda)),
         }
     }
 
@@ -216,6 +227,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::ThinDielectric(m) => m.get_bsdf(tex_eval, ctx, lambda),
             SingleMaterial::CoatedDiffuse(m) => m.get_bsdf(tex_eval, ctx, lambda),
             SingleMaterial::CoatedConductor(m) => m.get_bsdf(tex_eval, ctx, lambda),
+            SingleMaterial::Debug(m) => m.get_bsdf(tex_eval, ctx, lambda),
         }
     }
 
@@ -233,6 +245,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::ThinDielectric(m) => m.get_bssrdf(tex_eval, ctx, lambda),
             SingleMaterial::CoatedDiffuse(m) => m.get_bssrdf(tex_eval, ctx, lambda),
             SingleMaterial::CoatedConductor(m) => m.get_bssrdf(tex_eval, ctx, lambda),
+            SingleMaterial::Debug(m) => m.get_bssrdf(tex_eval, ctx, lambda),
         }
     }
 
@@ -245,6 +258,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::ThinDielectric(m) => m.can_evaluate_textures(tex_eval),
             SingleMaterial::CoatedDiffuse(m) => m.can_evaluate_textures(tex_eval),
             SingleMaterial::CoatedConductor(m) => m.can_evaluate_textures(tex_eval),
+            SingleMaterial::Debug(m) => m.can_evaluate_textures(tex_eval),
         }
     }
 
@@ -257,6 +271,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::ThinDielectric(m) => m.get_normal_map(),
             SingleMaterial::CoatedDiffuse(m) => m.get_normal_map(),
             SingleMaterial::CoatedConductor(m) => m.get_normal_map(),
+            SingleMaterial::Debug(m) => m.get_normal_map(),
         }
     }
 
@@ -269,6 +284,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::ThinDielectric(m) => m.get_displacement(),
             SingleMaterial::CoatedDiffuse(m) => m.get_displacement(),
             SingleMaterial::CoatedConductor(m) => m.get_displacement(),
+            SingleMaterial::Debug(m) => m.get_displacement(),
         }
     }
 
@@ -281,6 +297,7 @@ impl AbstractMaterial for SingleMaterial {
             SingleMaterial::ThinDielectric(m) => m.has_subsurface_scattering(),
             SingleMaterial::CoatedDiffuse(m) => m.has_subsurface_scattering(),
             SingleMaterial::CoatedConductor(m) => m.has_subsurface_scattering(),
+            SingleMaterial::Debug(m) => m.has_subsurface_scattering(),
         }
     }
 }
@@ -320,11 +337,12 @@ impl MixMaterial {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct MaterialEvalContext {
-    tex_ctx: TextureEvalContext,
-    wo: Vec3f,
-    ns: Normal3f,
-    dpdus: Vec3f,
+    pub(crate) tex_ctx: TextureEvalContext,
+    pub(crate) wo: Vec3f,
+    pub(crate) ns: Normal3f,
+    pub(crate) dpdus: Vec3f,
 }
 
 impl From<&SurfaceInteraction> for MaterialEvalContext {
@@ -339,7 +357,7 @@ impl From<&SurfaceInteraction> for MaterialEvalContext {
 }
 
 pub trait AbstractTextureEvaluator {
-    fn can_evaluate(&self, f_tex: &[Option<Arc<FloatTexture>>], s_tex: &[Option<Arc<SpectrumTexture>>]) -> bool;
+    fn can_evaluate(&self, f_tex: &[Option<&Arc<FloatTexture>>], s_tex: &[Option<&Arc<SpectrumTexture>>]) -> bool;
 
     fn evaluate_float(&self, tex: &Arc<FloatTexture>, ctx: &TextureEvalContext) -> Float;
 
@@ -354,7 +372,7 @@ pub trait AbstractTextureEvaluator {
 pub struct UniversalTextureEvaluator;
 
 impl AbstractTextureEvaluator for UniversalTextureEvaluator {
-    fn can_evaluate(&self, _f_tex: &[Option<Arc<FloatTexture>>], _s_tex: &[Option<Arc<SpectrumTexture>>]) -> bool {
+    fn can_evaluate(&self, _f_tex: &[Option<&Arc<FloatTexture>>], _s_tex: &[Option<&Arc<SpectrumTexture>>]) -> bool {
         true
     }
 
@@ -363,11 +381,11 @@ impl AbstractTextureEvaluator for UniversalTextureEvaluator {
     }
 
     fn evaluate_spectrum(
-            &self,
-            tex: &Arc<SpectrumTexture>,
-            ctx: &TextureEvalContext,
-            lambda: &SampledWavelengths,
-        ) -> SampledSpectrum {
+        &self,
+        tex: &Arc<SpectrumTexture>,
+        ctx: &TextureEvalContext,
+        lambda: &SampledWavelengths,
+    ) -> SampledSpectrum {
         tex.evaluate(ctx, lambda)
     }
 }

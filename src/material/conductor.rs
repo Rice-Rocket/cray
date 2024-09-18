@@ -174,8 +174,8 @@ impl AbstractMaterial for ConductorMaterial {
 
     fn can_evaluate_textures<T: AbstractTextureEvaluator>(&self, tex_eval: &T) -> bool {
         tex_eval.can_evaluate(
-            &[Some(self.u_roughness.clone()), Some(self.v_roughness.clone())],
-            &[self.k.clone(), self.eta.clone(), self.reflectance.clone()],
+            &[Some(&self.u_roughness), Some(&self.v_roughness)],
+            &[self.k.as_ref(), self.eta.as_ref(), self.reflectance.as_ref()],
         )
     }
 

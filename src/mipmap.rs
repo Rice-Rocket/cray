@@ -123,7 +123,8 @@ impl MIPMap {
                 lerp_float(T::ewa(self, ilod, st, dst0, dst1), T::ewa(self, ilod + 1, st, dst0, dst1), lod - ilod as Float)
             },
             _ => {
-                let width: Float = 2.0 * [dst0[0].abs(), dst0[1].abs(), dst1[0].abs(), dst1[1].abs()].into_iter().reduce(|acc, e| acc.max(e)).unwrap();
+                let width: Float = 2.0 * [dst0[0].abs(), dst0[1].abs(), dst1[0].abs(), dst1[1].abs()]
+                    .into_iter().reduce(|acc, e| acc.max(e)).unwrap();
 
                 let n_levels = self.levels();
                 let level = n_levels as Float - 1.0 + width.max(1e-8).log2();

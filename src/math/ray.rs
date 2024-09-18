@@ -144,6 +144,7 @@ impl AbstractRay for Ray {
 }
 
 
+#[derive(Debug, Clone)]
 pub struct RayDifferential {
     pub ray: Ray,
     pub aux: Option<AuxiliaryRays>,
@@ -177,6 +178,7 @@ impl AbstractRay for RayDifferential {
 }
 
 
+#[derive(Debug, Clone)]
 pub struct AuxiliaryRays {
     pub rx_origin: Point3f,
     pub rx_direction: Vec3f,

@@ -307,6 +307,10 @@ where
                         let u = Point2f::new(r(), r());
                         let Some(ps) = phase.sample_p(-w, u) else { continue };
 
+                        if ps.pdf == 0.0 || ps.wi.z == 0.0 {
+                            continue
+                        }
+
                         beta *= (self.albedo * ps.p / ps.pdf);
                         w = ps.wi;
                         z = zp;
@@ -613,7 +617,7 @@ where
                         if !t_interface.flags().is_non_specular() {
                             pdf_sum += r_interface.pdf(-wos.wi, -wis.wi, mode, BxDFReflTransFlags::ALL);
                         } else if let Some(rs) = r_interface.sample_f(-wos.wi, r(), Point2f::new(r(), r()), mode, BxDFReflTransFlags::ALL) {
-                            if r_interface.flags().is_specular() {
+                            if !r_interface.flags().is_non_specular() {
                                 pdf_sum += t_interface.pdf(-rs.wi, wi, mode, BxDFReflTransFlags::ALL);
                             } else {
                                 let r_pdf = r_interface.pdf(-wos.wi, -wis.wi, mode, BxDFReflTransFlags::ALL);

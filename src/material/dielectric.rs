@@ -125,7 +125,7 @@ impl AbstractMaterial for DielectricMaterial {
     }
 
     fn can_evaluate_textures<T: AbstractTextureEvaluator>(&self, tex_eval: &T) -> bool {
-        tex_eval.can_evaluate(&[Some(self.u_roughness.clone()), Some(self.v_roughness.clone())], &[])
+        tex_eval.can_evaluate(&[Some(&self.u_roughness), Some(&self.v_roughness)], &[])
     }
 
     fn get_normal_map(&self) -> Option<Arc<Image>> {

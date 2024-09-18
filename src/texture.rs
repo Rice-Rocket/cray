@@ -873,8 +873,8 @@ impl AbstractTextureMapping2D for SphericalMapping {
         let x2y2 = sqr(pt.x) + sqr(pt.y);
         let sqrtx2y2 = x2y2.sqrt();
         let dsdp = Vec3f::new(-pt.y, pt.x, 0.0) / (2.0 * PI * x2y2);
-        let dtdp = Vec3f::new(pt.x * pt.z / sqrtx2y2, pt.y * pt.z / sqrtx2y2, -sqrtx2y2) *
-            (1.0 / (PI * (x2y2 + sqr(pt.z))));
+        let dtdp = 1.0 / (PI * (x2y2 + sqr(pt.z))) 
+            * Vec3f::new(pt.x * pt.z / sqrtx2y2, pt.y * pt.z / sqrtx2y2, -sqrtx2y2);
             
         
         let dpdx = self.texture_from_render.apply(ctx.dpdx);
@@ -967,14 +967,14 @@ impl AbstractTextureMapping2D for PlanarMapping {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct TexCoord2D {
-    st: Point2f,
-    dsdx: Float,
-    dsdy: Float,
-    dtdx: Float,
-    dtdy: Float,
+    pub(crate) st: Point2f,
+    pub(crate) dsdx: Float,
+    pub(crate) dsdy: Float,
+    pub(crate) dtdx: Float,
+    pub(crate) dtdy: Float,
 }
-
 
 pub trait AbstractTextureMapping3D {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord3D;
@@ -1030,16 +1030,17 @@ pub struct TexCoord3D {
     dpdy: Vec3f,
 }
 
+#[derive(Debug, Clone)]
 pub struct TextureEvalContext {
-    p: Point3f,
-    dpdx: Vec3f,
-    dpdy: Vec3f,
-    n: Normal3f,
-    uv: Point2f,
-    dudx: Float,
-    dudy: Float,
-    dvdx: Float,
-    dvdy: Float,
+    pub(crate) p: Point3f,
+    pub(crate) dpdx: Vec3f,
+    pub(crate) dpdy: Vec3f,
+    pub(crate) n: Normal3f,
+    pub(crate) uv: Point2f,
+    pub(crate) dudx: Float,
+    pub(crate) dudy: Float,
+    pub(crate) dvdx: Float,
+    pub(crate) dvdy: Float,
 }
 
 impl TextureEvalContext {
