@@ -164,9 +164,9 @@ impl Transform {
 
     #[inline]
     pub fn has_scale(self, epsilon: Float) -> bool {
-        let la2 = (self.apply(Point3f::new(1.0, 0.0, 0.0))).length_squared();
-        let lb2 = (self.apply(Point3f::new(0.0, 1.0, 0.0))).length_squared();
-        let lc2 = (self.apply(Point3f::new(0.0, 0.0, 1.0))).length_squared();
+        let la2 = (self.apply(Vec3f::new(1.0, 0.0, 0.0))).length_squared();
+        let lb2 = (self.apply(Vec3f::new(0.0, 1.0, 0.0))).length_squared();
+        let lc2 = (self.apply(Vec3f::new(0.0, 0.0, 1.0))).length_squared();
         (la2 - 1.0).abs() > epsilon || (lb2 - 1.0).abs() > epsilon || (lc2 - 1.0).abs() > epsilon
     }
 

@@ -335,10 +335,10 @@ impl PerspectiveCamera {
             screen_window,
         );
 
-        let dx_camera = projective.camera_from_raster.apply(Vec3f::new(1.0, 0.0, 0.0))
-            - projective.camera_from_raster.apply(Vec3f::ZERO);
-        let dy_camera = projective.camera_from_raster.apply(Vec3f::new(0.0, 1.0, 0.0))
-            - projective.camera_from_raster.apply(Vec3f::ZERO);
+        let dx_camera = Vec3f::from(projective.camera_from_raster.apply(Point3f::new(1.0, 0.0, 0.0))
+            - projective.camera_from_raster.apply(Point3f::ZERO));
+        let dy_camera = Vec3f::from(projective.camera_from_raster.apply(Point3f::new(0.0, 1.0, 0.0))
+            - projective.camera_from_raster.apply(Point3f::ZERO));
 
         let radius = Point2f::from(projective.camera_base.film.get_filter().radius());
         let p_corner = Point3f::new(-radius.x, -radius.y, 0.0);
@@ -413,27 +413,23 @@ impl AbstractCamera for PerspectiveCamera {
             self.projective.camera_base.medium.clone(),
         );
 
-        let p_lens = if self.projective.lens_radius > 0.0 {
-            let p_lens = sample_uniform_disk_concentric(sample.p_lens) * self.projective.lens_radius;
+        let aux = if self.projective.lens_radius > 0.0 {
+            let p_lens = self.projective.lens_radius * sample_uniform_disk_concentric(sample.p_lens);
             let ft = self.projective.focal_distance / ray.direction.z;
             let p_focus = ray.at(ft);
 
             ray.origin = Point3f::new(p_lens.x, p_lens.y, 0.0);
             ray.direction = (p_focus - ray.origin).normalize().into();
 
-            Some(p_lens)
-        } else { None };
-
-        let aux = if let Some(p_lens) = p_lens {
             let dx = Vec3f::from(p_camera + self.dx_camera).normalize();
             let ft = self.projective.focal_distance / dx.z;
-            let p_focus = Point3f::ZERO + dx * ft;
+            let p_focus = Point3f::ZERO + ft * dx;
             let rx_origin = Point3f::new(p_lens.x, p_lens.y, 0.0);
             let rx_direction = (p_focus - rx_origin).normalize();
 
             let dy = Vec3f::from(p_camera + self.dy_camera).normalize();
             let ft = self.projective.focal_distance / dy.z;
-            let p_focus = Point3f::ZERO + dy * ft;
+            let p_focus = Point3f::ZERO + ft * dy;
             let ry_origin = Point3f::new(p_lens.x, p_lens.y, 0.0);
             let ry_direction = (p_focus - ry_origin).normalize();
 

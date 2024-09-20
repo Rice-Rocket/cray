@@ -261,8 +261,8 @@ impl BilinearPatch {
         let (v0, v1, v2, v3) = BilinearPatch::get_vertex_indices(mesh, blp_index);
 
         let p = lerp_float(lerp_float(p00, p01, uv.y), lerp_float(p10, p11, uv.y), uv.x);
-        let mut dpdu = lerp_float(p10, p11, uv.y) - lerp_float(p00, p01, uv.y);
-        let mut dpdv = lerp_float(p01, p11, uv.x) - lerp_float(p00, p10, uv.x);
+        let mut dpdu = Vec3f::from(lerp_float(p10, p11, uv.y) - lerp_float(p00, p01, uv.y));
+        let mut dpdv = Vec3f::from(lerp_float(p01, p11, uv.x) - lerp_float(p00, p10, uv.x));
 
         let mut st = uv;
         let mut duds = 1.0;
@@ -304,7 +304,7 @@ impl BilinearPatch {
             let dpds = dpdu * duds + dpdv * dvds;
             let mut dpdt = dpdu * dudt + dpdv * dvdt;
 
-            if dpds.cross(dpdt) != Point3f::ZERO {
+            if dpds.cross(dpdt) != Vec3f::ZERO {
                 if dpdu.cross(dpdv).dot(dpds.cross(dpdt)) < 0.0 {
                     dpdt = -dpdt;
                 }
@@ -357,8 +357,8 @@ impl BilinearPatch {
             Point3fi::from_errors(p, p_error),
             st,
             wo,
-            dpdu.into(),
-            dpdv.into(),
+            dpdu,
+            dpdv,
             dndu,
             dndv,
             time,
@@ -384,7 +384,7 @@ impl BilinearPatch {
                 dndv = dndt;
 
                 let r = Transform::from_rotation_delta(isect.interaction.n.into(), ns.into());
-                isect.set_shading_geometry(ns, r.apply(dpdu).into(), r.apply(dpdv).into(), dndu, dndv, true);
+                isect.set_shading_geometry(ns, r.apply(dpdu), r.apply(dpdv), dndu, dndv, true);
             }
         }
 

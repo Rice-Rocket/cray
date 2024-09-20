@@ -945,7 +945,7 @@ pub struct PlanarMapping {
 
 impl AbstractTextureMapping2D for PlanarMapping {
     fn map(&self, ctx: &TextureEvalContext) -> TexCoord2D {
-        let vec: Vec3f = (self.texture_from_render.apply(ctx.p)).into();
+        let vec: Vec3f = self.texture_from_render.apply(ctx.p).into();
         let dpdx = self.texture_from_render.apply(ctx.dpdx);
         let dpdy = self.texture_from_render.apply(ctx.dpdy);
         let dsdx = self.vs.dot(dpdx);

@@ -598,7 +598,7 @@ pub fn sample_uniform_disk_concentric(u: Point2f) -> Point2f {
         (FRAC_PI_2 - FRAC_PI_4 * (u_offset.x / u_offset.y), u_offset.y)
     };
 
-    Point2f::new(theta.cos(), theta.sin()) * r
+    r * Point2f::new(theta.cos(), theta.sin())
 }
 
 pub fn sample_uniform_disk_polar(u: Point2f) -> Point2f {

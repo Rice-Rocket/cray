@@ -325,14 +325,16 @@ impl CameraBase {
         let px = x_ray.at(tx);
         let py = y_ray.at(ty);
 
-        let spp_scale = if options.disable_pixel_jitter { 1.0 } else {
+        let spp_scale = if options.disable_pixel_jitter {
+            1.0
+        } else {
             Float::max(0.125, 1.0 / (samples_per_pixel as Float).sqrt())
         };
 
-        let dpdx = self.render_from_camera(down_z_from_camera.inverse().apply(px - p_down_z)) * spp_scale;
-        let dpdy = self.render_from_camera(down_z_from_camera.inverse().apply(py - p_down_z)) * spp_scale;
+        let dpdx = spp_scale * self.render_from_camera(down_z_from_camera.apply_inverse(Vec3f::from(px - p_down_z)));
+        let dpdy = spp_scale * self.render_from_camera(down_z_from_camera.apply_inverse(Vec3f::from(py - p_down_z)));
 
-        (dpdx.into(), dpdy.into())
+        (dpdx, dpdy)
     }
 
     pub fn find_minimum_differentials<T: AbstractCamera>(&mut self, camera: &T) {
@@ -359,14 +361,14 @@ impl CameraBase {
 
             let ray = &mut crd.ray;
 
-            let dox = self.camera_from_render(ray.aux.as_ref().unwrap().rx_origin - ray.ray.origin, ray.ray.time);
+            let dox = self.camera_from_render(Vec3f::from(ray.aux.as_ref().unwrap().rx_origin - ray.ray.origin), ray.ray.time);
             if dox.length_squared() < self.min_pos_differential_x.length_squared() {
-                self.min_pos_differential_x = dox.into();
+                self.min_pos_differential_x = dox;
             }
 
-            let doy = self.camera_from_render(ray.aux.as_ref().unwrap().ry_origin - ray.ray.origin, ray.ray.time);
+            let doy = self.camera_from_render(Vec3f::from(ray.aux.as_ref().unwrap().ry_origin - ray.ray.origin), ray.ray.time);
             if doy.length_squared() < self.min_pos_differential_y.length_squared() {
-                self.min_pos_differential_y = doy.into();
+                self.min_pos_differential_y = doy;
             }
 
             ray.ray.direction = ray.ray.direction.normalize();
