@@ -339,7 +339,7 @@ macro_rules! impl_vec_ops {
 
             #[inline]
             pub fn normalize(self) -> Self {
-                self * self.length_recip()
+                self / self.length()
             }
 
             #[inline]

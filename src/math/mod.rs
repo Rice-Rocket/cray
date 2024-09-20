@@ -18,9 +18,11 @@ pub mod vec2d;
 pub mod scattering;
 pub mod lowdiscrepancy;
 pub mod sobol;
+pub mod compensated_float;
 #[macro_use]
 pub mod hashing;
 
+use compensated_float::CompensatedFloat;
 use fast_polynomial::poly;
 use hexf::hexf32;
 pub use mat::{TMat2, TMat3, TMat4};
@@ -293,6 +295,34 @@ pub fn round_up_pow_2(mut v: i32) -> i32 {
     v |= v.wrapping_shr(8);
     v |= v.wrapping_shr(16);
     v + 1
+}
+
+#[inline]
+pub fn two_prod(a: Float, b: Float) -> CompensatedFloat {
+    let ab = a * b;
+    let err = Float::mul_add(a, b, -ab);
+    CompensatedFloat::new(ab, err)
+}
+
+#[inline]
+pub fn two_sum(a: Float, b: Float) -> CompensatedFloat {
+    let s = a + b;
+    let d = s - a;
+    let err = (a - (s - d)) + (b - d);
+    CompensatedFloat::new(s, err)
+}
+
+#[inline]
+pub fn inner_product(xs: &[Float], ys: &[Float]) -> CompensatedFloat {
+    debug_assert!(xs.len() == ys.len());
+    if xs.len() == 1 {
+        two_prod(xs[0], ys[0])
+    } else {
+        let ab = two_prod(xs[0], ys[0]);
+        let tp = inner_product(&xs[1..xs.len()], &ys[1..ys.len()]);
+        let sum = two_sum(ab.v, tp.v);
+        CompensatedFloat::new(sum.v, ab.err + tp.err + sum.err)
+    }
 }
 
 #[inline]

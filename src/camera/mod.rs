@@ -456,6 +456,7 @@ impl CameraRay {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct CameraRayDifferential {
     pub ray: RayDifferential,
     pub weight: SampledSpectrum,

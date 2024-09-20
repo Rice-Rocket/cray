@@ -79,7 +79,7 @@ impl Transform {
         debug_assert!(from.is_normalized());
         debug_assert!(to.is_normalized());
 
-        let refl = if from.x.abs() < 0.72 && to.x.abs() < 0.72 {
+        let ref1 = if from.x.abs() < 0.72 && to.x.abs() < 0.72 {
             Point3f::new(1.0, 0.0, 0.0)
         } else if from.y.abs() < 0.72 && to.y.abs() < 0.72 {
             Point3f::new(0.0, 1.0, 0.0)
@@ -87,8 +87,8 @@ impl Transform {
             Point3f::new(0.0, 0.0, 1.0)
         };
 
-        let u = refl - from;
-        let v = refl - to;
+        let u = ref1 - from;
+        let v = ref1 - to;
         let mut r = Mat4::IDENTITY;
         for i in 0..3 {
             for j in 0..3 {
@@ -107,10 +107,8 @@ impl Transform {
 
     #[inline]
     pub fn looking_at(pos: Point3f, target: Point3f, up: Vec3f) -> Transform {
-        debug_assert!(up.is_normalized());
-
         let dir = (target - pos).normalize().into();
-        let right = up.cross(dir).normalize();
+        let right = up.normalize().cross(dir).normalize();
         let new_up = dir.cross(right);
 
         let m_inv = Mat4::new(

@@ -1,4 +1,5 @@
 use std::ops::{Add, Index, IndexMut, Mul, Neg, Sub};
+use compensated_float::CompensatedFloat;
 use numeric::DifferenceOfProducts;
 
 use crate::math::*;
@@ -191,6 +192,17 @@ impl<T: Copy> From<[T; 16]> for TMat4<T> {
     }
 }
 
+impl<T: Copy> From<[[T; 4]; 4]> for TMat4<T> {
+    fn from(value: [[T; 4]; 4]) -> Self {
+        Self::new(
+            value[0][0], value[0][1], value[0][2], value[0][3],
+            value[1][0], value[1][1], value[1][2], value[1][3],
+            value[2][0], value[2][1], value[2][2], value[2][3],
+            value[3][0], value[3][1], value[3][2], value[3][3],
+        )
+    }
+}
+
 impl<T: NumericConsts> TMat2<T> {
     pub const IDENTITY: Self = Self::new(
         T::ONE,  T::ZERO,
@@ -210,11 +222,12 @@ impl<T: Clone + Copy> TMat2<T> {
 
 impl<T> TMat2<T> 
 where 
-    T: Clone + Copy + NumericConsts + NumericFloat + PartialEq + Neg<Output = T> + Mul<T, Output = T> + Sub<T, Output = T>
+    T: Clone + Copy + NumericConsts + NumericFloat + PartialEq 
+        + Neg<Output = T> + Mul<T, Output = T> + Sub<T, Output = T> + DifferenceOfProducts
 {
     #[inline]
     pub fn determinant(self) -> T {
-        self[(0, 0)] * self[(1, 1)] - self[(0, 1)] * self[(1, 0)]
+        T::difference_of_products(self[(0, 0)], self[(1, 1)], self[(0, 1)], self[(1, 0)])
     }
 
     #[inline]
@@ -263,14 +276,17 @@ impl<T: Clone + Copy> TMat3<T> {
     }
 }
 
-impl<T> TMat3<T> 
-where 
-    T: Clone + Copy + NumericConsts + NumericFloat + PartialEq + DifferenceOfProducts
-        + Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T>
-{
+impl TMat3<Float> {
     #[inline]
-    pub fn determinant(self) -> T {
-        self.rowc::<2>().dot(self.rowc::<0>().cross(self.rowc::<1>()))
+    pub fn determinant(self) -> Float {
+        let minor12 = Float::difference_of_products(self[(1, 1)], self[(2, 2)], self[(1, 2)], self[(2, 1)]);
+        let minor02 = Float::difference_of_products(self[(1, 0)], self[(2, 2)], self[(1, 2)], self[(2, 0)]);
+        let minor01 = Float::difference_of_products(self[(1, 0)], self[(2, 1)], self[(1, 1)], self[(2, 0)]);
+        Float::mul_add(
+            self[(0, 2)],
+            minor01,
+            Float::difference_of_products(self[(0, 0)], minor12, self[(0, 1)], minor02),
+        )
     }
 
     #[inline]
@@ -280,17 +296,35 @@ where
 
     #[inline]
     pub fn try_inverse(self) -> Option<Self> {
-        let tmp0 = self.rowc::<1>().cross(self.rowc::<2>());
-        let tmp1 = self.rowc::<2>().cross(self.rowc::<0>());
-        let tmp2 = self.rowc::<0>().cross(self.rowc::<1>());
-        let det = self.rowc::<2>().dot(tmp2);
-
-        if det == T::ZERO {
+        let det = self.determinant();
+        if det == 0.0 {
             return None;
         }
 
-        let inv_det = Vec3::splat(det.ninv());
-        Some(Self([tmp0.mul(inv_det).into(), tmp1.mul(inv_det).into(), tmp2.mul(inv_det).into()]).transpose())
+        let inv_det = 1.0 / det;
+
+        let mut out = Mat3::IDENTITY;
+
+        out[(0, 0)] =
+            inv_det * Float::difference_of_products(self[(1, 1)], self[(2, 2)], self[(1, 2)], self[(2, 1)]);
+        out[(1, 0)] =
+            inv_det * Float::difference_of_products(self[(1, 2)], self[(2, 0)], self[(1, 0)], self[(2, 2)]);
+        out[(2, 0)] =
+            inv_det * Float::difference_of_products(self[(1, 0)], self[(2, 1)], self[(1, 1)], self[(2, 0)]);
+        out[(0, 1)] =
+            inv_det * Float::difference_of_products(self[(0, 2)], self[(2, 1)], self[(0, 1)], self[(2, 2)]);
+        out[(1, 1)] =
+            inv_det * Float::difference_of_products(self[(0, 0)], self[(2, 2)], self[(0, 2)], self[(2, 0)]);
+        out[(2, 1)] =
+            inv_det * Float::difference_of_products(self[(0, 1)], self[(2, 0)], self[(0, 0)], self[(2, 1)]);
+        out[(0, 2)] =
+            inv_det * Float::difference_of_products(self[(0, 1)], self[(1, 2)], self[(0, 2)], self[(1, 1)]);
+        out[(1, 2)] =
+            inv_det * Float::difference_of_products(self[(0, 2)], self[(1, 0)], self[(0, 0)], self[(1, 2)]);
+        out[(2, 2)] =
+            inv_det * Float::difference_of_products(self[(0, 0)], self[(1, 1)], self[(0, 1)], self[(1, 0)]);
+
+        Some(out)
     }
 }
 
@@ -316,23 +350,28 @@ impl<T: Clone + Copy> TMat4<T> {
     }
 }
 
-impl<T> TMat4<T>
-where 
-    T: Clone + Copy + NumericConsts + NumericNegative + NumericFloat + PartialEq + Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T>
-{
+impl TMat4<Float> {
     #[inline]
-    pub fn determinant(self) -> T {
-        let a2323 = self[(2, 2)] * self[(3, 3)] - self[(2, 3)] * self[(3, 2)];
-        let a1323 = self[(2, 1)] * self[(3, 3)] - self[(2, 3)] * self[(3, 1)];
-        let a1223 = self[(2, 1)] * self[(3, 2)] - self[(2, 2)] * self[(3, 1)];
-        let a0323 = self[(2, 0)] * self[(3, 3)] - self[(2, 3)] * self[(3, 0)];
-        let a0223 = self[(2, 0)] * self[(3, 2)] - self[(2, 2)] * self[(3, 0)];
-        let a0123 = self[(2, 0)] * self[(3, 1)] - self[(2, 1)] * self[(3, 0)];
+    pub fn determinant(self) -> Float {
+        let s0 = Float::difference_of_products(self[(0, 0)], self[(1, 1)], self[(1, 0)], self[(0, 1)]);
+        let s1 = Float::difference_of_products(self[(0, 0)], self[(1, 2)], self[(1, 0)], self[(0, 2)]);
+        let s2 = Float::difference_of_products(self[(0, 0)], self[(1, 3)], self[(1, 0)], self[(0, 3)]);
 
-        self[(0, 0)] * (self[(1, 1)] * a2323 - self[(1, 2)] * a1323 + self[(1, 3)] * a1223)
-            - self[(0, 1)] * (self[(1, 0)] * a2323 - self[(1, 2)] * a0323 + self[(1, 3)] * a0223)
-            + self[(0, 2)] * (self[(1, 0)] * a1323 - self[(1, 1)] * a0323 + self[(1, 3)] * a0123)
-            - self[(0, 3)] * (self[(1, 0)] * a1223 - self[(1, 1)] * a0223 + self[(1, 2)] * a0123)
+        let s3 = Float::difference_of_products(self[(0, 1)], self[(1, 2)], self[(1, 1)], self[(0, 2)]);
+        let s4 = Float::difference_of_products(self[(0, 1)], self[(1, 3)], self[(1, 1)], self[(0, 3)]);
+        let s5 = Float::difference_of_products(self[(0, 2)], self[(1, 3)], self[(1, 2)], self[(0, 3)]);
+
+        let c0 = Float::difference_of_products(self[(2, 0)], self[(3, 1)], self[(3, 0)], self[(2, 1)]);
+        let c1 = Float::difference_of_products(self[(2, 0)], self[(3, 2)], self[(3, 0)], self[(2, 2)]);
+        let c2 = Float::difference_of_products(self[(2, 0)], self[(3, 3)], self[(3, 0)], self[(2, 3)]);
+
+        let c3 = Float::difference_of_products(self[(2, 1)], self[(3, 2)], self[(3, 1)], self[(2, 2)]);
+        let c4 = Float::difference_of_products(self[(2, 1)], self[(3, 3)], self[(3, 1)], self[(2, 3)]);
+        let c5 = Float::difference_of_products(self[(2, 2)], self[(3, 3)], self[(3, 2)], self[(2, 3)]);
+
+        Float::difference_of_products(s0, c5, s1, c4)
+            + Float::difference_of_products(s2, c3, -s3, c2)
+            + Float::difference_of_products(s5, c0, s4, c1)
     }
 
     #[inline]
@@ -342,78 +381,105 @@ where
 
     #[inline]
     pub fn try_inverse(self) -> Option<Self> {
-        let (m00, m01, m02, m03) = self.rowc::<0>().into();
-        let (m10, m11, m12, m13) = self.rowc::<1>().into();
-        let (m20, m21, m22, m23) = self.rowc::<2>().into();
-        let (m30, m31, m32, m33) = self.rowc::<3>().into();
+        let s0 = Float::difference_of_products(self[(0, 0)], self[(1, 1)], self[(1, 0)], self[(0, 1)]);
+        let s1 = Float::difference_of_products(self[(0, 0)], self[(1, 2)], self[(1, 0)], self[(0, 2)]);
+        let s2 = Float::difference_of_products(self[(0, 0)], self[(1, 3)], self[(1, 0)], self[(0, 3)]);
 
-        let coef00 = m22 * m33 - m32 * m23;
-        let coef02 = m12 * m33 - m32 * m13;
-        let coef03 = m12 * m23 - m22 * m13;
+        let s3 = Float::difference_of_products(self[(0, 1)], self[(1, 2)], self[(1, 1)], self[(0, 2)]);
+        let s4 = Float::difference_of_products(self[(0, 1)], self[(1, 3)], self[(1, 1)], self[(0, 3)]);
+        let s5 = Float::difference_of_products(self[(0, 2)], self[(1, 3)], self[(1, 2)], self[(0, 3)]);
 
-        let coef04 = m21 * m33 - m31 * m23;
-        let coef06 = m11 * m33 - m31 * m13;
-        let coef07 = m11 * m23 - m21 * m13;
+        let c0 = Float::difference_of_products(self[(2, 0)], self[(3, 1)], self[(3, 0)], self[(2, 1)]);
+        let c1 = Float::difference_of_products(self[(2, 0)], self[(3, 2)], self[(3, 0)], self[(2, 2)]);
+        let c2 = Float::difference_of_products(self[(2, 0)], self[(3, 3)], self[(3, 0)], self[(2, 3)]);
 
-        let coef08 = m21 * m32 - m31 * m22;
-        let coef10 = m11 * m32 - m31 * m12;
-        let coef11 = m11 * m22 - m21 * m12;
+        let c3 = Float::difference_of_products(self[(2, 1)], self[(3, 2)], self[(3, 1)], self[(2, 2)]);
+        let c4 = Float::difference_of_products(self[(2, 1)], self[(3, 3)], self[(3, 1)], self[(2, 3)]);
+        let c5 = Float::difference_of_products(self[(2, 2)], self[(3, 3)], self[(3, 2)], self[(2, 3)]);
 
-        let coef12 = m20 * m33 - m30 * m23;
-        let coef14 = m10 * m33 - m30 * m13;
-        let coef15 = m10 * m23 - m20 * m13;
-
-        let coef16 = m20 * m32 - m30 * m22;
-        let coef18 = m10 * m32 - m30 * m12;
-        let coef19 = m10 * m22 - m20 * m12;
-
-        let coef20 = m20 * m31 - m30 * m21;
-        let coef22 = m10 * m31 - m30 * m11;
-        let coef23 = m10 * m21 - m20 * m11;
-
-        let fac0 = Vec4::new(coef00, coef00, coef02, coef03);
-        let fac1 = Vec4::new(coef04, coef04, coef06, coef07);
-        let fac2 = Vec4::new(coef08, coef08, coef10, coef11);
-        let fac3 = Vec4::new(coef12, coef12, coef14, coef15);
-        let fac4 = Vec4::new(coef16, coef16, coef18, coef19);
-        let fac5 = Vec4::new(coef20, coef20, coef22, coef23);
-
-        let vec0 = Vec4::new(m10, m00, m00, m00);
-        let vec1 = Vec4::new(m11, m01, m01, m01);
-        let vec2 = Vec4::new(m12, m02, m02, m02);
-        let vec3 = Vec4::new(m13, m03, m03, m03);
-
-        let inv0 = vec1.mul(fac0).sub(vec2.mul(fac1)).add(vec3.mul(fac2));
-        let inv1 = vec0.mul(fac0).sub(vec2.mul(fac3)).add(vec3.mul(fac4));
-        let inv2 = vec0.mul(fac1).sub(vec1.mul(fac3)).add(vec3.mul(fac5));
-        let inv3 = vec0.mul(fac2).sub(vec1.mul(fac4)).add(vec2.mul(fac5));
-
-        let sign_a = Vec4::new(T::ONE, T::NEG_ONE, T::ONE, T::NEG_ONE);
-        let sign_b = Vec4::new(T::NEG_ONE, T::ONE, T::NEG_ONE, T::ONE);
-
-        let inverse = Self([
-            inv0.mul(sign_a).into(),
-            inv1.mul(sign_b).into(),
-            inv2.mul(sign_a).into(),
-            inv3.mul(sign_b).into(),
-        ]);
-
-        let col0 = Vec4::new(
-            inverse.rowc::<0>().x,
-            inverse.rowc::<1>().x,
-            inverse.rowc::<2>().x,
-            inverse.rowc::<3>().x,
-        );
-
-        let dot0 = self.rowc::<0>().mul(col0);
-        let dot1 = dot0.x + dot0.y + dot0.z + dot0.w;
-
-        if dot1 == T::ZERO {
+        let det: Float = inner_product(&[s0, -s1, s2, s3, s5, -s4], &[c5, c4, c3, c2, c0, c1]).into();
+        if det == 0.0 {
             return None;
         }
 
-        let rcp_det = dot1.ninv();
-        Some(inverse.mul(rcp_det))
+        let s = 1.0 / det;
+
+        let inv: [[Float; 4]; 4] = [
+            [
+                s * Float::from(inner_product(
+                    &[self[(1, 1)], self[(1, 3)], -self[(1, 2)]],
+                    &[c5, c3, c4],
+                )),
+                s * Float::from(inner_product(
+                    &[-self[(0, 1)], self[(0, 2)], -self[(0, 3)]],
+                    &[c5, c4, c3],
+                )),
+                s * Float::from(inner_product(
+                    &[self[(3, 1)], self[(3, 3)], -self[(3, 2)]],
+                    &[s5, s3, s4],
+                )),
+                s * Float::from(inner_product(
+                    &[-self[(2, 1)], self[(2, 2)], -self[(2, 3)]],
+                    &[s5, s4, s3],
+                )),
+            ],
+            [
+                s * Float::from(inner_product(
+                    &[-self[(1, 0)], self[(1, 2)], -self[(1, 3)]],
+                    &[c5, c2, c1],
+                )),
+                s * Float::from(inner_product(
+                    &[self[(0, 0)], self[(0, 3)], -self[(0, 2)]],
+                    &[c5, c1, c2],
+                )),
+                s * Float::from(inner_product(
+                    &[-self[(3, 0)], self[(3, 2)], -self[(3, 3)]],
+                    &[s5, s2, s1],
+                )),
+                s * Float::from(inner_product(
+                    &[self[(2, 0)], self[(2, 3)], -self[(2, 2)]],
+                    &[s5, s1, s2],
+                )),
+            ],
+            [
+                s * Float::from(inner_product(
+                    &[self[(1, 0)], self[(1, 3)], -self[(1, 1)]],
+                    &[c4, c0, c2],
+                )),
+                s * Float::from(inner_product(
+                    &[-self[(0, 0)], self[(0, 1)], -self[(0, 3)]],
+                    &[c4, c2, c0],
+                )),
+                s * Float::from(inner_product(
+                    &[self[(3, 0)], self[(3, 3)], -self[(3, 1)]],
+                    &[s4, s0, s2],
+                )),
+                s * Float::from(inner_product(
+                    &[-self[(2, 0)], self[(2, 1)], -self[(2, 3)]],
+                    &[s4, s2, s0],
+                )),
+            ],
+            [
+                s * Float::from(inner_product(
+                    &[-self[(1, 0)], self[(1, 1)], -self[(1, 2)]],
+                    &[c3, c1, c0],
+                )),
+                s * Float::from(inner_product(
+                    &[self[(0, 0)], self[(0, 2)], -self[(0, 1)]],
+                    &[c3, c0, c1],
+                )),
+                s * Float::from(inner_product(
+                    &[-self[(3, 0)], self[(3, 1)], -self[(3, 2)]],
+                    &[s3, s1, s0],
+                )),
+                s * Float::from(inner_product(
+                    &[self[(2, 0)], self[(2, 2)], -self[(2, 1)]],
+                    &[s3, s0, s1],
+                )),
+            ],
+        ];
+
+        Some(Mat4::from(inv))
     }
 }
 
