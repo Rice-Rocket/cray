@@ -254,15 +254,15 @@ pub fn equal_area_sphere_to_square(d: Vec3f) -> Point2f {
     let b = Float::min(x, y);
     let b = if a == 0.0 { 0.0 } else { b / a };
 
-    let t1 = 0.406758566246788489601959989e-5;
-    let t2 = 0.636226545274016134946890922156;
-    let t3 = 0.61572017898280213493197203466e-2;
-    let t4 = -0.247333733281268944196501420480;
-    let t5 = 0.881770664775316294736387951347e-1;
-    let t6 = 0.419038818029165735901852432784e-1;
-    let t7 = -0.251390972343483509333252996350e-1;
+    const T1: Float = 0.406758566246788489601959989e-5;
+    const T2: Float = 0.636226545274016134946890922156;
+    const T3: Float = 0.61572017898280213493197203466e-2;
+    const T4: Float = -0.247333733281268944196501420480;
+    const T5: Float = 0.881770664775316294736387951347e-1;
+    const T6: Float = 0.419038818029165735901852432784e-1;
+    const T7: Float = -0.251390972343483509333252996350e-1;
 
-    let mut phi = poly_array(b, &[t1, t2, t3, t4, t5, t6, t7]);
+    let mut phi = poly_array(b, &[T1, T2, T3, T4, T5, T6, T7]);
 
     if x < y {
         phi = 1.0 - phi;
@@ -348,3 +348,25 @@ impl OctahedralVec3 {
     }
 }
 
+
+#[cfg(test)]
+mod tests {
+    use rand::Rng;
+
+    use crate::{equal_area_sphere_to_square, equal_area_square_to_sphere, sampling::sample_uniform_sphere, Dot, Point2f};
+
+    #[test]
+    fn test_sphere_sampling() {
+        let mut rng = rand::thread_rng();
+        
+        for _ in 0..100 {
+            let u = Point2f::new(rng.gen(), rng.gen());
+            let v = sample_uniform_sphere(u);
+            let c = equal_area_sphere_to_square(v);
+            let vp = equal_area_square_to_sphere(c.into());
+
+            assert!(vp.length() > 0.9999 && vp.length() < 1.0001);
+            assert!(v.dot(vp) > 0.9999);
+        }
+    }
+}

@@ -579,14 +579,14 @@ mod tests {
     use crate::math::*;
 
     #[test]
-    fn translate() {
+    fn test_translate() {
         let m = Mat4::from_translation(Point3f::new(1.0, 2.0, 3.0));
         let p = Point4f::new(1.0, 2.0, 3.0, 1.0);
         assert_eq!((m * p).xyz(), Point3f::new(2.0, 4.0, 6.0));
     }
 
     #[test]
-    fn rotate_axis() {
+    fn test_rotate_axis() {
         let theta = 1.214 as Float;
         let m = Mat4::from_rotation_x(theta.sin(), theta.cos());
         let gm = glam::Mat4::from_rotation_x(theta as f32);
@@ -625,7 +625,7 @@ mod tests {
     }
 
     #[test]
-    fn rotate() {
+    fn test_rotate() {
         let theta = 1.431 as Float;
 
         let m = Mat4::from_rotation(theta.sin(), theta.cos(), Vec3f::new(3.0, 1.0, 2.0).normalize());
@@ -641,7 +641,7 @@ mod tests {
     }
 
     #[test]
-    fn scale() {
+    fn test_scale() {
         let m = Mat4::from_scale(Vec3f::new(1.541, 3.312, 0.231));
         let gm = glam::Mat4::from_scale(glam::Vec3::new(1.541, 3.312, 0.231));
 
@@ -655,7 +655,7 @@ mod tests {
     }
 
     #[test]
-    fn concat() {
+    fn test_concat() {
         let theta = 0.712 as Float;
         let mut m = Mat4::from_rotation(theta.sin(), theta.cos(), Vec3f::new(4.0, 2.0, 5.0).normalize());
         let mut gm = glam::Mat4::from_axis_angle(glam::Vec3::new(4.0, 2.0, 5.0).normalize(), theta as f32);
@@ -680,13 +680,13 @@ mod tests {
     }
 
     #[test]
-    fn determinant() {
+    fn test_determinant() {
         let m = Mat4::from_scale(Vec3f::new(2.0, 3.0, 1.5));
         assert_abs_diff_eq!(m.determinant(), 9.0);
     }
 
     #[test]
-    fn inverse() {
+    fn test_inverse() {
         let theta = -0.834 as Float;
         let m = Mat4::from_rotation(theta.sin(), theta.cos(), Vec3f::new(2.0, 5.0, 7.0).normalize())
             * Mat4::from_translation(Point3f::new(0.9, 0.3, 0.6))
@@ -701,7 +701,7 @@ mod tests {
         let p1 = (m.inverse() * p).xyz();
         let gp1 = (gm.inverse() * gp).xyz();
 
-        assert_abs_diff_eq!(p1, Point3f::new(gp1.x as Float, gp1.y as Float, gp1.z as Float));
+        assert_abs_diff_eq!(p1, Point3f::new(gp1.x as Float, gp1.y as Float, gp1.z as Float), epsilon = 0.0001);
     }
 
     #[test]

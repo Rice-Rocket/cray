@@ -150,9 +150,8 @@ where
     };
 
     let mut t_maj = SampledSpectrum::from_const(1.0);
-    let mut done = false;
 
-    while !done {
+    'outer: loop {
         let Some(seg) = iter.next() else {
             return t_maj;
         };
@@ -180,8 +179,7 @@ where
                 let mp = medium.sample_point(ray.at(t), lambda);
 
                 if !callback(ray, ray.at(t), &mp, &seg.sigma_maj, &t_maj, rng) {
-                    done = true;
-                    break;
+                    break 'outer;
                 }
 
                 t_maj = SampledSpectrum::from_const(1.0);

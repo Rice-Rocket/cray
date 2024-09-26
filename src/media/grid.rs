@@ -92,17 +92,17 @@ impl GridMedium {
 
         let sigma_a = parameters.get_one_spectrum(
             "sigma_a",
-            Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)))),
+            None,
             SpectrumType::Unbounded,
             cached_spectra,
-        );
+        ).unwrap_or_else(|| Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0))));
 
         let sigma_s = parameters.get_one_spectrum(
             "sigma_s",
-            Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)))),
+            None,
             SpectrumType::Unbounded,
             cached_spectra,
-        );
+        ).unwrap_or_else(|| Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0))));
 
         let sigma_scale = parameters.get_one_float("scale", 1.0);
         let temperature_cutoff = parameters.get_one_float("temperaturecutoff", 0.0);
@@ -112,8 +112,8 @@ impl GridMedium {
         GridMedium::new(
             Bounds3f::new(p0, p1),
             render_from_medium,
-            DenselySampledSpectrum::new(sigma_a.unwrap().as_ref()),
-            DenselySampledSpectrum::new(sigma_s.unwrap().as_ref()),
+            DenselySampledSpectrum::new(sigma_a.as_ref()),
+            DenselySampledSpectrum::new(sigma_s.as_ref()),
             sigma_scale,
             g,
             density_grid,

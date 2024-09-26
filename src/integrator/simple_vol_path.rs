@@ -73,10 +73,10 @@ impl AbstractRayIntegrator for SimpleVolumetricPathIntegrator {
                             ray.origin = p;
                             ray.direction = ps.wi;
                             scattered = true;
-                            return false;
+                            false
                         } else {
                             u_mode = rng.gen();
-                            return true;
+                            true
                         }
                     },
                 );
@@ -115,11 +115,4 @@ impl AbstractRayIntegrator for SimpleVolumetricPathIntegrator {
 
         l
     }
-}
-
-fn hash(mut p: Float) -> Float {
-    p = (p * 0.1031).fract();
-    p *= p + 33.33;
-    p *= p + p;
-    p.fract()
 }

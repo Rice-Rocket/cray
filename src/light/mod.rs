@@ -99,7 +99,7 @@ impl Light {
                 if l.is_empty() && filename.is_empty() && portal.is_empty() {
                     scale /= spectrum_to_photometric(&color_space.illuminant);
                     if e_v > 0.0 {
-                        let k_e = 4.0 * PI;
+                        let k_e = PI;
                         scale *= e_v / k_e;
                     }
 
@@ -115,7 +115,7 @@ impl Light {
 
                     scale /= spectrum_to_photometric(&l[0]);
                     if e_v > 0.0 {
-                        let k_e = 4.0 * PI;
+                        let k_e = PI;
                         scale *= e_v / k_e;
                     }
 
@@ -158,6 +158,10 @@ impl Light {
                                 for c in 0..image_and_metadata.image.n_channels() {
                                     if image_and_metadata.image.get_channel(Point2i::new(x, y), c).is_nan() {
                                         panic!("Image '{}' contains NaN values", truncate_filename(&filename));
+                                    }
+
+                                    if image_and_metadata.image.get_channel(Point2i::new(x, y), c).is_infinite() {
+                                        panic!("Image '{}' contains infinite values", truncate_filename(&filename));
                                     }
                                 }
                             }

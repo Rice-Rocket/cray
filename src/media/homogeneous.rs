@@ -33,19 +33,21 @@ impl HomogeneousMedium {
         }
 
         if sig_a.is_none() {
-            sig_a = parameters.get_one_spectrum(
+            sig_a = Some(parameters.get_one_spectrum(
                 "sigma_a",
-                Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)))),
+                None,
                 SpectrumType::Unbounded,
                 cached_spectra,
-            );
+            ).unwrap_or_else(|| Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)))));
+        }
 
-            sig_s = parameters.get_one_spectrum(
+        if sig_s.is_none() {
+            sig_s = Some(parameters.get_one_spectrum(
                 "sigma_s",
-                Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)))),
+                None,
                 SpectrumType::Unbounded,
                 cached_spectra,
-            );
+            ).unwrap_or_else(|| Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)))));
         }
 
         let mut le = parameters.get_one_spectrum("Le", None, SpectrumType::Illuminant, cached_spectra);

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ffi::OsStr, fmt::Display, fs::File, io, ops::{Index, IndexMut}, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, ffi::OsStr, fmt::Display, fs::{self, File}, io, ops::{Index, IndexMut}, path::PathBuf, sync::Arc};
 
 use arrayvec::ArrayVec;
 use half::f16;
@@ -539,8 +539,8 @@ impl Image {
     }
 
     pub fn float_resize_up(&mut self, new_res: Point2i, wrap_mode: WrapMode2D) -> Image {
-        assert!(new_res.x > self.resolution.x);
-        assert!(new_res.y > self.resolution.y);
+        assert!(new_res.x >= self.resolution.x);
+        assert!(new_res.y >= self.resolution.y);
 
         let mut resampled_image = Image::new(PixelFormat::Float32, new_res, &self.channel_names, None);
 
@@ -626,7 +626,7 @@ impl Image {
     }
 
     fn resample_weights(&self, old_res: usize, new_res: usize) -> Vec<ResampleWeight> {
-        assert!(old_res < new_res);
+        assert!(new_res >= old_res);
         let mut wt = vec![ResampleWeight::default(); new_res];
         let filter_radius = 2.0;
         let tau = 2.0;
@@ -1059,11 +1059,23 @@ impl Image {
         };
 
         let mut decoder = png::Decoder::new(File::open(path).unwrap());
-        decoder.set_transformations(png::Transformations::IDENTITY);
-        let mut reader = decoder.read_info().unwrap();
+
+        if decoder.read_header_info().ok().map(|h| h.color_type) == Some(png::ColorType::Indexed) {
+            decoder.set_transformations(png::Transformations::EXPAND);
+        } else {
+            decoder.set_transformations(png::Transformations::IDENTITY);
+        }
+
+        let mut reader = match decoder.read_info() {
+            Ok(reader) => reader,
+            Err(_) => return Err(io::Error::new(io::ErrorKind::InvalidData, "failed to decode PNG image")),
+        };
 
         let mut im_data = vec![0; reader.output_buffer_size()];
-        let info = reader.next_frame(&mut im_data).unwrap();
+        let info = match reader.next_frame(&mut im_data) {
+            Ok(info) => info,
+            Err(_) => return Err(io::Error::new(io::ErrorKind::InvalidData, "failed to decode PNG image")),
+        };
 
         let image = match info.color_type {
             png::ColorType::Grayscale | png::ColorType::GrayscaleAlpha => {
@@ -1102,7 +1114,42 @@ impl Image {
 
                         image
                     },
-                    _ => return io::Result::Err(io::Error::new(io::ErrorKind::InvalidData, "unsupported bit depth"))
+                    png::BitDepth::One => Image::new_u256(
+                        im_data.iter().flat_map(|v| [
+                            if v & 0b00000001 != 0 { 255u8 } else { 0u8 },
+                            if v & 0b00000010 != 0 { 255u8 } else { 0u8 },
+                            if v & 0b00000100 != 0 { 255u8 } else { 0u8 },
+                            if v & 0b00001000 != 0 { 255u8 } else { 0u8 },
+                            if v & 0b00010000 != 0 { 255u8 } else { 0u8 },
+                            if v & 0b00100000 != 0 { 255u8 } else { 0u8 },
+                            if v & 0b01000000 != 0 { 255u8 } else { 0u8 },
+                            if v & 0b10000000 != 0 { 255u8 } else { 0u8 },
+                        ].into_iter()).collect(),
+                        Point2i::new(info.width as i32, info.height as i32),
+                        &["Y".to_owned()],
+                        encoding
+                    ),
+                    png::BitDepth::Two => Image::new_u256(
+                        im_data.iter().flat_map(|v| [
+                            (v & 0b00000011),
+                            (v & 0b00001100) >> 2,
+                            (v & 0b00110000) >> 4,
+                            (v & 0b11000000) >> 6,
+                        ].into_iter()).collect(),
+                        Point2i::new(info.width as i32, info.height as i32),
+                        &["Y".to_owned()],
+                        encoding
+                    ),
+                    png::BitDepth::Four => Image::new_u256(
+                        im_data.iter().flat_map(|v| [
+                            (v & 0b00001111),
+                            (v & 0b11110000) >> 4,
+                        ].into_iter()).collect(),
+                        Point2i::new(info.width as i32, info.height as i32),
+                        &["Y".to_owned()],
+                        encoding
+                    ),
+                    // _ => return io::Result::Err(io::Error::new(io::ErrorKind::InvalidData, "unsupported bit depth"))
                 }
             },
             png::ColorType::Rgb | png::ColorType::Rgba => {
@@ -1178,7 +1225,7 @@ impl Image {
                     _ => return io::Result::Err(io::Error::new(io::ErrorKind::InvalidData, "unsupported bit depth")),
                 }
             },
-            png::ColorType::Indexed => return io::Result::Err(io::Error::new(io::ErrorKind::InvalidData, "indexed PNGs are not supported")),
+            png::ColorType::Indexed => unreachable!(),
         };
 
         let metadata = match info.color_type {

@@ -106,7 +106,7 @@ impl PiecewiseConstant2D {
         let mut conditional_v = Vec::with_capacity(nv);
 
         for v in 0..nv {
-            conditional_v.push(PiecewiseConstant1D::new_bounded(&f[v * nu..(v * nu) + nu], domain.min[0], domain.max[0]));
+            conditional_v.push(PiecewiseConstant1D::new_bounded(&f[v * nu..(v * nu) + nu], domain.min.x, domain.max.x));
         }
 
         let mut marginal_func = Vec::with_capacity(nv);
@@ -115,7 +115,7 @@ impl PiecewiseConstant2D {
             marginal_func.push(v.integral());
         }
 
-        let marginal = PiecewiseConstant1D::new_bounded(&marginal_func, domain.min[1], domain.max[1]);
+        let marginal = PiecewiseConstant1D::new_bounded(&marginal_func, domain.min.y, domain.max.y);
 
         PiecewiseConstant2D {
             domain,
@@ -143,8 +143,8 @@ impl PiecewiseConstant2D {
     pub fn pdf(&self, pr: Point2f) -> Float {
         let p = self.domain.offset(pr);
 
-        let iu = ((p[0] * self.conditional_v[0].size() as Float) as usize).clamp(0, self.conditional_v[0].size() - 1);
-        let iv = ((p[1] * self.marginal.size() as Float) as usize).clamp(0, self.marginal.size() - 1);
+        let iu = ((p.x * self.conditional_v[0].size() as Float) as usize).clamp(0, self.conditional_v[0].size() - 1);
+        let iv = ((p.y * self.marginal.size() as Float) as usize).clamp(0, self.marginal.size() - 1);
         self.conditional_v[iv].f[iu] / self.marginal.integral()
     }
 }
@@ -654,7 +654,7 @@ pub fn sample_discrete(
         *pmf = weights[offset] / sum_weights;
     }
     if let Some(u_remapped) = u_remapped {
-        *u_remapped = Float::min((up - sum) / weights[offset], 1.0 - Float::EPSILON);
+        *u_remapped = Float::min((up - sum) / weights[offset], ONE_MINUS_EPSILON);
     }
 
     Some(offset)
@@ -667,7 +667,7 @@ pub fn sample_linear(u: Float, a: Float, b: Float) -> Float {
     }
 
     let x = u * (a + b) / (a + Float::sqrt(lerp(a * a, b * b, u)));
-    Float::min(x, 1.0 - Float::EPSILON)
+    Float::min(x, ONE_MINUS_EPSILON)
 }
 
 pub fn sample_tent(mut u: Float, r: Float) -> Float {
@@ -1074,7 +1074,7 @@ pub fn sample_spherical_rectangle(
     let au = u[0] * (g0 + g1 - 2.0 * PI) + (u[0] - 1.0) * (g2 + g3);
     let fu = (Float::cos(au) * b0 - b1) / Float::sin(au);
     let cu = Float::copysign(1.0 / Float::sqrt(sqr(fu) + sqr(b0)), fu);
-    let cu = Float::clamp(cu, -(1.0 - Float::EPSILON), 1.0 - Float::EPSILON);
+    let cu = Float::clamp(cu, -ONE_MINUS_EPSILON, ONE_MINUS_EPSILON);
 
     let xu = -(cu * z0) / safe::sqrt(1.0 - sqr(cu));
     let xu = Float::clamp(xu, x0, x1);

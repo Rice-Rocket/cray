@@ -3,7 +3,7 @@ use std::{collections::{HashMap, HashSet}, ops::{Index, IndexMut}, path::{Path, 
 use string_interner::{symbol::SymbolU32, DefaultBackend, StringInterner};
 use tracing::{info, warn};
 
-use crate::{camera::{film::{AbstractFilm, Film}, filter::Filter, AbstractCamera, Camera, CameraTransform}, clear_log, color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{ColorEncoding, ColorEncodingCache}, spectrum::Spectrum}, file::resolve_filename, image::Image, integrator::{AbstractIntegrator, Integrator}, light::Light, log, material::Material, media::{Medium, MediumInterface}, mipmap::MIPMap, options::{CameraRenderingSpace, Options}, primitive::{bvh::{create_accelerator, BvhAggregate, BvhSplitMethod}, geometric::GeometricPrimitive, simple::SimplePrimitive, transformed::TransformedPrimitive, Primitive}, sampler::Sampler, shape::Shape, texture::{FloatConstantTexture, FloatTexture, SpectrumTexture, TexInfo}, transform::{ApplyTransform, Transform}, Float, Mat4, Point3f, Vec3f};
+use crate::{camera::{film::{AbstractFilm, Film}, filter::Filter, AbstractCamera, Camera, CameraTransform}, clear_log, color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{ColorEncoding, ColorEncodingCache}, spectrum::Spectrum}, file::resolve_filename, image::Image, integrator::{AbstractIntegrator, Integrator}, light::Light, log, material::Material, media::{Medium, MediumInterface}, mipmap::MIPMap, options::{CameraRenderingSpace, Options}, primitive::{bvh::{create_accelerator, BvhAggregate, BvhSplitMethod}, geometric::GeometricPrimitive, simple::SimplePrimitive, transformed::TransformedPrimitive, Primitive}, sampler::Sampler, shape::Shape, texture::{FloatConstantTexture, FloatTexture, SpectrumTexture, TexInfo}, to_radians, transform::{ApplyTransform, Transform}, Float, Mat4, Point3f, Vec3f};
 
 use super::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::{FileLoc, ParsedParameterVector, ParserTarget}, utils::normalize_arg};
 
@@ -1441,7 +1441,8 @@ impl ParserTarget for BasicSceneBuilder {
         })
     }
 
-    fn rotate(&mut self, angle: Float, ax: Float, ay: Float, az: Float, loc: FileLoc) {
+    fn rotate(&mut self, mut angle: Float, ax: Float, ay: Float, az: Float, loc: FileLoc) {
+        angle = to_radians(angle);
         self.graphics_state.for_active_transforms(|t: &mut Transform| {
             *t = t.apply(Transform::from_rotation(angle.sin(), angle.cos(), Vec3f::new(ax, ay, az)))
         })

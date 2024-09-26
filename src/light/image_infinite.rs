@@ -24,14 +24,11 @@ impl AbstractLight for ImageInfiniteLight {
 
         let width = self.image.resolution().x;
         let height = self.image.resolution().y;
-        for v in 0..height
-        {
-            for u in 0..width
-            {
+        for v in 0..height {
+            for u in 0..width {
                 let mut rgb = Rgb::default();
-                for c in  0..3 
-                {
-                    rgb[c] = self.image.get_channel_wrapped(Point2i::new(u,v), c, WrapMode::OctahedralSphere.into());
+                for c in  0..3 {
+                    rgb[c] = self.image.get_channel_wrapped(Point2i::new(u, v), c, WrapMode::OctahedralSphere.into());
                 }
                 sum_l += RgbIlluminantSpectrum::new(&self.image_color_space, &rgb.clamp_zero()).sample(lambda);
             }
@@ -51,14 +48,13 @@ impl AbstractLight for ImageInfiniteLight {
         lambda: &SampledWavelengths,
         allow_incomplete_pdf: bool,
     ) -> Option<LightLiSample> {
-        let (uv, map_pdf, _offset) = if allow_incomplete_pdf
-        {
+        let (uv, map_pdf, _offset) = if allow_incomplete_pdf {
             self.compensated_distribution.sample(u)
         } else {
             self.distribution.sample(u)
         };
-        if map_pdf == 0.0 
-        {
+
+        if map_pdf == 0.0 {
             return None;
         }
 
@@ -67,25 +63,19 @@ impl AbstractLight for ImageInfiniteLight {
 
         let pdf = map_pdf / (4.0 * PI);
 
-        // TODO: We'll want to include the medium interface here, when we add media.
-        // I also want to rework Interaction ctors.
-        let intr = Interaction::new(
-            (ctx.p() + wi * (2.0 * self.scene_radius)).into(),
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            Default::default(),
-        );
+        let intr = Interaction {
+            pi: (ctx.p() + wi * (2.0 * self.scene_radius)).into(),
+            medium_interface: self.base.medium.clone(),
+            ..Default::default()
+        };
 
-        Some(LightLiSample::new(
-            self.image_le(uv, lambda), wi, pdf, intr))
+        Some(LightLiSample::new(self.image_le(uv, lambda), wi, pdf, intr))
     }
 
     fn pdf_li(&self, ctx: &LightSampleContext, wi: Vec3f, allow_incomplete_pdf: bool) -> Float {
         let w_light = self.base.render_from_light.apply_inverse(wi);
         let uv = equal_area_sphere_to_square(w_light);
-        let pdf = if allow_incomplete_pdf
-        {
+        let pdf = if allow_incomplete_pdf {
             self.compensated_distribution.pdf(uv)
         } else {
             self.distribution.pdf(uv)
@@ -105,7 +95,7 @@ impl AbstractLight for ImageInfiniteLight {
     }
 
     fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
-        let w_light = self.base.render_from_light.apply_inverse(ray.direction);
+        let w_light = self.base.render_from_light.apply_inverse(ray.direction).normalize();
         let uv = equal_area_sphere_to_square(w_light);
         self.image_le(uv, lambda)
     }
@@ -137,11 +127,10 @@ impl ImageInfiniteLight {
 
         log!("Creating image infinite light from file '{}'...", truncate_filename(filename));
 
-        let channel_desc = image.get_channel_desc(&["R", "G", "B"]);
-        if channel_desc.is_none() {
+        let Some(channel_desc) = image.get_channel_desc(&["R", "G", "B"]) else {
             panic!("{} Image used for ImageInfiniteLight doesn't have RGB channels", filename);
-        }
-        let channel_desc = channel_desc.unwrap();
+        };
+
         assert!(channel_desc.size() == 3);
         assert!(channel_desc.is_identity());
         if image.resolution().x != image.resolution().y {
@@ -175,8 +164,7 @@ impl ImageInfiniteLight {
 
     fn image_le(&self, uv: Point2f, lambda: &SampledWavelengths) -> SampledSpectrum {
         let mut rgb = Rgb::default();
-        for c in 0..3
-        {
+        for c in 0..3 {
             rgb[c] = self.image.lookup_nearest_channel_wrapped(uv, c, WrapMode::OctahedralSphere.into());
         }
         let spec = RgbIlluminantSpectrum::new(&self.image_color_space, &rgb.clamp_zero());

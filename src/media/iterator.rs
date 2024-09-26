@@ -115,9 +115,9 @@ impl Iterator for DDAMajorantIterator<'_> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.t_min >= self.t_max { return None };
 
-        let bits = if self.next_crossing_t[0] < self.next_crossing_t[1] { 4 } else { 0 }
-            | if self.next_crossing_t[0] < self.next_crossing_t[2] { 2 } else { 0 }
-            | if self.next_crossing_t[1] < self.next_crossing_t[2] { 1 } else { 0 };
+        let bits = if self.next_crossing_t[0] < self.next_crossing_t[1] { 0b100 } else { 0 }
+            | if self.next_crossing_t[0] < self.next_crossing_t[2] { 0b010 } else { 0 }
+            | if self.next_crossing_t[1] < self.next_crossing_t[2] { 0b001 } else { 0 };
 
         const CMP_TO_AXIS: [usize; 8] = [2, 1, 2, 1, 2, 2, 0, 0];
         let step_axis = CMP_TO_AXIS[bits];
@@ -159,10 +159,12 @@ impl MajorantGrid {
     }
 
     pub fn lookup(&self, x: i32, y: i32, z: i32) -> Float {
+        debug_assert!(x >= 0 && x < self.res.x && y >= 0 && y < self.res.y && z >= 0 && z < self.res.z);
         self.voxels[(x + self.res.x * (y + self.res.y * z)) as usize]
     }
 
     pub fn set(&mut self, x: i32, y: i32, z: i32, v: Float) {
+        debug_assert!(x >= 0 && x < self.res.x && y >= 0 && y < self.res.y && z >= 0 && z < self.res.z);
         self.voxels[(x + self.res.x * (y + self.res.y * z)) as usize] = v;
     }
 

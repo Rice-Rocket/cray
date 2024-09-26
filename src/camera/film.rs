@@ -225,13 +225,12 @@ impl FilmBaseParameters {
             }
             image_file.clone()
         } else if filename.is_empty() {
-            // TODO: Change to EXR
-            "output.png".to_string()
+            "output.exr".to_string()
         } else {
             filename
         };
 
-        // TODO Fullscreen option, if we get to GUI.
+        // TODO: Fullscreen option, if we get to GUI.
         let full_resolution = Point2i::new(
             parameters.get_one_int("xresolution", 1280),
             parameters.get_one_int("yresolution", 720),
@@ -303,16 +302,16 @@ impl FilmBaseParameters {
                 crop
             };
             if !cr.is_empty() {
-                // warn!(
-                //     "{} Crop window on command line will override the one in the file",
-                //     loc
-                // );
+                warn!(
+                    "{} Crop window on command line will override the one in the file",
+                    loc
+                );
             }
             if options.pixel_bounds.is_some() || !pb.is_empty() {
-                // warn!(
-                //     "{} Both pixel bounds and crop window specified; using crop window",
-                //     loc
-                // );
+                warn!(
+                    "{} Both pixel bounds and crop window specified; using crop window",
+                    loc
+                );
             }
             Bounds2i::new(
                 Point2i::new(
@@ -326,26 +325,26 @@ impl FilmBaseParameters {
             )
         } else if !cr.is_empty() {
             if options.pixel_bounds.is_some() {
-                // warn!(
-                //     "{} Ignoring cropwindow since pixel bounds were specified on command line",
-                //     loc
-                // );
+                warn!(
+                    "{} Ignoring cropwindow since pixel bounds were specified on command line",
+                    loc
+                );
                 pixel_bounds
             } else if cr.len() == 4 {
                 if !pb.is_empty() {
-                    // warn!(
-                    //     "{} Both pixel bounds and crop window specified; using crop window",
-                    //     loc
-                    // );
+                    warn!(
+                        "{} Both pixel bounds and crop window specified; using crop window",
+                        loc
+                    );
                 }
 
                 let crop = Bounds2f::new(
                     Point2f::new(
                         Float::clamp(Float::min(cr[0], cr[1]), 0.0, 1.0),
-                        Float::clamp(Float::max(cr[0], cr[1]), 0.0, 1.0),
+                        Float::clamp(Float::min(cr[2], cr[3]), 0.0, 1.0),
                     ),
                     Point2f::new(
-                        Float::clamp(Float::min(cr[2], cr[3]), 0.0, 1.0),
+                        Float::clamp(Float::max(cr[0], cr[1]), 0.0, 1.0),
                         Float::clamp(Float::max(cr[2], cr[3]), 0.0, 1.0),
                     ),
                 );
@@ -361,11 +360,11 @@ impl FilmBaseParameters {
                     ),
                 )
             } else {
-                // error!(
-                //     "{} {} Values provided for cropwindow, expected 4.",
-                //     loc,
-                //     cr.len()
-                // );
+                error!(
+                    "{} {} Values provided for cropwindow, expected 4.",
+                    loc,
+                    cr.len()
+                );
                 pixel_bounds
             }
         } else {
@@ -373,11 +372,10 @@ impl FilmBaseParameters {
         };
 
         if pixel_bounds.is_empty() {
-            // panic!("{} Degenerate pixel bounds provided to film", loc);
+            panic!("{} Degenerate pixel bounds provided to film", loc);
         }
 
-        // let diagonal = parameters.get_one_float("diagonal", 35.0);
-        let diagonal = 35.0;
+        let diagonal = parameters.get_one_float("diagonal", 35.0);
 
         FilmBaseParameters {
             full_resolution,
