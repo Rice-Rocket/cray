@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use once_cell::sync::Lazy;
 
-use crate::{color::rgb_to_spectra, mat::mul_mat_vec, Mat3, Point2f};
+use crate::{color::rgb_to_spectra, error, mat::mul_mat_vec, Mat3, Point2f};
 
 use super::{named_spectrum::NamedSpectrum, rgb_xyz::{Rgb, RgbSigmoidPolynomial, Xyz}, rgb_to_spectra::Gamut, spectrum::{DenselySampledSpectrum, Spectrum}};
 
@@ -113,7 +113,7 @@ impl From<&str> for NamedColorSpace {
             "srgb" => NamedColorSpace::SRgb,
             "rec2020" => NamedColorSpace::Rec2020,
             "aces2065-1" => NamedColorSpace::Aces2065_1,
-            _ => panic!("unknown color space: {}", value)
+            _ => { error!(@basic "unknown color space '{}'", value); },
         }
     }
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{bounds::Union, gamma, interaction::{Interaction, SurfaceInteraction}, lerp, lerp_float, numeric::DifferenceOfProducts, quadratic, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::{bilinear_pdf, invert_bilinear, invert_spherical_rectangle_sample, sample_bilinear, sample_spherical_rectangle}, spherical_quad_area, transform::{ApplyTransform, Transform}, Bounds3f, DirectionCone, Dot, Float, Mat3, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
+use crate::{bounds::Union, error, gamma, interaction::{Interaction, SurfaceInteraction}, lerp, lerp_float, numeric::DifferenceOfProducts, quadratic, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::{bilinear_pdf, invert_bilinear, invert_spherical_rectangle_sample, sample_bilinear, sample_spherical_rectangle}, spherical_quad_area, transform::{ApplyTransform, Transform}, Bounds3f, DirectionCone, Dot, Float, Mat3, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
 
 use super::{mesh::BilinearPatchMesh, AbstractShape, Shape, ShapeIntersection, ShapeSample, ShapeSampleContext};
 
@@ -23,7 +23,7 @@ impl BilinearPatch {
         render_from_object: &Transform,
         reverse_orientation: bool,
         parameters: &mut ParameterDictionary,
-        _loc: &FileLoc,
+        loc: &FileLoc,
     ) -> BilinearPatchMesh {
         let mut vi = parameters.get_int_array("indices");
         let p = parameters.get_point3f_array("P");
@@ -33,37 +33,37 @@ impl BilinearPatch {
             if p.len() == 4 {
                 vi = vec![0, 1, 2, 3];
             } else {
-                panic!("vertex indices 'indices' not provided with bilinear patch mesh shape");
+                error!(loc, "vertex indices 'indices' not provided with bilinear patch mesh shape");
             }
         } else if vi.len() % 4 != 0 {
-            panic!("number of vertex indices 'indices' not multiple of 4 as expected");
+            error!(loc, "number of vertex indices 'indices' not multiple of 4 as expected");
             // TODO: Could just pop excess and warn
         }
 
         if p.is_empty() {
-            panic!("vertex positions 'P' not provided with bilinear path mesh shape");
+            error!(loc, "vertex positions 'P' not provided with bilinear path mesh shape");
         }
 
         if !uvs.is_empty() && uvs.len() != p.len() {
-            panic!("number of vertex positions 'P' and vertex UVs 'uv' do not match");
+            error!(loc, "number of vertex positions 'P' and vertex UVs 'uv' do not match");
             // TODO: Could just dicard uvs instead of panicing + warn
         }
 
         let n = parameters.get_normal3f_array("N");
         if !n.is_empty() && n.len() != p.len() {
-            panic!("number of vertex positions 'P' and vertex normals 'N' do not match");
+            error!(loc, "number of vertex positions 'P' and vertex normals 'N' do not match");
             // TODO: Could just discard instead of pancing + warn
         }
 
         for v in vi.iter() {
             if *v as usize >= p.len() {
-                panic!("vertex indices {} out of bounds 'P' array length {}", v, p.len());
+                error!(loc, "vertex indices {} out of bounds 'P' array length {}", v, p.len());
             }
         }
 
         let face_indices = parameters.get_int_array("faceIndices");
         if !face_indices.is_empty() && face_indices.len() != vi.len() / 4 {
-            panic!("number of face indices 'faceIndices' and vertex indices 'indices' do not match");
+            error!(loc, "number of face indices 'faceIndices' and vertex indices 'indices' do not match");
             // TODO: Could just discard instead of pancing + warn
         }
 

@@ -1,8 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use tracing::error;
-
-use crate::{color::{sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}, wavelengths::SampledWavelengths}, phase::{HGPhaseFunction, PhaseFunction}, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::SampledGrid, transform::{ApplyInverseTransform, ApplyRayInverseTransform, Transform}, Bounds3f, Float, Point3f, Point3i, Ray};
+use crate::{color::{sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, phase::{HGPhaseFunction, PhaseFunction}, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::SampledGrid, transform::{ApplyInverseTransform, ApplyRayInverseTransform, Transform}, Bounds3f, Float, Point3f, Point3i, Ray};
 
 use super::{iterator::{DDAMajorantIterator, MajorantGrid}, AbstractMedium, MediumProperties};
 
@@ -31,12 +29,12 @@ impl RgbGridMedium {
         let le = parameters.get_rgb_array("Le");
 
         if sigma_a.is_empty() && sigma_s.is_empty() {
-            error!("{}: Rgb grid requires 'sigma_a' and/or 'sigma_s' parameter values", loc);
+            error!(loc, "rgb grid requires 'sigma_a' and/or 'sigma_s' parameter values");
         }
 
         let n_density = if !sigma_a.is_empty() {
             if !sigma_s.is_empty() && sigma_a.len() != sigma_s.len() {
-                error!("{}: Different number of samples ({} vs {}) provided for 'sigma_a' and 'sigma_s'", loc, sigma_a.len(), sigma_s.len());
+                error!(loc, "different number of samples ({} vs {}) provided for 'sigma_a' and 'sigma_s'", sigma_a.len(), sigma_s.len());
             }
 
             sigma_a.len()
@@ -45,11 +43,11 @@ impl RgbGridMedium {
         };
 
         if !le.is_empty() && sigma_a.is_empty() {
-            error!("{}: Rgb grid requires 'sigma_a' if 'Le' value provided", loc);
+            error!(loc, "rgb grid requires 'sigma_a' if 'Le' value provided");
         }
 
         if !le.is_empty() && n_density != le.len() {
-            error!("{}: Expected {} values for 'Le' parameter but was given {}", loc, n_density, le.len());
+            error!(loc, "expected {} values for 'Le' parameter but was given {}", n_density, le.len());
         }
 
         let nx = parameters.get_one_int("nx", 1);
@@ -57,7 +55,7 @@ impl RgbGridMedium {
         let nz = parameters.get_one_int("nz", 1);
 
         if n_density as i32 != nx * ny * nz {
-            error!("{}: Rgb grid medium has {} density values; expected nx*ny*nz = {}", loc, n_density, nx * ny * nz);
+            error!(loc, "rgb grid medium has {} density values; expected nx*ny*nz = {}", n_density, nx * ny * nz);
         }
 
         let sigma_a_grid = if !sigma_a.is_empty() {

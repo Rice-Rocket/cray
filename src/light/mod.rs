@@ -5,10 +5,9 @@ use image_infinite::ImageInfiniteLight;
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 use point::PointLight;
 use portal_image_infinite::PortalImageInfiniteLight;
-use tracing::warn;
 use uniform_infinite::UniformInfiniteLight;
 
-use crate::{bounds::Union, camera::CameraTransform, clear_log, color::{colorspace::{NamedColorSpace, RgbColorSpace}, sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, spectrum_to_xyz, DenselySampledSpectrum, RgbIlluminantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, cos_theta, equal_area_square_to_sphere, file::resolve_filename, image::{Image, ImageAndMetadata, ImageMetadata, PixelFormat}, interaction::{Interaction, SurfaceInteraction}, log, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc, utils::truncate_filename}, safe, shape::Shape, sqr, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Dot, Float, Normal3f, Point2f, Point2i, Point3f, Point3fi, Ray, Vec2f, Vec3f, PI};
+use crate::{bounds::Union, camera::CameraTransform, clear_log, color::{colorspace::{NamedColorSpace, RgbColorSpace}, sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, spectrum_to_xyz, DenselySampledSpectrum, RgbIlluminantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, cos_theta, equal_area_square_to_sphere, error, file::resolve_filename, image::{Image, ImageAndMetadata, ImageMetadata, PixelFormat}, interaction::{Interaction, SurfaceInteraction}, log, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc, utils::truncate_filename}, safe, shape::Shape, sqr, texture::FloatTexture, transform::Transform, warn, Bounds3f, DirectionCone, Dot, Float, Normal3f, Point2f, Point2i, Point3f, Point3fi, Ray, Vec2f, Vec3f, PI};
 
 pub mod sampler;
 pub mod point;
@@ -110,7 +109,7 @@ impl Light {
                     ))
                 } else if !l.is_empty() && portal.is_empty() {
                     if !filename.is_empty() {
-                        panic!("Can't specify both emission L and filename with ImageInfiniteLight");
+                        error!(loc, "can't specify both emission L and filename with ImageInfiniteLight");
                     }
 
                     scale /= spectrum_to_photometric(&l[0]);
@@ -127,7 +126,7 @@ impl Light {
                 } else {
                     let image_and_metadata = if filename.is_empty() {
                         if let Spectrum::RgbIlluminant(_) = l[0].as_ref() {} else {
-                            warn!("{}: Converting non-RGB 'L' parameter to RGB so that image infinite light can be used", loc);
+                            warn!(loc, "converting non-RGB 'L' parameter to RGB so that image infinite light can be used");
                         };
 
                         let xyz = spectrum_to_xyz(&l[0]);
@@ -157,11 +156,11 @@ impl Light {
                             for x in 0..image_and_metadata.image.resolution().x {
                                 for c in 0..image_and_metadata.image.n_channels() {
                                     if image_and_metadata.image.get_channel(Point2i::new(x, y), c).is_nan() {
-                                        panic!("Image '{}' contains NaN values", truncate_filename(&filename));
+                                        error!(loc, "image '{}' contains NaN values", truncate_filename(&filename));
                                     }
 
                                     if image_and_metadata.image.get_channel(Point2i::new(x, y), c).is_infinite() {
-                                        panic!("Image '{}' contains infinite values", truncate_filename(&filename));
+                                        error!(loc, "image '{}' contains infinite values", truncate_filename(&filename));
                                     }
                                 }
                             }
@@ -171,7 +170,7 @@ impl Light {
 
                     let color_space = image_and_metadata.metadata.color_space.expect("expected color space");
                     let Some(channel_desc) = image_and_metadata.image.get_channel_desc(&["R", "G", "B"]) else {
-                        panic!("Infinite image light sources must have RGB channels");
+                        error!(loc, "infinite image light sources must have RGB channels");
                     };
 
                     scale /= spectrum_to_photometric(&color_space.illuminant);
@@ -224,6 +223,7 @@ impl Light {
                             scale,
                             &filename,
                             portal,
+                            loc,
                         ))
                     } else {
                         Light::ImageInfinite(ImageInfiniteLight::new(
@@ -232,11 +232,12 @@ impl Light {
                             color_space,
                             scale,
                             &filename,
+                            loc,
                         ))
                     }
                 }
             },
-            _ => panic!("{}: Light {} unknown", loc, name)
+            _ => { error!(loc, "light '{}' unknown", name); },
         }
     }
 
@@ -261,7 +262,7 @@ impl Light {
                 alpha,
                 options,
             )),
-            _ => panic!("Area light {} unknown", name),
+            _ => { error!(loc, "area light '{}' unknown", name); },
         }
     }
 }

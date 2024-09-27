@@ -28,3 +28,7 @@ pub mod integrator;
 pub mod render;
 #[macro_use]
 pub mod macros;
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) struct Wrap<T>(pub T);

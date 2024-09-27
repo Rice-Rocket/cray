@@ -5,7 +5,7 @@ use fast_polynomial::poly;
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
 
-use crate::{mat::mul_mat_vec, math::safe, numeric::HasNan, Mat3, Point2f, Float};
+use crate::{error, mat::mul_mat_vec, math::safe, numeric::HasNan, Float, Mat3, Point2f};
 
 use super::{cie::{Cie, CIE_Y_INTEGRAL}, spectrum::{inner_product, Spectrum, AbstractSpectrum, LAMBDA_MAX, LAMBDA_MIN}};
 
@@ -455,12 +455,12 @@ impl ColorEncoding {
             let params = name.split_whitespace().collect::<Vec<&str>>();
 
             if params.len() != 2 || params[0] != "gamma" {
-                panic!("expected gamma <value> for color encoding");
+                error!(@basic "expected gamma <value> for color encoding");
             }
 
             let gamma = params[1].parse::<Float>().expect("unable to parse gamma float value");
             if gamma == 0.0 {
-                panic!("gamma value cannot be 0.0");
+                error!(@basic "gamma value cannot be 0.0");
             }
 
             let gamma = OrderedFloat(gamma);
@@ -474,7 +474,7 @@ impl ColorEncoding {
                     encoding
                 }
             } else {
-                panic!("no gamma encoded cache provided");
+                error!(@basic "no gamma encoded cache provided");
             }
         }
     }

@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use crate::{gaussian, gaussian_integral, lerp, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampler::AbstractSampler, sampling::{sample_tent, PiecewiseConstant2D}, sqr, vec2d::Vec2D, windowed_sinc, Bounds2f, Bounds2i, Float, Point2f, Point2i, Vec2f};
+use crate::{error, gaussian, gaussian_integral, lerp, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampler::AbstractSampler, sampling::{sample_tent, PiecewiseConstant2D}, sqr, vec2d::Vec2D, windowed_sinc, Bounds2f, Bounds2i, Float, Point2f, Point2i, Vec2f};
 
 use super::CameraSample;
 
@@ -31,7 +31,7 @@ impl Filter {
             "gaussian" => Filter::Gaussian(GaussianFilter::create(parameters, loc)),
             "mitchell" => Filter::Mitchell(MitchellFilter::create(parameters, loc)),
             "sinc" => Filter::LanczosSinc(LanczosSincFilter::create(parameters, loc)),
-            _ => panic!("unknown filter type")
+            _ => { error!(loc, "unknown filter type '{}'", name); },
         }
     }
 }

@@ -1,8 +1,6 @@
 use std::{collections::HashMap, fmt::Display, str::FromStr as _, sync::Arc};
 
-use tracing::warn;
-
-use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, named_spectrum::NamedSpectrum, rgb_xyz::Rgb, spectrum::{BlackbodySpectrum, PiecewiseLinearSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}}, texture::{FloatConstantTexture, FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Normal3f, Point2f, Point3f, Float, Vec2f, Vec3f};
+use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, named_spectrum::NamedSpectrum, rgb_xyz::Rgb, spectrum::{BlackbodySpectrum, PiecewiseLinearSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}}, error, texture::{FloatConstantTexture, FloatTexture, SpectrumConstantTexture, SpectrumTexture}, warn, Float, Normal3f, Point2f, Point3f, Vec2f, Vec3f};
 
 use super::{param::{Param, ParamType}, target::{FileLoc, ParsedParameterVector}, utils::{dequote_string, is_quoted_string}};
 
@@ -263,12 +261,10 @@ impl<'a> From<Param<'a>> for ParsedParameter {
             ParamType::Texture => "texture".to_owned(),
         };
 
-        let loc = FileLoc::default();
-
         let mut param = ParsedParameter {
             name: name.to_owned(),
             param_type,
-            loc,
+            loc: value.loc.clone(),
             floats: Vec::new(),
             ints: Vec::new(),
             strings: Vec::new(),
@@ -309,21 +305,21 @@ impl<'a> From<Param<'a>> for ParsedParameter {
                 match val_type {
                     ValueType::Unknown => val_type = ValueType::String,
                     ValueType::String => (),
-                    _ => panic!("parameter {} has mixed types", name),
+                    _ => { error!(&value.loc, "parameter '{}' has mixed types", name); },
                 }
                 param.add_string(dequote_string(v.as_str()).to_owned());
             } else if v.starts_with('t') && v == "true" {
                 match val_type {
                     ValueType::Unknown => val_type = ValueType::Boolean,
                     ValueType::Boolean => {}
-                    _ => panic!("Parameter {} has mixed types", name),
+                    _ => { error!(&value.loc, "parameter '{}' has mixed types", name); },
                 }
                 param.add_bool(true);
             } else if v.starts_with('f') && v == "false" {
                 match val_type {
                     ValueType::Unknown => val_type = ValueType::Boolean,
                     ValueType::Boolean => {}
-                    _ => panic!("Parameter {} has mixed types", name),
+                    _ => { error!(&value.loc, "parameter '{}' has mixed types", name); },
                 }
                 param.add_bool(false);
             } else {
@@ -331,7 +327,7 @@ impl<'a> From<Param<'a>> for ParsedParameter {
                     ValueType::Unknown => val_type = ValueType::Scalar,
                     ValueType::Scalar => {}
                     ValueType::Integer => {}
-                    _ => panic!("Parameter {} has mixed types", name),
+                    _ => { error!(&value.loc, "parameter '{}' has mixed types", name); },
                 }
 
                 if val_type == ValueType::Integer {
@@ -419,7 +415,7 @@ impl ParameterDictionary {
             match p.param_type.as_str() {
                 BooleanParam::TYPE_NAME => {
                     if p.bools.is_empty() {
-                        panic!("No boolean values provided for boolean-valued parameter!");
+                        error!(&p.loc, "no boolean values provided for boolean-valued parameter!");
                     }
                 }
                 FloatParam::TYPE_NAME
@@ -432,27 +428,27 @@ impl ParameterDictionary {
                 | "rgb"
                 | "blackbody" => {
                     if p.ints.is_empty() && p.floats.is_empty() {
-                        panic!(
-                            "{} Non-numeric values provided for numeric-valued parameter!",
-                            p.loc
+                        error!(
+                            &p.loc,
+                            "non-numeric values provided for numeric-valued parameter!",
                         );
                     }
                 }
                 StringParam::TYPE_NAME | "texture" => {
                     if p.strings.is_empty() {
-                        panic!(
-                            "{} Non-string values provided for string-valued parameter!",
-                            p.loc
-                        )
+                        error!(
+                            &p.loc,
+                            "non-string values provided for string-valued parameter!",
+                        );
                     }
                 }
                 "spectrum" => {
                     if p.strings.is_empty() && p.ints.is_empty() && p.floats.is_empty() {
-                        panic!("{} Expecting string or numeric-valued parameter for spectrum parameter.", p.loc)
+                        error!(&p.loc, "expecting string or numeric-valued parameter for spectrum parameter.");
                     }
                 }
                 param => {
-                    panic!("{} Unknown parameter type {}", p.loc, param)
+                    error!(&p.loc, "unknown parameter type '{}'", param);
                 }
             }
         }
@@ -472,13 +468,13 @@ impl ParameterDictionary {
             let values = P::get_values(p);
 
             if values.is_empty() {
-                panic!("{} no values provided for parameter {}", p.loc, p.name);
+                error!(&p.loc, "no values provided for parameter '{}'", p.name);
             }
 
             if values.len() != P::N_PER_ITEM as usize {
-                panic!(
-                    "{} expected {} values for parameter {}",
-                    p.loc,
+                error!(
+                    &p.loc,
+                    "expected {} values for parameter '{}'",
                     P::N_PER_ITEM,
                     p.name
                 );
@@ -547,9 +543,10 @@ impl ParameterDictionary {
             );
             if !s.is_empty() {
                 if s.len() > 1 {
-                    panic!(
-                        "{} More than one value provided for parameter {}",
-                        p.loc, p.name
+                    error!(
+                        &p.loc,
+                        "more than one value provided for parameter '{}'",
+                        p.name
                     );
                 }
                 return Some(s.into_iter().nth(0).expect("Expected non-empty vector"));
@@ -585,9 +582,10 @@ impl ParameterDictionary {
                         color_space.clone()
                     };
                     if rgb.r < 0.0 || rgb.g < 0.0 || rgb.b < 0.0 {
-                        panic!(
-                            "{} Rgb Parameter {} has negative component",
-                            loc, param.name
+                        error!(
+                            loc,
+                            "rgb parameter '{}' has negative component",
+                            param.name
                         );
                     }
                     match spectrum_type {
@@ -598,9 +596,10 @@ impl ParameterDictionary {
                         }
                         SpectrumType::Albedo => {
                             if rgb.r > 1.0 || rgb.g > 1.0 || rgb.b > 1.0 {
-                                panic!(
-                                    "{} Rgb Parameter {} has component value > 1.0",
-                                    loc, param.name
+                                error!(
+                                    loc,
+                                    "rgb parameter '{}' has component value > 1.0",
+                                    param.name
                                 );
                             }
                             Arc::new(Spectrum::RgbAlbedo(RgbAlbedoSpectrum::new(
@@ -626,14 +625,15 @@ impl ParameterDictionary {
             );
         } else if param.param_type == "spectrum" && !param.floats.is_empty() {
             if param.floats.len() % 2 != 0 {
-                panic!(
-                    "{} Found odd number of values for {}",
-                    param.loc, param.name
+                error!(
+                    param.loc,
+                    "found odd number of values for '{}'",
+                    param.name
                 );
             }
             let n_samples = param.floats.len() / 2;
             if n_samples == 1 {
-                warn!("{} {} Specified spectrum is only non-zero at a single wavelength; probably unintended", param.loc, param.name);
+                warn!(param.loc, "{} specified spectrum is only non-zero at a single wavelength; probably unintended", param.name);
             }
             return Self::return_array(
                 param.floats.as_slice(),
@@ -646,7 +646,7 @@ impl ParameterDictionary {
                     let mut value = vec![0.0; n_samples];
                     for i in 0..n_samples {
                         if i > 0 && v[2 * i] <= lambda[i - 1] {
-                            panic!("{} Spectrum description invalid: at {}'th entry, wavelengths aren't increasing: {} >= {}", param.loc, i - 1, lambda[i -1], v[2 * i]);
+                            error!(param.loc, "spectrum description invalid: at {}'th entry, wavelengths aren't increasing: {} >= {}", i - 1, lambda[i -1], v[2 * i]);
                         }
                         lambda[i] = v[2 * i];
                         value[i] = v[2 * i + 1];
@@ -672,7 +672,7 @@ impl ParameterDictionary {
 
                     let spd = Spectrum::read(&s[0], cached_spectra);
                     if spd.is_none() {
-                        panic!("{} Unable to read/invalid spectrum file {}", &s[0], loc);
+                        error!(loc, "unable to read/invalid spectrum file '{}'", &s[0]);
                     }
                     spd.unwrap()
                 },
@@ -715,12 +715,13 @@ impl ParameterDictionary {
         C: FnMut(&[ValueType], &FileLoc) -> ReturnType,
     {
         if values.is_empty() {
-            panic!("{} No values provided for {}", loc, name);
+            error!(loc, "no values provided for '{}'", name);
         }
         if values.len() % n_per_item as usize != 0 {
-            panic!(
-                "{} Number of values provided for {} is not a multiple of {}",
-                loc, name, n_per_item
+            error!(
+                loc,
+                "number of values provided for '{}' is not a multiple of {}",
+                name, n_per_item
             );
         }
 
@@ -932,15 +933,17 @@ impl TextureParameterDictionary {
         let p = self.dict.params.iter_mut().find(|p| p.name == name)?;
         if p.param_type == "texture" {
             if p.strings.is_empty() {
-                panic!(
-                    "{} No filename provided for texture parameter {}",
-                    p.loc, p.name
+                error!(
+                    p.loc,
+                    "no filename provided for texture parameter '{}'",
+                    p.name
                 );
             }
             if p.strings.len() != 1 {
-                panic!(
-                    "{} More than one filename provided for texture parameter {}",
-                    p.loc, p.name
+                error!(
+                    p.loc,
+                    "more than one filename provided for texture parameter '{}'",
+                    p.name
                 );
             }
 
@@ -950,7 +953,7 @@ impl TextureParameterDictionary {
             if let Some(tex) = tex {
                 Some(tex.clone())
             } else {
-                panic!("{} Couldn't find float texture {}", p.loc, p.strings[0]);
+                error!(p.loc, "couldn't find float texture '{}'", p.strings[0]);
             }
         } else if p.param_type == "float" {
             let v = self.get_one_float(name, 0.0);
@@ -1000,15 +1003,17 @@ impl TextureParameterDictionary {
             match p.param_type.as_str() {
                 "texture" => {
                     if p.strings.is_empty() {
-                        panic!(
-                            "{} No filename provided for texture parameter {}",
-                            p.loc, p.name
+                        error!(
+                            p.loc,
+                            "no filename provided for texture parameter '{}'",
+                            p.name
                         );
                     }
                     if p.strings.len() > 1 {
-                        panic!(
-                            "{} More than one filename provided for texture parameter {}",
-                            p.loc, p.name
+                        error!(
+                            p.loc,
+                            "more than one filename provided for texture parameter '{}'",
+                            p.name
                         );
                     }
 
@@ -1018,20 +1023,21 @@ impl TextureParameterDictionary {
                     if let Some(spec) = spec {
                         Some(spec.clone())
                     } else {
-                        panic!("{} Couldn't find spectrum texture {}", p.loc, p.strings[0]);
+                        error!(p.loc, "couldn't find spectrum texture '{}'", p.strings[0]);
                     }
                 }
                 "rgb" => {
                     if p.floats.len() != 3 {
-                        panic!(
-                            "{} Expected 3 values for Rgb texture parameter {}",
-                            p.loc, p.name
+                        error!(
+                            p.loc,
+                            "expected 3 values for rgb texture parameter '{}'",
+                            p.name
                         );
                     }
                     p.looked_up = true;
                     let rgb = Rgb::new(p.floats[0], p.floats[1], p.floats[2]);
                     if rgb.r < 0.0 || rgb.g < 0.0 || rgb.b < 0.0 {
-                        panic!("{} Rgb Parameter {} has negative component", p.loc, p.name);
+                        error!(p.loc, "rgb parameter '{}' has negative component", p.name);
                     }
                     let s = match spectrum_type {
                         SpectrumType::Illuminant => Spectrum::RgbIlluminant(

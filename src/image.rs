@@ -3,9 +3,8 @@ use std::{collections::HashMap, ffi::OsStr, fmt::Display, fs::{self, File}, io, 
 use arrayvec::ArrayVec;
 use half::f16;
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
-use tracing::warn;
 
-use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{AbstractColorEncoding as _, ColorEncoding, ColorEncodingPtr}}, modulo, reader::utils::truncate_filename, tile::Tile, vec2d::Vec2D, windowed_sinc, Bounds2f, Bounds2i, Float, Mat4, Point2f, Point2i};
+use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{AbstractColorEncoding as _, ColorEncoding, ColorEncodingPtr}}, modulo, reader::utils::truncate_filename, tile::Tile, vec2d::Vec2D, warn, windowed_sinc, Bounds2f, Bounds2i, Float, Mat4, Point2f, Point2i};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PixelFormat {
@@ -923,7 +922,7 @@ impl Image {
     }
 
     pub fn set_channel(&mut self, p: Point2i, c: usize, value: Float) {
-        let value = if value.is_nan() { warn!("tried to store NaN value in image, using 0.0 instead"); 0.0 } else { value };
+        let value = if value.is_nan() { warn!(@basic "tried to store NaN value in image, using 0.0 instead"); 0.0 } else { value };
 
         let index = self.pixel_offset(p) + c;
         match &mut self.data {

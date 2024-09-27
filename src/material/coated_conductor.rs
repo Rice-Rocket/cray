@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{conductor::ConductorBxDF, dielectric::DielectricBxDF, layered::CoatedConductorBxDF, BxDF}, color::{named_spectrum::NamedSpectrum, sampled::SampledSpectrum, spectrum::{AbstractSpectrum, ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, scattering::TrowbridgeReitzDistribution, texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Float};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{conductor::ConductorBxDF, dielectric::DielectricBxDF, layered::CoatedConductorBxDF, BxDF}, color::{named_spectrum::NamedSpectrum, sampled::SampledSpectrum, spectrum::{AbstractSpectrum, ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, scattering::TrowbridgeReitzDistribution, texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Float};
 
 use super::{AbstractMaterial, AbstractTextureEvaluator, MaterialEvalContext};
 
@@ -111,7 +111,7 @@ impl CoatedConductorMaterial {
         let reflectance = parameters.get_spectrum_texture("reflectance", None, SpectrumType::Albedo, cached_spectra, textures);
 
         if reflectance.is_some() && (conductor_eta.is_some() || k.is_some()) {
-            panic!("Cannot specify both reflectance and conductor eta/k for conductor material");
+            error!(loc, "cannot specify both reflectance and conductor eta/k for conductor material");
         }
 
         if reflectance.is_none() && conductor_eta.is_none() {

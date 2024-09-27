@@ -5,7 +5,7 @@ use mesh::{BilinearPatchMesh, TriQuadMesh, TriangleMesh};
 use sphere::Sphere;
 use triangle::Triangle;
 
-use crate::{file::resolve_filename, interaction::{Interaction, SurfaceInteraction}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
+use crate::{error, file::resolve_filename, interaction::{Interaction, SurfaceInteraction}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
 
 pub mod sphere;
 pub mod mesh;
@@ -132,7 +132,7 @@ impl Shape {
 
                 tri_quad_shapes
             },
-            _ => panic!("unknown shape {}", name),
+            _ => { error!(loc, "unknown shape '{}'", name); },
         }
     }
 }

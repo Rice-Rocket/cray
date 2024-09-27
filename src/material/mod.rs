@@ -10,7 +10,7 @@ use diffuse_transmission::DiffuseTransmissionMaterial;
 use rand::{rngs::SmallRng, Rng};
 use thin_dielectric::ThinDielectricMaterial;
 
-use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{AbstractBxDF, BxDF}, color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, image::{Image, WrapMode, WrapMode2D}, interaction::SurfaceInteraction, reader::{paramdict::{NamedTextures, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractFloatTexture, AbstractSpectrumTexture, FloatTexture, SpectrumTexture, TextureEvalContext}, Float, Frame, Normal3f, Point2f, Point3f, Vec2f, Vec3f};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{AbstractBxDF, BxDF}, color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, error, image::{Image, WrapMode, WrapMode2D}, interaction::SurfaceInteraction, reader::{paramdict::{NamedTextures, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractFloatTexture, AbstractSpectrumTexture, FloatTexture, SpectrumTexture, TextureEvalContext}, Float, Frame, Normal3f, Point2f, Point3f, Vec2f, Vec3f};
 
 pub mod diffuse;
 pub mod diffuse_transmission;
@@ -78,7 +78,7 @@ impl Material {
             "mix" => {
                 let material_names = parameters.get_string_array("materials");
                 if material_names.len() != 2 {
-                    panic!("expected exactly two materials for mix material");
+                    error!(loc, "expected exactly two materials for mix material");
                 }
 
                 let named_material: Vec<Arc<Material>> = material_names.iter()
@@ -187,7 +187,7 @@ impl SingleMaterial {
                 cached_spectra,
                 loc,
             )),
-            _ => panic!("material {} unknown", name),
+            _ => { error!(loc, "material '{}' unknown", name); },
         }
     }
 }

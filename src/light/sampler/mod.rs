@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bvh::BvhLightSampler;
 use uniform::UniformLightSampler;
 
-use crate::Float;
+use crate::{error, reader::target::FileLoc, Float};
 
 use super::{Light, LightSampleContext};
 
@@ -68,7 +68,7 @@ impl LightSampler {
                 lights,
             }),
             "bvh" => LightSampler::Bvh(BvhLightSampler::new(lights)),
-            _ => panic!("unknown light sampler: {}", name),
+            _ => { error!(@basic "unknown light sampler: '{}'", name); },
         }
     }
 }

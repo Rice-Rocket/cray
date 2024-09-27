@@ -2,11 +2,10 @@ use std::{ops::Mul, sync::Arc};
 
 use film::{Film, AbstractFilm as _};
 use projective::{OrthographicCamera, PerspectiveCamera};
-use tracing::warn;
 use transform::{ApplyInverseTransform, ApplyRayInverseTransform, ApplyRayTransform, ApplyTransform};
 use vect::Dot;
 
-use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, math::*, media::Medium, options::{CameraRenderingSpace, Options}, ray::AbstractRay, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, AuxiliaryRays, Frame, Normal3f, Point2f, Point3f, Ray, RayDifferential, Float, Vec3f};
+use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, error, image::ImageMetadata, math::*, media::Medium, options::{CameraRenderingSpace, Options}, ray::AbstractRay, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, warn, AuxiliaryRays, Float, Frame, Normal3f, Point2f, Point3f, Ray, RayDifferential, Vec3f};
 
 pub mod projective;
 pub mod film;
@@ -56,7 +55,7 @@ impl Camera {
                 options,
                 loc
             )),
-            _ => panic!("camera type '{}' unknown", name)
+            _ => { error!(loc, "camera type '{}' unknown", name); },
         }
     }
 }
@@ -411,7 +410,7 @@ impl CameraBaseParameters {
         let mut shutter_close = parameters.get_one_float("shutterclose", 1.0);
 
         if shutter_close < shutter_open {
-            warn!("{} Shutter close time [{}] < shutter open time [{}]. Swapping them.", loc, shutter_close, shutter_open);
+            warn!(loc, "shutter close time [{}] < shutter open time [{}]. swapping them.", shutter_close, shutter_open);
             std::mem::swap(&mut shutter_close, &mut shutter_open);
         }
 

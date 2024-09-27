@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex}};
 
-use crate::{color::{rgb_xyz::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, Rgb}, sampled::SampledSpectrum, spectrum::{AbstractSpectrum as _, ConstantSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}, wavelengths::SampledWavelengths}, file::resolve_filename, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, material::NormalBumpEvalContext, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, reader::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::FileLoc}, spherical_theta, sqr, transform::{ApplyTransform, Transform}, Dot, Float, Normal3f, Point2f, Point3f, Vec2f, Vec3f, FRAC_1_PI, FRAC_1_TAU, PI};
+use crate::{color::{rgb_xyz::{ColorEncoding, ColorEncodingCache, ColorEncodingPtr, Rgb}, sampled::SampledSpectrum, spectrum::{AbstractSpectrum as _, ConstantSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, file::resolve_filename, image::WrapMode, interaction::{Interaction, SurfaceInteraction}, material::NormalBumpEvalContext, mipmap::{FilterFunction, MIPMap, MIPMapFilterOptions}, options::Options, reader::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::FileLoc}, spherical_theta, sqr, transform::{ApplyTransform, Transform}, Dot, Float, Normal3f, Point2f, Point3f, Vec2f, Vec3f, FRAC_1_PI, FRAC_1_TAU, PI};
 
 pub trait AbstractFloatTexture {
     fn evaluate(&self, ctx: &TextureEvalContext) -> Float;
@@ -112,9 +112,8 @@ impl FloatTexture {
                 let t = FloatImageTexture::create(&render_from_texture, parameters, loc, options, texture_cache, gamma_encoding_cache);
                 FloatTexture::Image(t)
             }
-            _ => {
-                panic!("Texture {} unknown", name);
-            }
+            _ => { error!(loc, "texture '{}' unknown", name); },
+
         }
     }
 }
@@ -442,9 +441,7 @@ impl SpectrumTexture {
                 let t = SpectrumImageTexture::create(&render_from_texture, parameters, spectrum_type, options, texture_cache, gamma_encoding_cache, loc);
                 SpectrumTexture::Image(t)
             }
-            _ => {
-                panic!("Texture {} unknown", name);
-            }
+            _ => { error!(loc, "texture '{}' unknown", name); },
         }
     }
 }
@@ -783,7 +780,7 @@ impl TextureMapping2D {
     pub fn create(
         parameters: &mut ParameterDictionary,
         render_from_texture: &Transform,
-        _loc: &FileLoc,
+        loc: &FileLoc,
     ) -> TextureMapping2D {
         // TODO change the default to take &str...
         let ty = parameters.get_one_string("mapping", "uv");
@@ -809,7 +806,7 @@ impl TextureMapping2D {
                 ds: parameters.get_one_float("udelta", 0.0),
                 dt: parameters.get_one_float("vdelta", 0.0)
             }),
-            _ => panic!("Unknown texture mapping type {}", ty),
+            _ => { error!(loc, "unknown texture mapping type '{}'", ty); },
         }
     }
 }

@@ -1,9 +1,8 @@
 use std::{collections::HashMap, sync::Arc};
 
 use once_cell::sync::Lazy;
-use tracing::warn;
 
-use crate::{color::cie::CIE_Y_INTEGRAL, file::read_float_file, math::*};
+use crate::{color::cie::CIE_Y_INTEGRAL, file::read_float_file, math::*, warn};
 
 use super::{cie::{Cie, NUM_CIES_SAMPLES}, colorspace::RgbColorSpace, named_spectrum::{NamedSpectrum, CIE_S0, CIE_S1, CIE_S2, CIE_S_LAMBDA}, rgb_xyz::{Rgb, RgbSigmoidPolynomial, Xyz}, sampled::{SampledSpectrum, NUM_SPECTRUM_SAMPLES}, wavelengths::SampledWavelengths};
 
@@ -331,12 +330,12 @@ impl PiecewiseLinearSpectrum {
     pub fn read(filename: &str) -> Option<PiecewiseLinearSpectrum> {
         let vals = read_float_file(filename);
         if vals.is_empty() {
-            warn!("unable to read spectrum file: {}", filename);
+            warn!(@image filename, "unable to read spectrum file");
             return None;
         }
 
         if vals.len() % 2 != 0 {
-            warn!("extra value found in spectrum file: {}", filename);
+            warn!(@image filename, "extra value found in spectrum file");
             return None;
         }
 
@@ -346,8 +345,9 @@ impl PiecewiseLinearSpectrum {
         for i in 0..(vals.len() / 2) {
             if i > 0 && vals[2 * i] <= *lambdas.last().unwrap() {
                 warn!(
-                    "{}: spectrum file invalid at {} entry, wavelengths not increasing ({} >= {})",
-                    filename, i, *lambdas.last().unwrap(), vals[2 * i],
+                    @image filename,
+                    "spectrum file invalid at {} entry, wavelengths not increasing ({} >= {})",
+                    i, *lambdas.last().unwrap(), vals[2 * i],
                 );
                 return None;
             }

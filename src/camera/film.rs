@@ -3,9 +3,8 @@ use std::{ops::{AddAssign, Div, Index, IndexMut, MulAssign}, path::PathBuf, str:
 use half::f16;
 use once_cell::sync::Lazy;
 use rgb2spec::{LAMBDA_MAX, LAMBDA_MIN};
-use tracing::{error, warn};
 
-use crate::{color::{cie::Cie, colorspace::{NamedColorSpace, RgbColorSpace}, named_spectrum::NamedSpectrum, rgb_xyz::{white_balance, Rgb, Xyz}, sampled::SampledSpectrum, spectrum::{inner_product, DenselySampledSpectrum, PiecewiseLinearSpectrum, Spectrum, AbstractSpectrum}, wavelengths::SampledWavelengths}, image::{Image, ImageMetadata, PixelFormat}, interaction::SurfaceInteraction, linear_least_squares_3, numeric::HasNan, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, vec2d::Vec2D, Bounds2f, Bounds2i, Mat3, Normal3f, Point2f, Point2i, Point3f, Float, Vec2f, Vec3f};
+use crate::{color::{cie::Cie, colorspace::{NamedColorSpace, RgbColorSpace}, named_spectrum::NamedSpectrum, rgb_xyz::{white_balance, Rgb, Xyz}, sampled::SampledSpectrum, spectrum::{inner_product, AbstractSpectrum, DenselySampledSpectrum, PiecewiseLinearSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, image::{Image, ImageMetadata, PixelFormat}, interaction::SurfaceInteraction, linear_least_squares_3, numeric::HasNan, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, vec2d::Vec2D, warn, Bounds2f, Bounds2i, Float, Mat3, Normal3f, Point2f, Point2i, Point3f, Vec2f, Vec3f};
 
 use super::{filter::{Filter, AbstractFilter as _}, CameraTransform};
 
@@ -81,7 +80,7 @@ impl Film {
                 loc,
                 options,
             ))),
-            _ => panic!("{} unknown film type {}", loc, name)
+            _ => { error!(loc, "unknown film type '{}'", name); },
         }
     }
 }
@@ -221,7 +220,7 @@ impl FilmBaseParameters {
 
         let filename = if let Some(image_file) = options.image_file.as_ref() {
             if !filename.is_empty() {
-                warn!("Output filename supplied on command line {} will override filename in scene description file {}", image_file, filename);
+                warn!(@basic "output filename supplied on command line '{}' will override filename in scene description file '{}'", image_file, filename);
             }
             image_file.clone()
         } else if filename.is_empty() {
@@ -252,22 +251,22 @@ impl FilmBaseParameters {
 
             if intersect != new_bounds {
                 warn!(
-                    "{} Supplied pixel bounds extend beyond image, clamping",
-                    loc
+                    loc,
+                    "supplied pixel bounds extend beyond image, clamping",
                 );
             }
             if !pb.is_empty() {
                 warn!(
-                    "{} Both pixel bounds and crop window are specified; using crop window",
-                    loc
+                    loc,
+                    "both pixel bounds and crop window are specified; using crop window",
                 );
             }
             intersect
         } else if !pb.is_empty() {
             if pb.len() != 4 {
-                panic!(
-                    "{} Too many values ({}) supplied for pixel bounds, expected 4",
+                error!(
                     loc,
+                    "too many values ({}) supplied for pixel bounds, expected 4",
                     pb.len()
                 );
             }
@@ -277,8 +276,8 @@ impl FilmBaseParameters {
 
             if intersect != new_bounds {
                 warn!(
-                    "{} Supplied pixel bounds extend beyond image resolution, clamping.",
-                    loc
+                    loc,
+                    "supplied pixel bounds extend beyond image resolution, clamping.",
                 );
             }
             intersect
@@ -292,8 +291,8 @@ impl FilmBaseParameters {
         let pixel_bounds = if let Some(crop) = options.crop_window {
             let crop = if crop.intersect(Bounds2f::new(Point2f::ZERO, Point2f::ONE)) != crop {
                 error!(
-                    "{} Film crop window is not in [0,1]; did you mean to use pixel_bounds instead? Clamping to valid range.",
-                    loc
+                    loc,
+                    "film crop window is not in [0,1]; did you mean to use pixel_bounds instead? clamping to valid range.",
                 );
                 let intersect = crop.intersect(Bounds2f::new(Point2f::ZERO, Point2f::ONE));
                 if intersect.is_empty() { panic!("expected some overlap") };
@@ -303,14 +302,14 @@ impl FilmBaseParameters {
             };
             if !cr.is_empty() {
                 warn!(
-                    "{} Crop window on command line will override the one in the file",
-                    loc
+                    loc,
+                    "crop window on command line will override the one in the file",
                 );
             }
             if options.pixel_bounds.is_some() || !pb.is_empty() {
                 warn!(
-                    "{} Both pixel bounds and crop window specified; using crop window",
-                    loc
+                    loc,
+                    "both pixel bounds and crop window specified; using crop window",
                 );
             }
             Bounds2i::new(
@@ -326,15 +325,15 @@ impl FilmBaseParameters {
         } else if !cr.is_empty() {
             if options.pixel_bounds.is_some() {
                 warn!(
-                    "{} Ignoring cropwindow since pixel bounds were specified on command line",
-                    loc
+                    loc,
+                    "ignoring cropwindow since pixel bounds were specified on command line",
                 );
                 pixel_bounds
             } else if cr.len() == 4 {
                 if !pb.is_empty() {
                     warn!(
-                        "{} Both pixel bounds and crop window specified; using crop window",
-                        loc
+                        loc,
+                        "both pixel bounds and crop window specified; using crop window",
                     );
                 }
 
@@ -361,8 +360,8 @@ impl FilmBaseParameters {
                 )
             } else {
                 error!(
-                    "{} {} Values provided for cropwindow, expected 4.",
                     loc,
+                    "{} Values provided for cropwindow, expected 4.",
                     cr.len()
                 );
                 pixel_bounds
@@ -372,7 +371,7 @@ impl FilmBaseParameters {
         };
 
         if pixel_bounds.is_empty() {
-            panic!("{} Degenerate pixel bounds provided to film", loc);
+            error!(loc, "{} degenerate pixel bounds provided to film", loc);
         }
 
         let diagonal = parameters.get_one_float("diagonal", 35.0);
@@ -988,11 +987,11 @@ impl PixelSensor {
             PixelSensor::new(&colorspace, &sensor_illum, imaging_ratio)
         } else {
             let r = Spectrum::get_named_spectrum(NamedSpectrum::from_str(&(sensor_name.to_string() + "_r"))
-                .expect("{} unknown sensor type"));
+                .unwrap_or_else(|()| { error!(loc, "unknown sensor type '{}'", sensor_name); }));
             let g = Spectrum::get_named_spectrum(NamedSpectrum::from_str(&(sensor_name.to_string() + "_g"))
-                .expect("{} unknown sensor type"));
+                .unwrap_or_else(|()| { error!(loc, "unknown sensor type '{}'", sensor_name); }));
             let b = Spectrum::get_named_spectrum(NamedSpectrum::from_str(&(sensor_name.to_string() + "_b"))
-                .expect("{} unknown sensor type"));
+                .unwrap_or_else(|()| { error!(loc, "unknown sensor type '{}'", sensor_name); }));
 
             PixelSensor::new_with_rgb(r, g, b, &colorspace, &sensor_illum.unwrap(), imaging_ratio)
         }

@@ -1,6 +1,6 @@
 use std::{mem::MaybeUninit, sync::{atomic::{AtomicUsize, Ordering}, Arc}};
 
-use crate::{bounds::Union, light::Light, material::Material, reader::paramdict::ParameterDictionary, shape::{AbstractShape, Shape, ShapeIntersection}, Bounds3, Bounds3f, Float, Point3f, Ray, Vec3f};
+use crate::{bounds::Union, error, light::Light, material::Material, reader::{paramdict::ParameterDictionary, target::FileLoc}, shape::{AbstractShape, Shape, ShapeIntersection}, Bounds3, Bounds3f, Float, Point3f, Ray, Vec3f};
 
 use super::{Primitive, AbstractPrimitive};
 
@@ -11,7 +11,7 @@ pub fn create_accelerator(
 ) -> Primitive {
     match name {
         "bvh" => Primitive::BvhAggregate(BvhAggregate::create(prims, parameters)),
-        _ => panic!("accelerator {} unknown.", name),
+        _ => { error!(@basic "accelerator '{}' unknown.", name); },
     }
 }
 
@@ -42,7 +42,7 @@ impl BvhAggregate {
             "hlbvh" => BvhSplitMethod::HLBVH,
             "middle" => BvhSplitMethod::Middle,
             "equal" => BvhSplitMethod::EqualCounts,
-            _ => panic!("unknown split method {}", split_method_name),
+            _ => { error!(@basic "unknown bvh split method '{}'", split_method_name); },
         };
 
         let max_prims_in_node = parameters.get_one_int("maxnodeprims", 4) as usize;

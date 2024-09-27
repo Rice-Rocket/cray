@@ -22,16 +22,47 @@ impl<'a> From<ParamList<'a>> for ParsedParameterVector {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileLoc {
-    filename: String,
-    line: i32,
-    column: i32,
+    pub(crate) filename: String,
+    pub(crate) offset: usize,
+    pub(crate) line: i32,
+    pub(crate) n_lines: i32,
+    /// The starting column of the span
+    pub(crate) start: i32,
+    /// The length of the span
+    pub(crate) len: i32,
+}
+
+impl Default for FileLoc {
+    fn default() -> Self {
+        Self {
+            filename: String::default(),
+            offset: 0,
+            line: 0,
+            n_lines: 1,
+            start: 0,
+            len: 1,
+        }
+    }
+}
+
+impl FileLoc {
+    pub fn new<S: ToString>(filename: S, offset: usize, line: i32, n_lines: i32, start: i32, len: i32) -> FileLoc {
+        FileLoc {
+            filename: filename.to_string(),
+            offset,
+            line,
+            n_lines,
+            start,
+            len,
+        }
+    }
 }
 
 impl Display for FileLoc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} {}", self.filename, self.line, self.column)
+        write!(f, "{} {} {}", self.filename, self.line, self.start)
     }
 }
 

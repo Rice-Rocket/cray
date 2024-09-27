@@ -2,7 +2,6 @@ use std::{collections::HashMap, sync::{Arc, Mutex}};
 
 use console::style;
 use string_interner::{DefaultBackend, StringInterner};
-use tracing::info;
 
 use crate::{color::{rgb_xyz::ColorEncodingCache, spectrum::Spectrum}, integrator::AbstractIntegrator, mipmap::MIPMap, options::Options, reader::scene::BasicScene, texture::TexInfo};
 

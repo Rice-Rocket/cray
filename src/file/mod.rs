@@ -1,8 +1,6 @@
 use std::fs;
 
-use tracing::warn;
-
-use crate::{options::Options, Float};
+use crate::{options::Options, warn, Float};
 
 pub fn read_float_file(filename: &str) -> Vec<Float> {
     let contents = fs::read_to_string(filename);
@@ -15,7 +13,7 @@ pub fn read_float_file(filename: &str) -> Vec<Float> {
             })
             .collect::<Vec<Float>>(),
         Err(_) => {
-            warn!("error reading file {}", filename);
+            warn!(@image filename, "error reading file");
             Vec::new()
         }
     }
@@ -24,7 +22,7 @@ pub fn read_float_file(filename: &str) -> Vec<Float> {
 pub fn set_search_directory(options: &mut Options, path: &str) {
     let mut path = std::path::Path::new(path);
     if !path.exists() {
-        warn!("Search directory does not exist! {}", path.display());
+        warn!(@image path.display(), "search directory does not exist");
     }
     if !path.is_dir() {
         path = path.parent().unwrap();

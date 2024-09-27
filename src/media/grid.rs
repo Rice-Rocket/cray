@@ -1,8 +1,6 @@
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
-use tracing::error;
-
-use crate::{color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, BlackbodySpectrum, ConstantSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, phase::{HGPhaseFunction, PhaseFunction}, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, sampling::SampledGrid, transform::{ApplyInverseTransform, ApplyRayInverseTransform, Transform}, Bounds3f, Float, Point3f, Point3i, Ray};
+use crate::{color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, BlackbodySpectrum, ConstantSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, phase::{HGPhaseFunction, PhaseFunction}, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, sampling::SampledGrid, transform::{ApplyInverseTransform, ApplyRayInverseTransform, Transform}, Bounds3f, Float, Point3f, Point3i, Ray};
 
 use super::{iterator::{DDAMajorantIterator, MajorantGrid}, AbstractMedium, MediumProperties};
 
@@ -34,13 +32,13 @@ impl GridMedium {
         let temperature = parameters.get_float_array("temperature");
 
         if density.is_empty() {
-            error!("{}: No 'density' value provided for grid medium", loc);
+            error!(loc, "no 'density' value provided for grid medium");
         }
 
         let n_density = density.len();
 
         if !temperature.is_empty() && n_density != temperature.len() {
-            error!("{}: Different number of samples ({} vs {}) provided for 'density' and 'temperature'", loc, n_density, temperature.len());
+            error!(loc, "different number of samples ({} vs {}) provided for 'density' and 'temperature'", n_density, temperature.len());
         }
 
         let nx = parameters.get_one_int("nx", 1);
@@ -48,7 +46,7 @@ impl GridMedium {
         let nz = parameters.get_one_int("nz", 1);
 
         if n_density as i32 != nx * ny * nz {
-            error!("{}: Grid medium has {} density values; expected nx*ny*nz = {}", loc, n_density, nx * ny * nz);
+            error!(loc, "grid medium has {} density values; expected nx*ny*nz = {}", n_density, nx * ny * nz);
         }
 
         let density_grid = SampledGrid::new(density, nx, ny, nz);
@@ -61,7 +59,7 @@ impl GridMedium {
         let mut le = parameters.get_one_spectrum("Le", None, SpectrumType::Illuminant, cached_spectra);
 
         if le.is_some() && temperature_grid.is_some() {
-            error!("{}: Both 'Le' and 'temperature' values were provided", loc);
+            error!(loc, "both 'Le' and 'temperature' values were provided");
         }
 
         let mut le_norm = 1.0;
@@ -76,7 +74,7 @@ impl GridMedium {
             SampledGrid::new(vec![le_norm], 1, 1, 1)
         } else {
             if le_scale.len() as i32 != nx * ny * nz {
-                error!("{}: Expected {}*{}*{} = {} values for 'Lescale' but was given {}", loc, nx, ny, nz, nx * ny * nz, le_scale.len());
+                error!(loc, "expected {}*{}*{} = {} values for 'Lescale' but was given {}", nx, ny, nz, nx * ny * nz, le_scale.len());
             }
 
             for scale in le_scale.iter_mut() {

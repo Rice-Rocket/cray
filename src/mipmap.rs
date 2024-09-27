@@ -2,7 +2,7 @@ use std::{ops::{Add, Div, Mul}, path::PathBuf, sync::Arc};
 
 use ordered_float::OrderedFloat;
 
-use crate::{color::{colorspace::RgbColorSpace, rgb_xyz::{ColorEncodingPtr, Rgb}}, image::{Image, WrapMode}, lerp_float, options::Options, safe, sqr, Point2f, Point2i, Float, Vec2f};
+use crate::{color::{colorspace::RgbColorSpace, rgb_xyz::{ColorEncodingPtr, Rgb}}, error, image::{Image, WrapMode}, lerp_float, options::Options, safe, sqr, Float, Point2f, Point2i, Vec2f};
 
 #[derive(Debug)]
 pub struct MIPMap {
@@ -62,7 +62,7 @@ impl MIPMap {
                     if let Some(rgb_desc) = rgb_desc {
                         image = image.select_channels(&rgb_desc);
                     } else {
-                        panic!("{}: expected rgb channels", filename);
+                        error!(@image filename, "expected rgb channels");
                     }
                 } else {
                     image = image.select_channels(&rgba_desc);
@@ -70,7 +70,7 @@ impl MIPMap {
             } else if let Some(rgb_desc) = rgb_desc {
                 image = image.select_channels(&rgb_desc);
             } else {
-                panic!("{}: image doesn't have rgb channels", filename);
+                error!(@image filename, "image doesn't have rgb channels");
             }
         }
 

@@ -1,6 +1,8 @@
 use std::{collections::HashMap, num::{ParseFloatError, ParseIntError}, str::{FromStr, ParseBoolError}};
 
-use super::error::{Error, Result};
+use crate::new_syntax_err;
+
+use super::{error::{ParseOk, ParseResult, SyntaxError}, target::FileLoc};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ParamType {
@@ -19,10 +21,32 @@ pub enum ParamType {
     Texture
 }
 
-impl FromStr for ParamType {
-    type Err = Error;
+impl std::fmt::Display for ParamType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ParamType::Boolean => "bool",
+            ParamType::Float => "float",
+            ParamType::Integer => "integer",
+            ParamType::Point2 => "point2",
+            ParamType::Point3 => "point3",
+            ParamType::Vec2 => "vector2",
+            ParamType::Vec3 => "vector3",
+            ParamType::Normal3 => "normal",
+            ParamType::Spectrum => "spectrum",
+            ParamType::Rgb => "rgb",
+            ParamType::Blackbody => "blackbody",
+            ParamType::String => "string",
+            ParamType::Texture => "texture",
+        };
 
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        write!(f, "{}", s)
+    }
+}
+
+impl FromStr for ParamType {
+    type Err = SyntaxError;
+
+    fn from_str(s: &str) -> Result<ParamType, Self::Err> {
         let ty = match s {
             "bool" => ParamType::Boolean,
             "integer" => ParamType::Integer,
@@ -38,7 +62,7 @@ impl FromStr for ParamType {
             "blackbody" => ParamType::Blackbody,
             "string" => ParamType::String,
             "texture" => ParamType::Texture,
-            _ => return Err(Error::InvalidParamType),
+            s => return Err(new_syntax_err!(InvalidParamType, FileLoc::default(), "{s}")),
         };
 
         Ok(ty)
@@ -56,30 +80,31 @@ pub struct Param<'a> {
     pub name: &'a str,
     pub ty: ParamType,
     pub value: &'a str,
+    pub loc: FileLoc,
 }
 
 impl<'a> Param<'a> {
-    pub fn new(type_and_name: &'a str, value: &'a str) -> Result<Self> {
+    pub fn new(type_and_name: &'a str, value: &'a str, loc: FileLoc) -> Result<Self, SyntaxError> {
         let mut split = type_and_name.split_whitespace();
 
-        let ty_name = split.next().ok_or(Error::InvalidParamName)?;
+        let ty_name = split.next().ok_or(new_syntax_err!(InvalidParamName, loc.clone(), "{type_and_name}"))?;
         let ty = ParamType::from_str(ty_name)?;
 
-        let name = split.next().ok_or(Error::InvalidParamName)?;
+        let name = split.next().ok_or(new_syntax_err!(InvalidParamName, loc.clone(), "{type_and_name}"))?;
 
-        Ok(Self { name, ty, value })
+        Ok(Self { name, ty, value, loc })
     }
 
     pub fn items<T: FromStr>(&self) -> impl Iterator<Item = std::result::Result<T, <T as FromStr>::Err>> + 'a {
         self.value.split_whitespace().map(|s| T::from_str(s))
     }
 
-    pub fn rgb(&self) -> Result<[f32; 3]> {
+    pub fn rgb(&self) -> Result<[f32; 3], SyntaxError> {
         let mut iter = self.items::<f32>();
 
-        let r = iter.next().ok_or(Error::MissingRequiredParameter)??;
-        let g = iter.next().ok_or(Error::MissingRequiredParameter)??;
-        let b = iter.next().ok_or(Error::MissingRequiredParameter)??;
+        let r = iter.next().ok_or(new_syntax_err!(MissingRequiredParameter, self.loc.clone()))??;
+        let g = iter.next().ok_or(new_syntax_err!(MissingRequiredParameter, self.loc.clone()))??;
+        let b = iter.next().ok_or(new_syntax_err!(MissingRequiredParameter, self.loc.clone()))??;
 
         Ok([r, g, b])
     }
@@ -92,11 +117,11 @@ impl<'a> Param<'a> {
         self.items().collect::<std::result::Result<Vec<T>, <T as FromStr>::Err>>()
     }
 
-    pub fn spectrum(&self) -> Result<Spectrum> {
+    pub fn spectrum(&self) -> Result<Spectrum, SyntaxError> {
         let res = match self.ty {
             ParamType::Rgb => Spectrum::Rgb(self.rgb()?),
             ParamType::Blackbody => Spectrum::Blackbody(self.single()?),
-            _ => return Err(Error::InvalidObjectType),
+            t => return Err(new_syntax_err!(InvalidObjectType, self.loc.clone(), "{t}"))
         };
 
         Ok(res)
@@ -107,9 +132,9 @@ impl<'a> Param<'a> {
 pub struct ParamList<'a>(pub HashMap<&'a str, Param<'a>>);
 
 impl<'a> ParamList<'a> {
-    pub fn add(&mut self, param: Param<'a>) -> Result<()> {
-        if self.0.insert(param.name, param).is_some() {
-            return Err(Error::DuplicatedParamName);
+    pub fn add(&mut self, param: Param<'a>) -> Result<(), SyntaxError> {
+        if self.0.insert(param.name, param.clone()).is_some() {
+            return Err(new_syntax_err!(DuplicatedParamName, param.loc, "{}", param.name));
         }
 
         Ok(())

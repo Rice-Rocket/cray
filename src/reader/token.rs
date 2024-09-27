@@ -1,16 +1,19 @@
 use std::fmt;
 use std::str::FromStr;
 
-use super::error::Error;
+use crate::new_syntax_err;
+
+use super::{error::{SyntaxError, SyntaxErrorKind}, target::FileLoc};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Token<'a> {
     str: &'a str,
+    loc: FileLoc,
 }
 
 impl<'a> Token<'a> {
-    pub fn new(str: &'a str) -> Self {
-        Token { str }
+    pub fn new(str: &'a str, loc: FileLoc) -> Self {
+        Token { str, loc }
     }
 
     pub fn token_size(&self) -> usize {
@@ -19,6 +22,10 @@ impl<'a> Token<'a> {
 
     pub fn value(&self) -> &'a str {
         self.str.trim()
+    }
+
+    pub fn loc(&self) -> FileLoc {
+        self.loc.clone()
     }
 
     pub fn parse<F: FromStr>(&self) -> Result<F, <F as FromStr>::Err> {
@@ -138,7 +145,7 @@ impl fmt::Display for Directive {
 }
 
 impl FromStr for Directive {
-    type Err = Error;
+    type Err = SyntaxError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let e = match s {
@@ -180,7 +187,7 @@ impl FromStr for Directive {
             "MakeNamedMaterial" => Directive::MakeNamedMaterial,
             "NamedMaterial" => Directive::NamedMaterial,
             "PixelFilter" => Directive::PixelFilter,
-            _ => return Err(Error::UnknownDirective(s.to_owned())),
+            _ => return Err(new_syntax_err!(SyntaxErrorKind::UnknownDirective(s.to_owned()), FileLoc::default()))
         };
 
         Ok(e)

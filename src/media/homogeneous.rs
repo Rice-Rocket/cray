@@ -1,8 +1,6 @@
 use std::{collections::HashMap, mem::MaybeUninit, sync::Arc};
 
-use tracing::warn;
-
-use crate::{color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, ConstantSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, phase::{HGPhaseFunction, PhaseFunction}, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, Float, Point3f, Ray};
+use crate::{color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, ConstantSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, phase::{HGPhaseFunction, PhaseFunction}, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, warn, Float, Point3f, Ray};
 
 use super::{iterator::HomogeneousMajorantIterator, preset::get_medium_scattering_properties, AbstractMedium, MediumProperties, RayMajorantSegment};
 
@@ -28,7 +26,7 @@ impl HomogeneousMedium {
                 sig_a = Some(sa);
                 sig_s = Some(ss);
             } else {
-                warn!("{}: material preset {} not found", loc, preset);
+                warn!(loc, "material preset '{}' not found", preset);
             }
         }
 

@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{diffuse::DiffuseBxDF, BxDF}, color::{rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractTextureMapping2D, FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Vec2f};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{diffuse::DiffuseBxDF, BxDF}, color::{rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractTextureMapping2D, FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Vec2f};
 
 use super::{AbstractMaterial, AbstractTextureEvaluator, MaterialEvalContext};
 
@@ -34,7 +34,7 @@ impl DebugMaterial {
         textures: &NamedTextures,
         normal_map: Option<Arc<Image>>,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
-        _loc: &FileLoc,
+        loc: &FileLoc,
     ) -> DebugMaterial {
         let color = parameters.get_spectrum_texture(
             "color",
@@ -67,7 +67,7 @@ impl DebugMaterial {
             "dvdxy" => DebugMaterialMode::Dvdxy,
             "st" => DebugMaterialMode::St,
             "texture" => DebugMaterialMode::Texture,
-            s => panic!("unknown debug material mode {}", s),
+            s => { error!(loc, "unknown debug material mode '{}'", s); },
         };
 
         DebugMaterial::new(color, displacement, normal_map, mode)

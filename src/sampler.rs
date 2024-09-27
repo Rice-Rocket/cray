@@ -1,9 +1,8 @@
 use hexf::hexf32;
 use num::integer::Roots;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
-use tracing::warn;
 
-use crate::{hash, hashing::{combine_bits_64, encode_morton_2, fmix, ihash21, ihash41, mix_bits, mur, permutation_element, split_u64}, lowdiscrepancy::{sobol_sample, BinaryPermuteScrambler, FastOwenScrambler, NoScrambler, OwenScrambler}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, round_up_pow_2, transmute, Float, Point2f, Point2i, Vec2u, ONE_MINUS_EPSILON};
+use crate::{error, hash, hashing::{combine_bits_64, encode_morton_2, fmix, ihash21, ihash41, mix_bits, mur, permutation_element, split_u64}, lowdiscrepancy::{sobol_sample, BinaryPermuteScrambler, FastOwenScrambler, NoScrambler, OwenScrambler}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, round_up_pow_2, transmute, warn, Float, Point2f, Point2i, Vec2u, ONE_MINUS_EPSILON};
 
 pub trait AbstractSampler {
     fn samples_per_pixel(&self) -> i32;
@@ -38,7 +37,7 @@ impl Sampler {
             // "pmj02bn" => Sampler::PMJ02BN(PMJ02BNSampler::create(parameters, options, loc)),
             "independent" => Sampler::Independent(IndependentSampler::create(parameters, options, loc)),
             "stratified" => Sampler::Stratified(StratifiedSampler::create(parameters, options, loc)),
-            _ => panic!("unknown sampler type {}", name)
+            _ => { error!(loc, "unknown sampler type '{}'", name); }
         }
     }
 }
@@ -280,7 +279,7 @@ impl ZSobolSampler {
             "permutedigits" => RandomizeStrategy::PermuteDigits,
             "fastowen" => RandomizeStrategy::FastOwen,
             "owen" => RandomizeStrategy::Owen,
-            s => panic!("unknown randomization strategy given to ZSobolSampler {}", s),
+            s => { error!(loc, "unknown randomization strategy given to ZSobolSampler '{}'", s); },
         };
 
         ZSobolSampler::new(n_samples, full_res, randomize, seed)
@@ -293,7 +292,7 @@ impl ZSobolSampler {
         seed: i32,
     ) -> ZSobolSampler {
         if (samples_per_pixel & (samples_per_pixel - 1)) != 0 {
-            warn!("sobol samplers with non power-of-two samples count ({}) are suboptimal", samples_per_pixel);
+            warn!(@basic "sobol samplers with non power-of-two samples count ({}) are suboptimal", samples_per_pixel);
         }
 
         let log2_samples_per_pixel = samples_per_pixel.ilog2();

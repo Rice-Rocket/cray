@@ -1,9 +1,8 @@
 use std::{collections::{HashMap, HashSet}, ops::{Index, IndexMut}, path::{Path, PathBuf}, sync::{atomic::{AtomicI32, Ordering}, Arc, Mutex}};
 
 use string_interner::{symbol::SymbolU32, DefaultBackend, StringInterner};
-use tracing::{info, warn};
 
-use crate::{camera::{film::{AbstractFilm, Film}, filter::Filter, AbstractCamera, Camera, CameraTransform}, clear_log, color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{ColorEncoding, ColorEncodingCache}, spectrum::Spectrum}, file::resolve_filename, image::Image, integrator::{AbstractIntegrator, Integrator}, light::Light, log, material::Material, media::{Medium, MediumInterface}, mipmap::MIPMap, options::{CameraRenderingSpace, Options}, primitive::{bvh::{create_accelerator, BvhAggregate, BvhSplitMethod}, geometric::GeometricPrimitive, simple::SimplePrimitive, transformed::TransformedPrimitive, Primitive}, sampler::Sampler, shape::Shape, texture::{FloatConstantTexture, FloatTexture, SpectrumTexture, TexInfo}, to_radians, transform::{ApplyTransform, Transform}, Float, Mat4, Point3f, Vec3f};
+use crate::{camera::{film::{AbstractFilm, Film}, filter::Filter, AbstractCamera, Camera, CameraTransform}, clear_log, color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{ColorEncoding, ColorEncodingCache}, spectrum::Spectrum}, error, file::resolve_filename, image::Image, integrator::{AbstractIntegrator, Integrator}, light::Light, log, material::Material, media::{Medium, MediumInterface}, mipmap::MIPMap, options::{CameraRenderingSpace, Options}, primitive::{bvh::{create_accelerator, BvhAggregate, BvhSplitMethod}, geometric::GeometricPrimitive, simple::SimplePrimitive, transformed::TransformedPrimitive, Primitive}, sampler::Sampler, shape::Shape, texture::{FloatConstantTexture, FloatTexture, SpectrumTexture, TexInfo}, to_radians, transform::{ApplyTransform, Transform}, warn, Float, Mat4, Point3f, Vec3f};
 
 use super::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::{FileLoc, ParsedParameterVector, ParserTarget}, utils::normalize_arg};
 
@@ -70,9 +69,9 @@ impl BasicScene {
             - camera.base.parameters.get_one_float("shutteropen", 0.0);
 
         if exposure_time <= 0.0 {
-            panic!(
-                "{}: The specified camera shutter times imply the camera won't open",
-                camera.base.loc
+            error!(
+                camera.base.loc,
+                "the specified camera shutter times imply the camera won't open",
             );
         }
 
@@ -124,7 +123,7 @@ impl BasicScene {
     fn add_medium(&mut self, mut medium: MediumSceneEntity, string_interner: &mut StringInterner<DefaultBackend>, cached_spectra: &mut HashMap<String, Arc<Spectrum>>) {
         let ty = medium.base.parameters.get_one_string("type", "");
         if ty.is_empty() {
-            panic!("{}: No parameter \"string type\" found for medium", medium.base.loc);
+            error!(medium.base.loc, "no parameter \"string type\" found for medium");
         }
 
         let m = Arc::new(Medium::create(
@@ -169,12 +168,12 @@ impl BasicScene {
 
         let filename = resolve_filename(options, filename.as_str());
         if filename.is_empty() {
-            panic!("{} No filename provided for texture.", texture.base.loc);
+            error!(texture.base.loc, "no filename provided for texture.");
         }
 
         let path = Path::new(filename.as_str());
         if !path.exists() {
-            panic!("Texture \"{}\" not found.", filename);
+            error!(texture.base.loc, "texture \"{}\" not found.", filename);
         }
 
         if self.loading_texture_filenames.contains(&filename) {
@@ -231,12 +230,12 @@ impl BasicScene {
         let filename = resolve_filename(options, filename.as_str());
 
         if filename.is_empty() {
-            panic!("{} No filename provided for texture.", texture.base.loc);
+            error!(texture.base.loc, "no filename provided for texture.");
         }
 
         let path = Path::new(&filename);
         if !path.exists() {
-            panic!("Texture \"{}\" not found.", filename);
+            error!(texture.base.loc, "texture \"{}\" not found.", filename);
         }
 
         if self.loading_texture_filenames.contains(&filename) {
@@ -325,7 +324,7 @@ impl BasicScene {
         }
         let filename = PathBuf::from(&normal_map_filename);
         if !filename.exists() {
-            warn!("Normal map \"{}\" not found.", filename.display());
+            warn!(@image filename.display(), "normal map not found.");
         }
 
         let image_and_metadata = Image::read(
@@ -336,16 +335,18 @@ impl BasicScene {
         let image = image_and_metadata.image;
         let rgb_desc = image.get_channel_desc(&["R", "G", "B"]);
         if rgb_desc.is_none() {
-            panic!(
-                "Normal map \"{}\" should have RGB channels.",
-                filename.display()
+            error!(
+                @image
+                filename.display(),
+                "normal map should have rgb channels.",
             );
         }
         let rgb_desc = rgb_desc.unwrap();
         if rgb_desc.size() != 3 {
-            panic!(
-                "Normal map \"{}\" should have RGB channels.",
-                filename.display()
+            error!(
+                @image
+                filename.display(),
+                "normal map should have rgb channels.",
             );
         }
         let image = Arc::new(image);
@@ -513,14 +514,14 @@ impl BasicScene {
         string_interner: &StringInterner<DefaultBackend>,
         options: &Options,
     ) -> (Arc<[Arc<Light>]>, HashMap<usize, Vec<Arc<Light>>>) {
-        let find_medium = |s: &str| -> Option<&Arc<Medium>> {
+        let find_medium = |s: &str, loc: &FileLoc| -> Option<&Arc<Medium>> {
             if s.is_empty() {
                 return None;
             }
 
             match self.media.get(s) {
                 Some(m) => Some(m),
-                None => panic!("Medium {} not defined", s),
+                None => { error!(loc, "medium '{}' not defined", s); },
             }
         };
 
@@ -538,9 +539,10 @@ impl BasicScene {
 
             let material_name = if let CurrentGraphicsMaterial::NamedMaterial(material_name) = &shape.material {
                 let Some(mut material) = self.named_materials.iter_mut().find(|m| m.0 == *material_name) else {
-                    panic!(
-                        "{}: Couldn't find named material {}.",
-                        shape.base.loc, material_name
+                    error!(
+                        shape.base.loc,
+                        "couldn't find named material '{}'",
+                        material_name
                     );
                 };
                 assert!(
@@ -561,8 +563,8 @@ impl BasicScene {
 
             if material_name == "interface" || material_name == "none" || material_name.is_empty() {
                 warn!(
-                    "{}: Ignoring area light specification for shape with interface material",
-                    shape.base.loc
+                    shape.base.loc,
+                    "ignoring area light specification for shape with interface material",
                 );
                 continue;
             }
@@ -583,8 +585,8 @@ impl BasicScene {
             let alpha = Arc::new(FloatTexture::Constant(FloatConstantTexture::new(alpha)));
 
             let mi = Arc::new(MediumInterface::new(
-                find_medium(&shape.inside_medium).cloned(),
-                find_medium(&shape.outside_medium).cloned(),
+                find_medium(&shape.inside_medium, &shape.base.loc).cloned(),
+                find_medium(&shape.outside_medium, &shape.base.loc).cloned(),
             ));
 
             let mut shape_lights = Vec::new();
@@ -607,7 +609,6 @@ impl BasicScene {
 
             shape_index_to_area_lights.insert(i, shape_lights);
         }
-        info!("Finished area lights");
 
         // TODO: We could create other lights in parallel here;
         //  for now, we are creating them in add_light() in self.lights.
@@ -632,12 +633,12 @@ impl BasicScene {
         let mut named_materials_out: HashMap<String, Arc<Material>> = HashMap::new();
         for (name, material) in &mut self.named_materials {
             if named_materials_out.iter().any(|nm| nm.0 == name) {
-                panic!("{}: Named material {} redefined.", material.loc, name);
+                error!(material.loc, "named material '{}' redefined", name);
             }
 
             let ty = material.parameters.get_one_string("type", "");
             if ty.is_empty() {
-                panic!("{}: No type specified for material {}", material.loc, name);
+                error!(material.loc, "no type specified for material '{}'", name);
             }
 
             let filename = resolve_filename(
@@ -651,7 +652,7 @@ impl BasicScene {
             } else {
                 let image = self.normal_maps.get(&filename);
                 if image.is_none() {
-                    panic!("{}: Normal map \"{}\" not found.", material.loc, filename);
+                    error!(material.loc, "normal map \"{}\" not found.", filename);
                 }
                 Some(image.unwrap().clone())
             };
@@ -680,7 +681,7 @@ impl BasicScene {
             } else {
                 let image = self.normal_maps.get(&filename);
                 if image.is_none() {
-                    panic!("{}: Normal map \"{}\" not found.", mtl.loc, filename);
+                    error!(mtl.loc, "normal map \"{}\" not found.", filename);
                 }
                 Some(image.unwrap().clone())
             };
@@ -711,14 +712,14 @@ impl BasicScene {
         string_interner: &StringInterner<DefaultBackend>,
         options: &Options,
     ) -> Arc<Primitive> {
-        let find_medium = |s: &str| -> Option<&Arc<Medium>> {
+        let find_medium = |s: &str, loc: &FileLoc| -> Option<&Arc<Medium>> {
             if s.is_empty() {
                 return None;
             }
             
             match media.get(s) {
                 Some(m) => Some(m),
-                None => panic!("Medium {} not defined", s),
+                None => { error!(loc, "medium '{}' not defined", s); },
             }
         };
 
@@ -755,7 +756,7 @@ impl BasicScene {
                     let mtl = if let CurrentGraphicsMaterial::NamedMaterial(material_name) = &sh.material {
                         named_materials
                             .get(material_name.as_str())
-                            .expect("No material name defined")
+                            .unwrap_or_else(|| { error!(sh.base.loc, "no material name defined"); })
                     } else {
                         let CurrentGraphicsMaterial::MaterialIndex(material_index) = sh.material else { unreachable!() };
                         assert!(
@@ -766,8 +767,8 @@ impl BasicScene {
                     };
 
                     let mi = Arc::new(MediumInterface::new(
-                        find_medium(&sh.inside_medium).cloned(),
-                        find_medium(&sh.outside_medium).cloned(),
+                        find_medium(&sh.inside_medium, &sh.base.loc).cloned(),
+                        find_medium(&sh.outside_medium, &sh.base.loc).cloned(),
                     ));
 
                     let area_lights = shape_index_to_area_lights.get(&i);
@@ -1318,7 +1319,7 @@ impl ParserTarget for BasicSceneBuilder {
             -1
         } else {
             if self.active_instance_definition.is_some() {
-                warn!("{}: area lights not supported with object instancing", loc);
+                warn!(loc, "area lights not supported with object instancing");
             }
             
             self.scene.add_area_light(SceneEntity::new(
@@ -1362,66 +1363,66 @@ impl ParserTarget for BasicSceneBuilder {
             "disablepixeljitter" => match value {
                 "true" => options.disable_pixel_jitter = true,
                 "false" => options.disable_pixel_jitter = false,
-                _ => panic!("{}: unknown option value {}", loc, value),
+                _ => { error!(loc, "unknown option value '{}'", value); },
             },
             "disabletexturefiltering" => match value {
                 "true" => options.disable_texture_filtering = true,
                 "false" => options.disable_texture_filtering = false,
-                _ => panic!("{}: unknown option value {}", loc, value),
+                _ => { error!(loc, "unknown option value '{}'", value); },
             },
             "disablewavelengthjitter" => match value {
                 "true" => options.disable_wavelength_jitter = true,
                 "false" => options.disable_wavelength_jitter = false,
-                _ => panic!("{}: unknown option_value {}", loc, value),
+                _ => { error!(loc, "unknown option_value '{}'", value); },
             },
             "displacementedgescale" => {
                 options.displacement_edge_scale = value.parse()
-                    .unwrap_or_else(|_| panic!("{}: unable to parse option value {}", loc, value));
+                    .unwrap_or_else(|_| { error!(loc, "unable to parse option value '{}'", value); });
             },
             "msereferenceimage" => {
                 if value.len() < 3 || !value.starts_with('\"') || !value.ends_with('\"') {
-                    panic!("{}: expected quotes string for option value {}", loc, value);
+                    error!(loc, "expected quotes string for option value '{}'", value);
                 }
                 options.mse_reference_image = Some(value[1..value.len() - 1].to_owned());
             },
             "msereferenceout" => {
                 if value.len() < 3 || !value.starts_with('\"') || !value.ends_with('\"') {
-                    panic!("{}: expected quotes string for option value {}", loc, value);
+                    error!(loc, "expected quotes string for option value '{}'", value);
                 }
                 options.mse_reference_output = Some(value[1..value.len() - 1].to_owned());
             },
             "rendercoordsys" => {
                 if value.len() < 3 || !value.starts_with('\"') || !value.ends_with('\"') {
-                    panic!("{}: expected quotes string for option value {}", loc, value);
+                    error!(loc, "expected quotes string for option value '{}'", value);
                 }
                 let render_coord_sys = value[1..value.len() - 1].to_owned();
                 match render_coord_sys.as_str() {
                     "camera" => options.rendering_space = CameraRenderingSpace::Camera,
                     "cameraworld" => options.rendering_space = CameraRenderingSpace::CameraWorld,
                     "world" => options.rendering_space = CameraRenderingSpace::World,
-                    _ => panic!("{}: unknown option value {}", loc, value),
+                    _ => { error!(loc, "unknown option value '{}'", value); },
                 }
             },
             "seed" => {
                 options.seed = value.parse()
-                    .unwrap_or_else(|_| panic!("{}: unable to parse option value {}", loc, value));
+                    .unwrap_or_else(|_| { error!(loc, "unable to parse option value '{}'", value); });
             },
             "forcediffuse" => match value {
                 "true" => options.force_diffuse = true,
                 "false" => options.force_diffuse = false,
-                _ => panic!("{}: unknown option value {} (expected true|false)", loc, value),
+                _ => { error!(loc, "unknown option value '{}' (expected true|false)", value); },
             },
             "pixelstats" => match value {
                 "true" => options.record_pixel_statistics = true,
                 "false" => options.record_pixel_statistics = false,
-                _ => panic!("{}: unknown option value {} (expected true|false)", loc, value),
+                _ => { error!(loc, "unknown option value '{}' (expected true|false)", value); },
             },
             "wavefront" => match value {
                 "true" => options.wavefront = true,
                 "false" => options.wavefront = false,
-                _ => panic!("{}: unknown option value {} (expected true|false)", loc, value),
+                _ => { error!(loc, "unknown option value '{}' (expected true|false)", value); },
             },
-            _ => panic!("{}: unknown option {}", loc, name),
+            _ => { error!(loc, "unknown option '{}'", name); },
         }
     }
 
@@ -1476,7 +1477,7 @@ impl ParserTarget for BasicSceneBuilder {
             if let Some(m_inv) = m.try_inverse() {
                 *t = Transform::new(m, m_inv).transpose();
             } else {
-                panic!("{}: matrix {:?} is not inversible", loc, transform);
+                error!(loc, "matrix {:?} is not inversible", transform);
             }
         })
     }
@@ -1487,7 +1488,7 @@ impl ParserTarget for BasicSceneBuilder {
             if let Some(m_inv) = m.try_inverse() {
                 *t = t.apply(Transform::new(m, m_inv).transpose())
             } else {
-                panic!("{}: matrix {:?} is not inversible", loc, transform);
+                error!(loc, "matrix {:?} is not inversible", transform);
             }
         })
     }
@@ -1502,7 +1503,7 @@ impl ParserTarget for BasicSceneBuilder {
         if let Some(ctm) = self.named_coordinate_systems.get(name) {
             self.graphics_state.ctm = *ctm;
         } else {
-            warn!("{}: couldn't find named coordinate system {}", loc, name);
+            warn!(loc, "couldn't find named coordinate system '{}'", name);
         }
     }
 
@@ -1626,7 +1627,7 @@ impl ParserTarget for BasicSceneBuilder {
             );
         } else {
             // TODO: defer error instead
-            panic!("{}: named medium {} redefined", loc, name);
+            error!(loc, "named medium {} redefined", name);
         }
     }
 
@@ -1684,14 +1685,14 @@ impl ParserTarget for BasicSceneBuilder {
     fn attribute_end(&mut self, loc: FileLoc) {
         // TODO: verify world
         if self.push_stack.is_empty() {
-            panic!("{}: unmatched attribute_end statement", loc);
+            error!(loc, "unmatched attribute_end statement");
         }
 
         // NOTE: Keep the following consistent with code in ObjectEnd
         self.graphics_state = self.pushed_graphics_states.pop().unwrap();
 
         if self.push_stack.last().unwrap().0 == b'o' {
-            panic!("{}: mismatched nesting: open ObjectBegin from {} at attribute_end", loc, self.push_stack.last().unwrap().1);
+            error!(loc, "mismatched nesting: open ObjectBegin from {} at attribute_end", self.push_stack.last().unwrap().1);
         } else {
             assert!(self.push_stack.last().unwrap().0 == b'a');
         }
@@ -1706,7 +1707,7 @@ impl ParserTarget for BasicSceneBuilder {
             "material" => &mut self.graphics_state.material_attributes,
             "medium" => &mut self.graphics_state.medium_attributes,
             "texture" => &mut self.graphics_state.texture_attributes,
-            _ => panic!("{}: unknown attribute target {}", loc, target),
+            _ => { error!(loc, "unknown attribute target '{}'", target); },
         };
 
         for p in params.iter_mut() {
@@ -1739,7 +1740,7 @@ impl ParserTarget for BasicSceneBuilder {
         );
 
         if texture_type != "float" && texture_type != "spectrum" {
-            panic!("{}: texture type \"{}\" unknown.", loc, texture_type);
+            error!(loc, "texture type '{}' unknown.", texture_type);
         }
 
         let names = if texture_type == "float" {
@@ -1783,11 +1784,11 @@ impl ParserTarget for BasicSceneBuilder {
                         gamma_encoding_cache,
                     );
                 },
-                _ => panic!("{}: unknown texture type {}", loc, texture_type),
+                _ => { error!(loc, "unknown texture type '{}'", texture_type); },
             }
         } else {
             // TODO: defer error instead
-            panic!("{}: texture \"{}\" redefined", loc, name);
+            error!(loc, "texture '{}' redefined", name);
         }
     }
 
@@ -1830,7 +1831,7 @@ impl ParserTarget for BasicSceneBuilder {
             self.scene.add_named_material(name, SceneEntity::new(name, loc, dict, string_interner), options);
         } else {
             // TODO: defer error instead
-            panic!("{}: named material {} redefined", loc, name);
+            error!(loc, "named material '{}' redefined", name);
         }
     }
 
@@ -1895,12 +1896,12 @@ impl ParserTarget for BasicSceneBuilder {
         self.push_stack.push((b'o', loc.clone()));
 
         if self.active_instance_definition.is_some() {
-            panic!("{}: ObjectBegin called inside of instance definition", loc);
+            error!(loc, "ObjectBegin called inside of instance definition");
         }
 
         let inserted = self.instance_names.insert(name.to_owned());
         if !inserted {
-            panic!("{}: ObjectBegin trying to redefine object instance {}", loc, name);
+            error!(loc, "ObjectBegin trying to redefine object instance '{}'", name);
         }
 
         self.active_instance_definition = Some(ActiveInstanceDefinition::new(name, loc, string_interner))
@@ -1909,22 +1910,22 @@ impl ParserTarget for BasicSceneBuilder {
     fn object_end(&mut self, loc: FileLoc) {
         // TODO: verify world
         if self.active_instance_definition.is_none() {
-            panic!("{}: ObjectEnd called outside an instance definition", loc);
+            error!(loc, "ObjectEnd called outside an instance definition");
         }
 
         if self.active_instance_definition.as_ref().unwrap().parent.is_some() {
-            panic!("{}: ObjectEnd called inside import for instance definition", loc);
+            error!(loc, "ObjectEnd called inside import for instance definition");
         }
 
         // NOTE: Keep the following consistent with AttributeEnd
         if self.pushed_graphics_states.last().is_none() {
-            panic!("{}: unmatched ObjectEnd statement", loc);
+            error!(loc, "unmatched ObjectEnd statement");
         }
 
         self.graphics_state = self.pushed_graphics_states.pop().unwrap();
 
         if self.push_stack.last().unwrap().0 == b'a' {
-            panic!("{}: mismatched nesting: open AttributeBegin from {} at ObjectEnd", loc, self.push_stack.last().unwrap().1);
+            error!(loc, "mismatched nesting: open AttributeBegin from {} at ObjectEnd", self.push_stack.last().unwrap().1);
         } else {
             assert!(self.push_stack.last().unwrap().0 == b'o');
         }
@@ -1946,7 +1947,7 @@ impl ParserTarget for BasicSceneBuilder {
         // TODO: verify world
 
         if self.active_instance_definition.is_some() {
-            panic!("{}: ObjectInstance called inside of instance definition", loc);
+            error!(loc, "ObjectInstance called inside of instance definition");
         }
 
         let world_from_render = self.render_from_world.inverse();
@@ -1963,11 +1964,11 @@ impl ParserTarget for BasicSceneBuilder {
 
     fn end_of_files(&mut self) {
         if self.current_block != BlockState::WorldBlock {
-            panic!("End of files before WorldBegin")
+            error!(@basic "End of files before WorldBegin");
         }
 
         if !self.pushed_graphics_states.is_empty() {
-            panic!("Missing end to AttributeBegin");
+            error!(@basic "Missing end to AttributeBegin");
         }
 
         // TODO: when defered errors are implemented, check for them here.

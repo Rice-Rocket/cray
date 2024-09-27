@@ -9,10 +9,9 @@ use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use simple_path::SimplePathIntegrator;
 use simple_vol_path::SimpleVolumetricPathIntegrator;
 use thread_local::ThreadLocal;
-use tracing::error;
 use vol_path::VolumetricPathIntegrator;
 
-use crate::{camera::{film::{AbstractFilm, Film, VisibleSurface}, filter::get_camera_sample, AbstractCamera, Camera}, color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, interaction::Interaction, light::{sampler::{uniform::UniformLightSampler, LightSampler}, AbstractLight, Light, LightType}, material::{Material, MaterialEvalContext, SingleMaterial}, numeric::HasNan, options::Options, primitive::{AbstractPrimitive, Primitive}, reader::paramdict::ParameterDictionary, sampler::{AbstractSampler, Sampler}, shape::ShapeIntersection, tile::Tile, Float, Normal3f, Point2f, Point2i, Ray, RayDifferential, Vec3f};
+use crate::{camera::{film::{AbstractFilm, Film, VisibleSurface}, filter::get_camera_sample, AbstractCamera, Camera}, color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, wavelengths::SampledWavelengths}, error, image::ImageMetadata, interaction::Interaction, light::{sampler::{uniform::UniformLightSampler, LightSampler}, AbstractLight, Light, LightType}, material::{Material, MaterialEvalContext, SingleMaterial}, numeric::HasNan, options::Options, primitive::{AbstractPrimitive, Primitive}, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampler::{AbstractSampler, Sampler}, shape::ShapeIntersection, tile::Tile, Float, Normal3f, Point2f, Point2i, Ray, RayDifferential, Vec3f};
 
 pub mod random_walk;
 pub mod simple_path;
@@ -58,7 +57,7 @@ impl Integrator {
             "debug" => Integrator::Debug(DebugIntegrator::create(
                 parameters, camera, sampler, aggregate, lights,
             )),
-            _ => panic!("unknown integrator {}", name),
+            _ => { error!(@basic "unknown integrator '{}'", name); },
         }
     }
 }
@@ -210,7 +209,6 @@ impl ImageTileIntegrator {
         let max_depth = parameters.get_one_int("maxdepth", 5);
         let regularize = parameters.get_one_bool("regularize", false);
 
-        // TODO: Change default to BVH
         let light_strategy = parameters.get_one_string("lightsampler", "bvh");
         let light_sampler = LightSampler::create(&light_strategy, lights.clone());
 
@@ -258,7 +256,6 @@ impl ImageTileIntegrator {
         let max_depth = parameters.get_one_int("maxdepth", 5);
         let regularize = parameters.get_one_bool("regularize", false);
 
-        // TODO: Change default to BVH
         let light_strategy = parameters.get_one_string("lightsampler", "bvh");
         let light_sampler = LightSampler::create(&light_strategy, lights.clone());
 
@@ -420,10 +417,10 @@ impl ImageTileIntegrator {
 
             if l.has_nan() {
                 l = SampledSpectrum::from_const(0.0);
-                error!("Ray integrator produced NaN value");
+                error!(@basic "ray integrator produced NaN value");
             } else if l.y(&lambda).is_infinite() {
                 l = SampledSpectrum::from_const(0.0);
-                error!("Ray integrator produced infinite value")
+                error!(@basic "ray integrator produced infinite value");
             }
 
             l
@@ -470,11 +467,11 @@ impl DebugIntegrator {
             "normal" => DebugMode::Normal,
             "uv" => DebugMode::UV,
             "material" => DebugMode::Material,
-            s => panic!("unknown debug mode {}", s)
+            s => { error!(@basic "unknown debug mode '{}'", s); },
         };
         
         let Film::Debug(_) = camera.get_film().as_ref() else {
-            panic!("debug integrator must be used with debug film");
+            error!(@basic "debug integrator must be used with debug film");
         };
 
         DebugIntegrator {

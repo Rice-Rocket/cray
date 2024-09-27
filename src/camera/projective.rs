@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use tracing::warn;
-
-use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, media::Medium, options::Options, ray::AbstractRay, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::sample_uniform_disk_concentric, transform::{ApplyTransform, Transform}, AuxiliaryRays, Bounds2f, Float, Normal3f, Point2f, Point3f, Ray, RayDifferential, Vec3f};
+use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, media::Medium, options::Options, ray::AbstractRay, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::sample_uniform_disk_concentric, transform::{ApplyTransform, Transform}, warn, AuxiliaryRays, Bounds2f, Float, Normal3f, Point2f, Point3f, Ray, RayDifferential, Vec3f};
 
 use super::{film::{Film, AbstractFilm as _}, filter::AbstractFilter as _, AbstractCamera, CameraBase, CameraBaseParameters, CameraRay, CameraRayDifferential, CameraSample, CameraTransform};
 
@@ -112,15 +110,15 @@ impl OrthographicCamera {
 
         if !sw.is_empty() {
             if options.fullscreen {
-                warn!("screenwindow is ignored in fullscreen mode");
+                warn!(loc, "screenwindow is ignored in fullscreen mode");
             } else if sw.len() == 4 {
                 screen = Bounds2f::new(Point2f::new(sw[0], sw[2]), Point2f::new(sw[1], sw[3]));
             } else {
                 warn!(
-                    "{} expected four values for 'screenwindow' parameter but got {}.",
                     loc,
+                    "expected four values for 'screenwindow' parameter but got {}.",
                     sw.len(),
-                )
+                );
             }
         }
 
@@ -302,15 +300,15 @@ impl PerspectiveCamera {
 
         if !sw.is_empty() {
             if options.fullscreen {
-                warn!("screenwindow is ignored in fullscreen mode");
+                warn!(loc, "screenwindow is ignored in fullscreen mode");
             } else if sw.len() == 4 {
                 screen = Bounds2f::new(Point2f::new(sw[0], sw[2]), Point2f::new(sw[1], sw[3]));
             } else {
                 warn!(
-                    "{} expected four values for 'screenwindow' parameter but got {}.",
                     loc,
+                    "expected four values for 'screenwindow' parameter but got {}.",
                     sw.len(),
-                )
+                );
             }
         }
         

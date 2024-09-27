@@ -3,7 +3,7 @@ use std::{fs::{self, File}, io::{self, BufReader}};
 use itertools::Itertools;
 use ply_rs::{parser::Parser, ply};
 
-use crate::{transform::{ApplyTransform, Transform}, Float, Normal3f, Point2f, Point3f, Vec3f};
+use crate::{error, transform::{ApplyTransform, Transform}, Float, Normal3f, Point2f, Point3f, Vec3f};
 
 #[derive(Debug, Clone)]
 pub struct TriangleMesh {
@@ -179,7 +179,7 @@ impl TriQuadMesh {
             match element.name.as_ref() {
                 "vertex" => vertex_list = vertex_parser.read_payload_for_element(&mut f, element, &header).unwrap(),
                 "face" => face_list = face_parser.read_payload_for_element(&mut f, element, &header).unwrap(),
-                _ => panic!("Unexpected element: {}", element.name),
+                _ => { error!(@image filename, "unexpected element '{}'", element.name); },
             }
         }
 
@@ -209,7 +209,7 @@ impl TriQuadMesh {
                 quad_indices.push(f.vertex_indices[3]);
                 quad_indices.push(f.vertex_indices[2]);
             } else if f.face_indices.is_empty() {
-                panic!("Only tris and quads are supported");
+                error!(@image filename, "only tris and quads are supported");
             }
 
             if !f.face_indices.is_empty() {
@@ -281,7 +281,7 @@ impl ply::PropertyAccess for PlyVertex {
             ("texture_v", ply::Property::Float(v)) => self.v = v as Float,
             ("texture_s", ply::Property::Float(v)) => self.u = v as Float,
             ("texture_t", ply::Property::Float(v)) => self.v = v as Float,
-            (k, _) => panic!("Vertex: Unexpected key/value combination: key: {}", k),
+            (k, _) => { error!(@basic "vertex: unexpected key/value combination: key: {}", k); },
         }
     }
 }
@@ -304,7 +304,7 @@ impl ply::PropertyAccess for PlyFace {
             ("vertex_indices", ply::Property::ListInt(v)) => self.vertex_indices = v,
             ("vertex_index", ply::Property::ListInt(v)) => self.vertex_indices = v,
             ("face_indices", ply::Property::ListInt(v)) => self.face_indices = v,
-            (k, _) => panic!("Face: Unexpected key/value combination: key: {}", k),
+            (k, _) => { error!(@basic "face: unexpected key/value combination: key: {}", k); },
         }
     }
 }

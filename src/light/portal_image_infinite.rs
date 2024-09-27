@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum}, wavelengths::SampledWavelengths}, equal_area_sphere_to_square, image::{Image, PixelFormat, WrapMode}, interaction::Interaction, light::{LightBase, LightType}, sampling::WindowedPiecewiseConstant2D, sqr, transform::{ApplyInverseTransform, Transform}, Bounds2f, Bounds3f, Dot, Float, Frame, Normal3f, Point2f, Point2i, Point3f, Ray, Vec3f, PI};
+use crate::{color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum}, wavelengths::SampledWavelengths}, equal_area_sphere_to_square, error, image::{Image, PixelFormat, WrapMode}, interaction::Interaction, light::{LightBase, LightType}, reader::target::FileLoc, sampling::WindowedPiecewiseConstant2D, sqr, transform::{ApplyInverseTransform, Transform}, Bounds2f, Bounds3f, Dot, Float, Frame, Normal3f, Point2f, Point2i, Point3f, Ray, Vec3f, PI};
 
 use super::{AbstractLight, LightBounds, LightLiSample, LightSampleContext};
 
@@ -25,6 +25,7 @@ impl PortalImageInfiniteLight {
         scale: Float,
         filename: &str,
         p: Vec<Point3f>,
+        loc: &FileLoc,
     ) -> PortalImageInfiniteLight {
         let base = LightBase {
             ty: LightType::Infinite,
@@ -33,18 +34,18 @@ impl PortalImageInfiniteLight {
         };
 
         let Some(channel_desc) = equal_area_image.get_channel_desc(&["R", "G", "B"]) else {
-            panic!("{}: image used for PortalImageInfiniteLight doesn't have R, G, B channels", filename);
+            error!(@image filename, "image used for PortalImageInfiniteLight doesn't have R, G, B channels");
         };
 
         assert_eq!(channel_desc.size(), 3);
         assert!(channel_desc.is_identity());
 
         if equal_area_image.resolution().x != equal_area_image.resolution().y {
-            panic!("{}: image resolution ({}, {}), is non-square", filename, equal_area_image.resolution().x, equal_area_image.resolution().y);
+            error!(@image filename, "image resolution ({}, {}), is non-square", equal_area_image.resolution().x, equal_area_image.resolution().y);
         }
 
         if p.len() != 4 {
-            panic!("Expected 4 vertices for infinite light portal but given {}", p.len());
+            error!(loc, "expected 4 vertices for infinite light portal but given {}", p.len());
         }
 
         let mut portal = [Point3f::ZERO; 4];
@@ -56,12 +57,12 @@ impl PortalImageInfiniteLight {
         let p03 = (portal[3] - portal[0]).normalize();
 
         if (p01.dot(p32) - 1.0).abs() > 0.001 || (p12.dot(p03) - 1.0) > 0.001 {
-            panic!("infinite light portal isn't a planar quadrilateral");
+            error!(loc, "infinite light portal isn't a planar quadrilateral");
         }
 
         if p01.dot(p12).abs() > 0.001 || p12.dot(p32).abs() > 0.001
         || p32.dot(p03).abs() > 0.001 || p03.dot(p01).abs() > 0.001 {
-            panic!("infinite light portal isn't a planar quadrilateral");
+            error!(loc, "infinite light portal isn't a planar quadrilateral");
         }
 
         let portal_frame = Frame::from_xy(p03.into(), p01.into());

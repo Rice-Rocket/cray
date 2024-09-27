@@ -1,8 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use tracing::warn;
-
-use crate::{color::{colorspace::RgbColorSpace, sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, file::resolve_filename, image::Image, media::Medium, options::Options, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, shape::{AbstractShape, Shape, ShapeSampleContext}, texture::FloatTexture, transform::Transform, Bounds3f, Dot, Float, Normal3f, Point2f, Point3f, Ray, Vec3f, PI};
+use crate::{color::{colorspace::RgbColorSpace, sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, file::resolve_filename, image::Image, media::Medium, options::Options, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, shape::{AbstractShape, Shape, ShapeSampleContext}, texture::FloatTexture, transform::Transform, warn, Bounds3f, Dot, Float, Normal3f, Point2f, Point3f, Ray, Vec3f, PI};
 
 use super::{AbstractLight, LightBase, LightBounds, LightLiSample, LightSampleContext, LightType};
 
@@ -73,7 +71,7 @@ impl DiffuseAreaLight {
         let image: Option<Image> = None;
         if !filename.is_empty() {
             if l.is_some() {
-                panic!("Both L and filename specified for diffuse area light");
+                error!(loc, "both L and filename specified for diffuse area light");
             }
             todo!("Image area lights not yet implemented");
         }
@@ -167,7 +165,7 @@ impl AbstractLight for DiffuseAreaLight {
     }
 
     fn le(&self, ray: &Ray, lambda: &SampledWavelengths) -> SampledSpectrum {
-        warn!("le() should only be called for infinite lights");
+        warn!(@basic "le() should only be called for infinite lights");
         SampledSpectrum::from_const(0.0)
     }
 
