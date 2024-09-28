@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use crate::{error, gaussian, gaussian_integral, lerp, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampler::AbstractSampler, sampling::{sample_tent, PiecewiseConstant2D}, sqr, vec2d::Vec2D, windowed_sinc, Bounds2f, Bounds2i, Float, Point2f, Point2i, Vec2f};
+use crate::{error, gaussian, gaussian_integral, lerp, options::Options, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, sampler::AbstractSampler, sampling::{sample_tent, PiecewiseConstant2D}, sqr, vec2d::Vec2D, windowed_sinc, Bounds2f, Bounds2i, Float, Point2f, Point2i, Vec2f};
 
 use super::CameraSample;
 
@@ -24,15 +24,15 @@ pub enum Filter {
 }
 
 impl Filter {
-    pub fn create(name: &str, parameters: &mut ParameterDictionary, loc: &FileLoc) -> Filter {
-        match name {
-            "box" => Filter::Box(BoxFilter::create(parameters, loc)),
-            "triangle" => Filter::Triangle(TriangleFilter::create(parameters, loc)),
-            "gaussian" => Filter::Gaussian(GaussianFilter::create(parameters, loc)),
-            "mitchell" => Filter::Mitchell(MitchellFilter::create(parameters, loc)),
-            "sinc" => Filter::LanczosSinc(LanczosSincFilter::create(parameters, loc)),
+    pub fn create(name: &str, parameters: &mut ParameterDictionary, loc: &FileLoc) -> ParseResult<Filter> {
+        Ok(match name {
+            "box" => Filter::Box(BoxFilter::create(parameters, loc)?),
+            "triangle" => Filter::Triangle(TriangleFilter::create(parameters, loc)?),
+            "gaussian" => Filter::Gaussian(GaussianFilter::create(parameters, loc)?),
+            "mitchell" => Filter::Mitchell(MitchellFilter::create(parameters, loc)?),
+            "sinc" => Filter::LanczosSinc(LanczosSincFilter::create(parameters, loc)?),
             _ => { error!(loc, "unknown filter type '{}'", name); },
-        }
+        })
     }
 }
 
@@ -145,13 +145,13 @@ pub struct BoxFilter {
 }
 
 impl BoxFilter {
-    pub fn create(parameters: &mut ParameterDictionary, loc: &FileLoc) -> BoxFilter {
-        let xw = parameters.get_one_float("xradius", 0.5);
-        let yw = parameters.get_one_float("yradius", 0.5);
+    pub fn create(parameters: &mut ParameterDictionary, loc: &FileLoc) -> ParseResult<BoxFilter> {
+        let xw = parameters.get_one_float("xradius", 0.5)?;
+        let yw = parameters.get_one_float("yradius", 0.5)?;
 
-        BoxFilter {
+        Ok(BoxFilter {
             radius: Vec2f::new(xw, yw),
-        }
+        })
     }
 
     pub fn new(radius: Vec2f) -> BoxFilter {
@@ -191,10 +191,10 @@ pub struct TriangleFilter {
 }
 
 impl TriangleFilter {
-    pub fn create(parameters: &mut ParameterDictionary, loc: &FileLoc) -> TriangleFilter {
-        let xw = parameters.get_one_float("xradius", 2.0);
-        let yw = parameters.get_one_float("yradius", 2.0);
-        TriangleFilter::new(Vec2f::new(xw, yw))
+    pub fn create(parameters: &mut ParameterDictionary, loc: &FileLoc) -> ParseResult<TriangleFilter> {
+        let xw = parameters.get_one_float("xradius", 2.0)?;
+        let yw = parameters.get_one_float("yradius", 2.0)?;
+        Ok(TriangleFilter::new(Vec2f::new(xw, yw)))
     }
 
     pub fn new(radius: Vec2f) -> TriangleFilter {
@@ -233,11 +233,11 @@ pub struct GaussianFilter {
 }
 
 impl GaussianFilter {
-    pub fn create(parameters: &mut ParameterDictionary, loc: &FileLoc) -> GaussianFilter {
-        let xw = parameters.get_one_float("xradius", 1.5);
-        let yw = parameters.get_one_float("yradius", 1.5);
-        let sigma = parameters.get_one_float("sigma", 0.5);
-        GaussianFilter::new(Vec2f::new(xw, yw), sigma)
+    pub fn create(parameters: &mut ParameterDictionary, loc: &FileLoc) -> ParseResult<GaussianFilter> {
+        let xw = parameters.get_one_float("xradius", 1.5)?;
+        let yw = parameters.get_one_float("yradius", 1.5)?;
+        let sigma = parameters.get_one_float("sigma", 0.5)?;
+        Ok(GaussianFilter::new(Vec2f::new(xw, yw), sigma))
     }
 
     pub fn new(radius: Vec2f, sigma: Float) -> GaussianFilter {
@@ -283,12 +283,12 @@ pub struct MitchellFilter {
 }
 
 impl MitchellFilter {
-    pub fn create(parameters: &mut ParameterDictionary, loc: &FileLoc) -> MitchellFilter {
-        let xw = parameters.get_one_float("xradius", 2.0);
-        let yw = parameters.get_one_float("yradius", 2.0);
-        let b = parameters.get_one_float("B", 1.0 / 3.0);
-        let c = parameters.get_one_float("C", 1.0 / 3.0);
-        MitchellFilter::new(Vec2f::new(xw, yw), b, c)
+    pub fn create(parameters: &mut ParameterDictionary, loc: &FileLoc) -> ParseResult<MitchellFilter> {
+        let xw = parameters.get_one_float("xradius", 2.0)?;
+        let yw = parameters.get_one_float("yradius", 2.0)?;
+        let b = parameters.get_one_float("B", 1.0 / 3.0)?;
+        let c = parameters.get_one_float("C", 1.0 / 3.0)?;
+        Ok(MitchellFilter::new(Vec2f::new(xw, yw), b, c))
     }
 
     pub fn new(radius: Vec2f, b: Float, c: Float) -> MitchellFilter {
@@ -345,11 +345,11 @@ pub struct LanczosSincFilter {
 }
 
 impl LanczosSincFilter {
-    pub fn create(parameters: &mut ParameterDictionary, loc: &FileLoc) -> LanczosSincFilter {
-        let xw = parameters.get_one_float("xradius", 4.0);
-        let yw = parameters.get_one_float("yradius", 4.0);
-        let tau = parameters.get_one_float("tau", 3.0);
-        LanczosSincFilter::new(Vec2f::new(xw, yw), tau)
+    pub fn create(parameters: &mut ParameterDictionary, loc: &FileLoc) -> ParseResult<LanczosSincFilter> {
+        let xw = parameters.get_one_float("xradius", 4.0)?;
+        let yw = parameters.get_one_float("yradius", 4.0)?;
+        let tau = parameters.get_one_float("tau", 3.0)?;
+        Ok(LanczosSincFilter::new(Vec2f::new(xw, yw), tau))
     }
 
     pub fn new(radius: Vec2f, tau: Float) -> LanczosSincFilter {

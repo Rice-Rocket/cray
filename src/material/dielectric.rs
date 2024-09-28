@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{dielectric::DielectricBxDF, BxDF}, color::{spectrum::{AbstractSpectrum, ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, scattering::TrowbridgeReitzDistribution, texture::FloatTexture};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{dielectric::DielectricBxDF, BxDF}, color::{spectrum::{AbstractSpectrum, ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{error::ParseResult, paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, scattering::TrowbridgeReitzDistribution, texture::FloatTexture};
 
 use super::{AbstractMaterial, AbstractTextureEvaluator, MaterialEvalContext};
 
@@ -21,37 +21,37 @@ impl DielectricMaterial {
         loc: &FileLoc,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         textures: &NamedTextures,
-    ) -> DielectricMaterial {
-        let eta = if !parameters.get_float_array("eta").is_empty() {
+    ) -> ParseResult<DielectricMaterial> {
+        let eta = if !parameters.get_float_array("eta")?.is_empty() {
             Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(
-                parameters.get_float_array("eta")[0],
+                parameters.get_float_array("eta")?[0],
             ))))
         } else {
-            parameters.get_one_spectrum("eta", None, SpectrumType::Unbounded, cached_spectra)
+            parameters.get_one_spectrum("eta", None, SpectrumType::Unbounded, cached_spectra)?
         }.unwrap_or(Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.5))));
 
-        let u_roughness = if let Some(roughness) = parameters.get_float_texture_or_none("uroughness", textures) {
+        let u_roughness = if let Some(roughness) = parameters.get_float_texture_or_none("uroughness", textures)? {
             roughness
         } else {
-            parameters.get_float_texture("roughness", 0.0, textures)
+            parameters.get_float_texture("roughness", 0.0, textures)?
         };
-        let v_roughness = if let Some(roughness) = parameters.get_float_texture_or_none("vroughness", textures) {
+        let v_roughness = if let Some(roughness) = parameters.get_float_texture_or_none("vroughness", textures)? {
             roughness
         } else {
-            parameters.get_float_texture("roughness", 0.0, textures)
+            parameters.get_float_texture("roughness", 0.0, textures)?
         };
 
-        let displacement = parameters.get_float_texture_or_none("displacement", textures);
-        let remap_roughness = parameters.get_one_bool("remaproughness", true);
+        let displacement = parameters.get_float_texture_or_none("displacement", textures)?;
+        let remap_roughness = parameters.get_one_bool("remaproughness", true)?;
 
-        DielectricMaterial::new(
+        Ok(DielectricMaterial::new(
             displacement,
             normal_map,
             u_roughness,
             v_roughness,
             remap_roughness,
             eta,
-        )
+        ))
     }
 
     pub fn new(

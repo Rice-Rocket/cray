@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Display, str::FromStr as _, sync::Arc};
 
 use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, named_spectrum::NamedSpectrum, rgb_xyz::Rgb, spectrum::{BlackbodySpectrum, PiecewiseLinearSpectrum, RgbAlbedoSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}}, error, texture::{FloatConstantTexture, FloatTexture, SpectrumConstantTexture, SpectrumTexture}, warn, Float, Normal3f, Point2f, Point3f, Vec2f, Vec3f};
 
-use super::{param::{Param, ParamType}, target::{FileLoc, ParsedParameterVector}, utils::{dequote_string, is_quoted_string}};
+use super::{error::{ParseError, ParseResult}, param::{Param, ParamType}, target::{FileLoc, ParsedParameterVector}, utils::{dequote_string, is_quoted_string}};
 
 pub trait ParameterType: sealed::Sealed {
     const TYPE_NAME: &'static str;
@@ -242,10 +242,10 @@ impl ParsedParameter {
     }
 }
 
-impl<'a> From<Param<'a>> for ParsedParameter {
-    fn from(value: Param<'a>) -> Self {
-        let name = value.name;
-        let param_type = match value.ty {
+impl<'a> Param<'a> {
+    pub fn parse(self) -> ParseResult<ParsedParameter> {
+        let name = self.name;
+        let param_type = match self.ty {
             ParamType::Boolean => BooleanParam::TYPE_NAME.to_owned(),
             ParamType::Float => FloatParam::TYPE_NAME.to_owned(),
             ParamType::Integer => IntegerParam::TYPE_NAME.to_owned(),
@@ -264,7 +264,7 @@ impl<'a> From<Param<'a>> for ParsedParameter {
         let mut param = ParsedParameter {
             name: name.to_owned(),
             param_type,
-            loc: value.loc.clone(),
+            loc: self.loc.clone(),
             floats: Vec::new(),
             ints: Vec::new(),
             strings: Vec::new(),
@@ -283,7 +283,7 @@ impl<'a> From<Param<'a>> for ParsedParameter {
         let mut split_values = Vec::new();
         let mut quoted_sequence = Vec::new();
 
-        for v in value.value.split_ascii_whitespace() {
+        for v in self.value.split_ascii_whitespace() {
             if v.starts_with('\"') && v.ends_with('\"') {
                 split_values.push(v.to_owned());
             } else if v.starts_with('\"') {
@@ -305,21 +305,21 @@ impl<'a> From<Param<'a>> for ParsedParameter {
                 match val_type {
                     ValueType::Unknown => val_type = ValueType::String,
                     ValueType::String => (),
-                    _ => { error!(&value.loc, "parameter '{}' has mixed types", name); },
+                    _ => { error!(&self.loc, "parameter '{}' has mixed types", name); },
                 }
                 param.add_string(dequote_string(v.as_str()).to_owned());
             } else if v.starts_with('t') && v == "true" {
                 match val_type {
                     ValueType::Unknown => val_type = ValueType::Boolean,
                     ValueType::Boolean => {}
-                    _ => { error!(&value.loc, "parameter '{}' has mixed types", name); },
+                    _ => { error!(&self.loc, "parameter '{}' has mixed types", name); },
                 }
                 param.add_bool(true);
             } else if v.starts_with('f') && v == "false" {
                 match val_type {
                     ValueType::Unknown => val_type = ValueType::Boolean,
                     ValueType::Boolean => {}
-                    _ => { error!(&value.loc, "parameter '{}' has mixed types", name); },
+                    _ => { error!(&self.loc, "parameter '{}' has mixed types", name); },
                 }
                 param.add_bool(false);
             } else {
@@ -327,7 +327,7 @@ impl<'a> From<Param<'a>> for ParsedParameter {
                     ValueType::Unknown => val_type = ValueType::Scalar,
                     ValueType::Scalar => {}
                     ValueType::Integer => {}
-                    _ => { error!(&value.loc, "parameter '{}' has mixed types", name); },
+                    _ => { error!(&self.loc, "parameter '{}' has mixed types", name); },
                 }
 
                 if val_type == ValueType::Integer {
@@ -338,7 +338,7 @@ impl<'a> From<Param<'a>> for ParsedParameter {
             }
         }
 
-        param
+        Ok(param)
     }
 }
 
@@ -410,7 +410,7 @@ impl ParameterDictionary {
         d
     }
 
-    pub fn check_parameter_types(&self) {
+    pub fn check_parameter_types(&self) -> ParseResult<()> {
         for p in &self.params {
             match p.param_type.as_str() {
                 BooleanParam::TYPE_NAME => {
@@ -452,13 +452,15 @@ impl ParameterDictionary {
                 }
             }
         }
+
+        Ok(())
     }
 
     fn lookup_single<P: ParameterType>(
         &mut self,
         name: &str,
         default_value: P::ReturnType,
-    ) -> P::ReturnType {
+    ) -> ParseResult<P::ReturnType> {
         for p in &mut self.params {
             if p.name != name || p.param_type != P::TYPE_NAME {
                 continue;
@@ -480,49 +482,49 @@ impl ParameterDictionary {
                 );
             }
 
-            return P::convert(values.as_slice(), &p.loc);
+            return Ok(P::convert(values.as_slice(), &p.loc));
         }
 
-        default_value
+        Ok(default_value)
     }
 
-    pub fn get_one_float(&mut self, name: &str, default_value: Float) -> Float {
+    pub fn get_one_float(&mut self, name: &str, default_value: Float) -> ParseResult<Float> {
         self.lookup_single::<FloatParam>(name, default_value)
     }
 
-    pub fn get_one_int(&mut self, name: &str, default_value: i32) -> i32 {
+    pub fn get_one_int(&mut self, name: &str, default_value: i32) -> ParseResult<i32> {
         self.lookup_single::<IntegerParam>(name, default_value)
     }
 
-    pub fn get_one_bool(&mut self, name: &str, default_value: bool) -> bool {
+    pub fn get_one_bool(&mut self, name: &str, default_value: bool) -> ParseResult<bool> {
         self.lookup_single::<BooleanParam>(name, default_value)
     }
 
-    pub fn get_one_point2f(&mut self, name: &str, default_value: Point2f) -> Point2f {
+    pub fn get_one_point2f(&mut self, name: &str, default_value: Point2f) -> ParseResult<Point2f> {
         self.lookup_single::<Point2fParam>(name, default_value)
     }
 
-    pub fn get_one_vector2f(&mut self, name: &str, default_value: Vec2f) -> Vec2f {
+    pub fn get_one_vector2f(&mut self, name: &str, default_value: Vec2f) -> ParseResult<Vec2f> {
         self.lookup_single::<Vec2fParam>(name, default_value)
     }
 
-    pub fn get_one_point3f(&mut self, name: &str, default_value: Point3f) -> Point3f {
+    pub fn get_one_point3f(&mut self, name: &str, default_value: Point3f) -> ParseResult<Point3f> {
         self.lookup_single::<Point3fParam>(name, default_value)
     }
 
-    pub fn get_one_vector3f(&mut self, name: &str, default_value: Vec3f) -> Vec3f {
+    pub fn get_one_vector3f(&mut self, name: &str, default_value: Vec3f) -> ParseResult<Vec3f> {
         self.lookup_single::<Vec3fParam>(name, default_value)
     }
 
-    pub fn get_one_normal3f(&mut self, name: &str, default_value: Normal3f) -> Normal3f {
+    pub fn get_one_normal3f(&mut self, name: &str, default_value: Normal3f) -> ParseResult<Normal3f> {
         self.lookup_single::<Normal3fParam>(name, default_value)
     }
 
-    pub fn get_one_rgb(&mut self, name: &str, default_value: Rgb) -> Rgb {
+    pub fn get_one_rgb(&mut self, name: &str, default_value: Rgb) -> ParseResult<Rgb> {
         self.lookup_single::<RgbParam>(name, default_value)
     }
 
-    pub fn get_one_string(&mut self, name: &str, default_value: &str) -> String {
+    pub fn get_one_string(&mut self, name: &str, default_value: &str) -> ParseResult<String> {
         self.lookup_single::<StringParam>(name, default_value.to_owned())
     }
 
@@ -532,7 +534,7 @@ impl ParameterDictionary {
         default_value: Option<Arc<Spectrum>>,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
-    ) -> Option<Arc<Spectrum>> {
+    ) -> ParseResult<Option<Arc<Spectrum>>> {
         let p = self.params.iter_mut().find(|p| p.name == name);
         if let Some(p) = p {
             let s = Self::extract_spectrum_array(
@@ -540,7 +542,7 @@ impl ParameterDictionary {
                 spectrum_type,
                 self.color_space.clone(),
                 cached_spectra,
-            );
+            )?;
             if !s.is_empty() {
                 if s.len() > 1 {
                     error!(
@@ -549,12 +551,12 @@ impl ParameterDictionary {
                         p.name
                     );
                 }
-                return Some(s.into_iter().nth(0).expect("Expected non-empty vector"));
+                return Ok(Some(s.into_iter().nth(0).expect("Expected non-empty vector")));
             }
 
-            default_value
+            Ok(default_value)
         } else {
-            default_value
+            Ok(default_value)
         }
     }
 
@@ -563,7 +565,7 @@ impl ParameterDictionary {
         spectrum_type: SpectrumType,
         color_space: Arc<RgbColorSpace>,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>
-    ) -> Vec<Arc<Spectrum>> {
+    ) -> ParseResult<Vec<Arc<Spectrum>>> {
         if param.param_type == "rgb" {
             // TODO We could also handle "color" in this block with an upgrade option, but
             //  I don't intend to use old PBRT scene files for now.
@@ -574,7 +576,7 @@ impl ParameterDictionary {
                 &param.name,
                 &mut param.looked_up,
                 3,
-                |v: &[Float], loc: &FileLoc| -> Arc<Spectrum> {
+                |v: &[Float], loc: &FileLoc| -> ParseResult<Arc<Spectrum>> {
                     let rgb = Rgb::new(v[0], v[1], v[2]);
                     let cs = if let Some(cs) = &param.color_space {
                         cs.clone()
@@ -588,7 +590,7 @@ impl ParameterDictionary {
                             param.name
                         );
                     }
-                    match spectrum_type {
+                    Ok(match spectrum_type {
                         SpectrumType::Illuminant => {
                             Arc::new(Spectrum::RgbIlluminant(
                                 RgbIlluminantSpectrum::new(&cs, &rgb),
@@ -609,7 +611,7 @@ impl ParameterDictionary {
                         SpectrumType::Unbounded => Arc::new(Spectrum::RgbUnbounded(
                             RgbUnboundedSpectrum::new(&cs, &rgb),
                         )),
-                    }
+                    })
                 },
             );
         } else if param.param_type == "blackbody" {
@@ -619,8 +621,8 @@ impl ParameterDictionary {
                 &param.name,
                 &mut param.looked_up,
                 1,
-                |v: &[Float], _loc: &FileLoc| -> Arc<Spectrum> {
-                    Arc::new(Spectrum::Blackbody(BlackbodySpectrum::new(v[0])))
+                |v: &[Float], _loc: &FileLoc| -> ParseResult<Arc<Spectrum>> {
+                    Ok(Arc::new(Spectrum::Blackbody(BlackbodySpectrum::new(v[0]))))
                 },
             );
         } else if param.param_type == "spectrum" && !param.floats.is_empty() {
@@ -641,7 +643,7 @@ impl ParameterDictionary {
                 &param.name,
                 &mut param.looked_up,
                 param.floats.len() as i32,
-                |v: &[Float], _loc: &FileLoc| -> Arc<Spectrum> {
+                |v: &[Float], _loc: &FileLoc| -> ParseResult<Arc<Spectrum>> {
                     let mut lambda = vec![0.0; n_samples];
                     let mut value = vec![0.0; n_samples];
                     for i in 0..n_samples {
@@ -651,12 +653,12 @@ impl ParameterDictionary {
                         lambda[i] = v[2 * i];
                         value[i] = v[2 * i + 1];
                     }
-                    return Arc::new(Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new(
-                        lambda.as_slice(),
-                        value.as_slice(),
-                    )));
+                    return Ok(Arc::new(Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new(
+                                    lambda.as_slice(),
+                                    value.as_slice(),
+                    ))));
                 },
-            );
+                );
         } else if param.param_type == "spectrum" && !param.strings.is_empty() {
             return Self::return_array(
                 param.strings.as_slice(),
@@ -664,21 +666,21 @@ impl ParameterDictionary {
                 &param.name,
                 &mut param.looked_up,
                 1,
-                |s: &[String], loc: &FileLoc| -> Arc<Spectrum> {
+                |s: &[String], loc: &FileLoc| -> ParseResult<Arc<Spectrum>> {
                     let named_spectrum = NamedSpectrum::from_str(&s[0]);
                     if let Ok(named_spectrum) = named_spectrum {
-                        return Spectrum::get_named_spectrum(named_spectrum);
+                        return Ok(Spectrum::get_named_spectrum(named_spectrum));
                     }
 
-                    let spd = Spectrum::read(&s[0], cached_spectra);
-                    if spd.is_none() {
+                    let Some(spd) = Spectrum::read(&s[0], cached_spectra) else {
                         error!(loc, "unable to read/invalid spectrum file '{}'", &s[0]);
-                    }
-                    spd.unwrap()
+                    };
+
+                    Ok(spd)
                 },
             );
         } else {
-            return Vec::new();
+            return Ok(Vec::new());
         }
     }
 
@@ -687,7 +689,7 @@ impl ParameterDictionary {
         name: &str,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
-    ) -> Vec<Arc<Spectrum>> {
+    ) -> ParseResult<Vec<Arc<Spectrum>>> {
         let p = self.params.iter_mut().find(|p| p.name == name);
         if let Some(p) = p {
             let s = Self::extract_spectrum_array(
@@ -695,12 +697,12 @@ impl ParameterDictionary {
                 spectrum_type,
                 self.color_space.clone(),
                 cached_spectra,
-            );
+            )?;
             if !s.is_empty() {
-                return s;
+                return Ok(s);
             }
         }
-        Vec::new()
+        Ok(Vec::new())
     }
 
     fn return_array<ValueType, ReturnType, C>(
@@ -710,9 +712,9 @@ impl ParameterDictionary {
         looked_up: &mut bool,
         n_per_item: i32,
         mut convert: C,
-    ) -> Vec<ReturnType>
+    ) -> ParseResult<Vec<ReturnType>>
     where
-        C: FnMut(&[ValueType], &FileLoc) -> ReturnType,
+        C: FnMut(&[ValueType], &FileLoc) -> ParseResult<ReturnType,>
     {
         if values.is_empty() {
             error!(loc, "no values provided for '{}'", name);
@@ -730,12 +732,12 @@ impl ParameterDictionary {
 
         let mut v = Vec::with_capacity(n);
         for i in 0..n {
-            v.push(convert(&values[n_per_item as usize * i..], loc));
+            v.push(convert(&values[n_per_item as usize * i..], loc)?);
         }
-        v
+        Ok(v)
     }
 
-    fn lookup_array<P: ParameterType>(&mut self, name: &str) -> Vec<P::ReturnType> {
+    fn lookup_array<P: ParameterType>(&mut self, name: &str) -> ParseResult<Vec<P::ReturnType>> {
         for p in &mut self.params {
             if p.name == name && p.param_type == P::TYPE_NAME {
                 let mut looked_up = p.looked_up;
@@ -745,48 +747,50 @@ impl ParameterDictionary {
                     &p.name,
                     &mut looked_up,
                     P::N_PER_ITEM,
-                    P::convert,
-                );
+                    |v, loc| {
+                        Ok(P::convert(v, loc))
+                    },
+                )?;
                 p.looked_up = looked_up;
-                return to_return;
+                return Ok(to_return);
             }
         }
-        Vec::new()
+        Ok(Vec::new())
     }
 
-    pub fn get_float_array(&mut self, name: &str) -> Vec<Float> {
+    pub fn get_float_array(&mut self, name: &str) -> ParseResult<Vec<Float>> {
         self.lookup_array::<FloatParam>(name)
     }
 
-    pub fn get_int_array(&mut self, name: &str) -> Vec<i32> {
+    pub fn get_int_array(&mut self, name: &str) -> ParseResult<Vec<i32>> {
         self.lookup_array::<IntegerParam>(name)
     }
 
-    pub fn get_bool_array(&mut self, name: &str) -> Vec<bool> {
+    pub fn get_bool_array(&mut self, name: &str) -> ParseResult<Vec<bool>> {
         self.lookup_array::<BooleanParam>(name)
     }
 
-    pub fn get_point2f_array(&mut self, name: &str) -> Vec<Point2f> {
+    pub fn get_point2f_array(&mut self, name: &str) -> ParseResult<Vec<Point2f>> {
         self.lookup_array::<Point2fParam>(name)
     }
 
-    pub fn get_vector2f_array(&mut self, name: &str) -> Vec<Vec2f> {
+    pub fn get_vector2f_array(&mut self, name: &str) -> ParseResult<Vec<Vec2f>> {
         self.lookup_array::<Vec2fParam>(name)
     }
 
-    pub fn get_point3f_array(&mut self, name: &str) -> Vec<Point3f> {
+    pub fn get_point3f_array(&mut self, name: &str) -> ParseResult<Vec<Point3f>> {
         self.lookup_array::<Point3fParam>(name)
     }
 
-    pub fn get_vector3f_array(&mut self, name: &str) -> Vec<Vec3f> {
+    pub fn get_vector3f_array(&mut self, name: &str) -> ParseResult<Vec<Vec3f>> {
         self.lookup_array::<Vec3fParam>(name)
     }
 
-    pub fn get_normal3f_array(&mut self, name: &str) -> Vec<Normal3f> {
+    pub fn get_normal3f_array(&mut self, name: &str) -> ParseResult<Vec<Normal3f>> {
         self.lookup_array::<Normal3fParam>(name)
     }
 
-    pub fn get_rgb_array(&mut self, name: &str) -> Vec<Rgb> {
+    pub fn get_rgb_array(&mut self, name: &str) -> ParseResult<Vec<Rgb>> {
         self.lookup_array::<RgbParam>(name)
     }
 }
@@ -808,39 +812,39 @@ impl TextureParameterDictionary {
         Self { dict }
     }
 
-    pub fn get_one_float(&mut self, name: &str, default_value: Float) -> Float {
+    pub fn get_one_float(&mut self, name: &str, default_value: Float) -> ParseResult<Float> {
         self.dict.get_one_float(name, default_value)
     }
 
-    pub fn get_one_int(&mut self, name: &str, default_value: i32) -> i32 {
+    pub fn get_one_int(&mut self, name: &str, default_value: i32) -> ParseResult<i32> {
         self.dict.get_one_int(name, default_value)
     }
 
-    pub fn get_one_bool(&mut self, name: &str, default_value: bool) -> bool {
+    pub fn get_one_bool(&mut self, name: &str, default_value: bool) -> ParseResult<bool> {
         self.dict.get_one_bool(name, default_value)
     }
 
-    pub fn get_one_point2f(&mut self, name: &str, default_value: Point2f) -> Point2f {
+    pub fn get_one_point2f(&mut self, name: &str, default_value: Point2f) -> ParseResult<Point2f> {
         self.dict.get_one_point2f(name, default_value)
     }
 
-    pub fn get_one_vector2f(&mut self, name: &str, default_value: Vec2f) -> Vec2f {
+    pub fn get_one_vector2f(&mut self, name: &str, default_value: Vec2f) -> ParseResult<Vec2f> {
         self.dict.get_one_vector2f(name, default_value)
     }
 
-    pub fn get_one_point3f(&mut self, name: &str, default_value: Point3f) -> Point3f {
+    pub fn get_one_point3f(&mut self, name: &str, default_value: Point3f) -> ParseResult<Point3f> {
         self.dict.get_one_point3f(name, default_value)
     }
 
-    pub fn get_one_vector3f(&mut self, name: &str, default_value: Vec3f) -> Vec3f {
+    pub fn get_one_vector3f(&mut self, name: &str, default_value: Vec3f) -> ParseResult<Vec3f> {
         self.dict.get_one_vector3f(name, default_value)
     }
 
-    pub fn get_one_normal3f(&mut self, name: &str, default_value: Normal3f) -> Normal3f {
+    pub fn get_one_normal3f(&mut self, name: &str, default_value: Normal3f) -> ParseResult<Normal3f> {
         self.dict.get_one_normal3f(name, default_value)
     }
 
-    pub fn get_one_rgb(&mut self, name: &str, default_value: Rgb) -> Rgb {
+    pub fn get_one_rgb(&mut self, name: &str, default_value: Rgb) -> ParseResult<Rgb> {
         self.dict.get_one_rgb(name, default_value)
     }
 
@@ -850,48 +854,47 @@ impl TextureParameterDictionary {
         default_value: Option<Arc<Spectrum>>,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
-    ) -> Option<Arc<Spectrum>> {
-        self.dict
-            .get_one_spectrum(name, default_value, spectrum_type, cached_spectra)
+    ) -> ParseResult<Option<Arc<Spectrum>>> {
+        self.dict.get_one_spectrum(name, default_value, spectrum_type, cached_spectra)
     }
 
-    pub fn get_one_string(&mut self, name: &str, default_value: &str) -> String {
+    pub fn get_one_string(&mut self, name: &str, default_value: &str) -> ParseResult<String> {
         self.dict.get_one_string(name, default_value)
     }
 
-    pub fn get_float_array(&mut self, name: &str) -> Vec<Float> {
+    pub fn get_float_array(&mut self, name: &str) -> ParseResult<Vec<Float>> {
         self.dict.get_float_array(name)
     }
 
-    pub fn get_int_array(&mut self, name: &str) -> Vec<i32> {
+    pub fn get_int_array(&mut self, name: &str) -> ParseResult<Vec<i32>> {
         self.dict.get_int_array(name)
     }
 
-    pub fn get_bool_array(&mut self, name: &str) -> Vec<bool> {
+    pub fn get_bool_array(&mut self, name: &str) -> ParseResult<Vec<bool>> {
         self.dict.get_bool_array(name)
     }
 
-    pub fn get_point2f_array(&mut self, name: &str) -> Vec<Point2f> {
+    pub fn get_point2f_array(&mut self, name: &str) -> ParseResult<Vec<Point2f>> {
         self.dict.get_point2f_array(name)
     }
 
-    pub fn get_vector2f_array(&mut self, name: &str) -> Vec<Vec2f> {
+    pub fn get_vector2f_array(&mut self, name: &str) -> ParseResult<Vec<Vec2f>> {
         self.dict.get_vector2f_array(name)
     }
 
-    pub fn get_point3f_array(&mut self, name: &str) -> Vec<Point3f> {
+    pub fn get_point3f_array(&mut self, name: &str) -> ParseResult<Vec<Point3f>> {
         self.dict.get_point3f_array(name)
     }
 
-    pub fn get_vector3f_array(&mut self, name: &str) -> Vec<Vec3f> {
+    pub fn get_vector3f_array(&mut self, name: &str) -> ParseResult<Vec<Vec3f>> {
         self.dict.get_vector3f_array(name)
     }
 
-    pub fn get_normal3f_array(&mut self, name: &str) -> Vec<Normal3f> {
+    pub fn get_normal3f_array(&mut self, name: &str) -> ParseResult<Vec<Normal3f>> {
         self.dict.get_normal3f_array(name)
     }
 
-    pub fn get_rgb_array(&mut self, name: &str) -> Vec<Rgb> {
+    pub fn get_rgb_array(&mut self, name: &str) -> ParseResult<Vec<Rgb>> {
         self.dict.get_rgb_array(name)
     }
 
@@ -900,12 +903,12 @@ impl TextureParameterDictionary {
         name: &str,
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
-    ) -> Vec<Arc<Spectrum>> {
+    ) -> ParseResult<Vec<Arc<Spectrum>>> {
         self.dict
             .get_spectrum_array(name, spectrum_type, cached_spectra)
     }
 
-    pub fn get_string_array(&mut self, name: &str) -> Vec<String> {
+    pub fn get_string_array(&mut self, name: &str) -> ParseResult<Vec<String>> {
         self.dict.lookup_array::<StringParam>(name)
     }
 
@@ -914,14 +917,14 @@ impl TextureParameterDictionary {
         name: &str,
         default_value: Float,
         textures: &NamedTextures,
-    ) -> Arc<FloatTexture> {
-        let tex = self.get_float_texture_or_none(name, textures);
+    ) -> ParseResult<Arc<FloatTexture>> {
+        let tex = self.get_float_texture_or_none(name, textures)?;
         if let Some(tex) = tex {
-            tex
+            Ok(tex)
         } else {
-            Arc::new(FloatTexture::Constant(FloatConstantTexture::new(
+            Ok(Arc::new(FloatTexture::Constant(FloatConstantTexture::new(
                 default_value,
-            )))
+            ))))
         }
     }
 
@@ -929,8 +932,10 @@ impl TextureParameterDictionary {
         &mut self,
         name: &str,
         textures: &NamedTextures,
-    ) -> Option<Arc<FloatTexture>> {
-        let p = self.dict.params.iter_mut().find(|p| p.name == name)?;
+    ) -> ParseResult<Option<Arc<FloatTexture>>> {
+        let Some(p) = self.dict.params.iter_mut().find(|p| p.name == name) else {
+            return Ok(None);
+        };
         if p.param_type == "texture" {
             if p.strings.is_empty() {
                 error!(
@@ -951,17 +956,17 @@ impl TextureParameterDictionary {
 
             let tex = textures.float_textures.get(p.strings[0].as_str());
             if let Some(tex) = tex {
-                Some(tex.clone())
+                Ok(Some(tex.clone()))
             } else {
                 error!(p.loc, "couldn't find float texture '{}'", p.strings[0]);
             }
         } else if p.param_type == "float" {
-            let v = self.get_one_float(name, 0.0);
-            return Some(Arc::new(FloatTexture::Constant(FloatConstantTexture::new(
+            let v = self.get_one_float(name, 0.0)?;
+            return Ok(Some(Arc::new(FloatTexture::Constant(FloatConstantTexture::new(
                 v,
-            ))));
+            )))));
         } else {
-            None
+            Ok(None)
         }
     }
 
@@ -972,16 +977,16 @@ impl TextureParameterDictionary {
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         textures: &NamedTextures,
-    ) -> Option<Arc<SpectrumTexture>> {
-        let tex = self.get_spectrum_texture_or_none(name, spectrum_type, cached_spectra, textures);
+    ) -> ParseResult<Option<Arc<SpectrumTexture>>> {
+        let tex = self.get_spectrum_texture_or_none(name, spectrum_type, cached_spectra, textures)?;
         if let Some(tex) = tex {
-            Some(tex)
+            Ok(Some(tex))
         } else if let Some(default_value) = default_value {
-            return Some(Arc::new(SpectrumTexture::Constant(
+            return Ok(Some(Arc::new(SpectrumTexture::Constant(
                 SpectrumConstantTexture::new(default_value.clone()),
-            )));
+            ))));
         } else {
-            return None;
+            return Ok(None);
         }
     }
 
@@ -991,7 +996,7 @@ impl TextureParameterDictionary {
         spectrum_type: SpectrumType,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         textures: &NamedTextures,
-    ) -> Option<Arc<SpectrumTexture>> {
+    ) -> ParseResult<Option<Arc<SpectrumTexture>>> {
         let spectrum_textures = match spectrum_type {
             SpectrumType::Illuminant => &textures.illuminant_spectrum_textures,
             SpectrumType::Albedo => &textures.albedo_spectrum_textures,
@@ -1021,7 +1026,7 @@ impl TextureParameterDictionary {
 
                     let spec = spectrum_textures.get(p.strings[0].as_str());
                     if let Some(spec) = spec {
-                        Some(spec.clone())
+                        Ok(Some(spec.clone()))
                     } else {
                         error!(p.loc, "couldn't find spectrum texture '{}'", p.strings[0]);
                     }
@@ -1050,22 +1055,24 @@ impl TextureParameterDictionary {
                             RgbUnboundedSpectrum::new(&self.dict.color_space, &rgb),
                         ),
                     };
-                    Some(Arc::new(SpectrumTexture::Constant(
+                    Ok(Some(Arc::new(SpectrumTexture::Constant(
                         SpectrumConstantTexture::new(Arc::new(s)),
-                    )))
+                    ))))
                 }
                 "spectrum" | "blackbody" => {
-                    let s = self.get_one_spectrum(name, None, spectrum_type, cached_spectra);
-                    assert!(s.is_some());
-                    let s = s.unwrap();
-                    Some(Arc::new(SpectrumTexture::Constant(
-                        SpectrumConstantTexture::new(s.clone()),
-                    )))
+                    let loc = p.loc.clone();
+                    let Some(s) = self.get_one_spectrum(name, None, spectrum_type, cached_spectra)?.clone() else {
+                        error!(loc, "expected spectrum '{}'", name);
+                    };
+
+                    Ok(Some(Arc::new(SpectrumTexture::Constant(
+                        SpectrumConstantTexture::new(s),
+                    ))))
                 }
-                _ => None,
+                _ => Ok(None),
             }
         } else {
-            None
+            Ok(None)
         }
     }
 }

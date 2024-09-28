@@ -5,7 +5,7 @@ use projective::{OrthographicCamera, PerspectiveCamera};
 use transform::{ApplyInverseTransform, ApplyRayInverseTransform, ApplyRayTransform, ApplyTransform};
 use vect::Dot;
 
-use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, error, image::ImageMetadata, math::*, media::Medium, options::{CameraRenderingSpace, Options}, ray::AbstractRay, reader::{paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, warn, AuxiliaryRays, Float, Frame, Normal3f, Point2f, Point3f, Ray, RayDifferential, Vec3f};
+use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, error, image::ImageMetadata, math::*, media::Medium, options::{CameraRenderingSpace, Options}, ray::AbstractRay, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, transform::Transform, warn, AuxiliaryRays, Float, Frame, Normal3f, Point2f, Point3f, Ray, RayDifferential, Vec3f};
 
 pub mod projective;
 pub mod film;
@@ -37,8 +37,8 @@ impl Camera {
         film: Arc<Film>,
         options: &Options,
         loc: &FileLoc,
-    ) -> Camera {
-        match name {
+    ) -> ParseResult<Camera> {
+        Ok(match name {
             "perspective" => Camera::Perspective(PerspectiveCamera::create(
                 parameters,
                 camera_transform,
@@ -46,7 +46,7 @@ impl Camera {
                 medium,
                 options,
                 loc
-            )),
+            )?),
             "orthographic" => Camera::Orthographic(OrthographicCamera::create(
                 parameters,
                 camera_transform,
@@ -54,9 +54,9 @@ impl Camera {
                 medium,
                 options,
                 loc
-            )),
+            )?),
             _ => { error!(loc, "camera type '{}' unknown", name); },
-        }
+        })
     }
 }
 
@@ -405,22 +405,22 @@ impl CameraBaseParameters {
         medium: Option<Arc<Medium>>,
         parameters: &mut ParameterDictionary,
         loc: &FileLoc,
-    ) -> CameraBaseParameters {
-        let mut shutter_open = parameters.get_one_float("shutteropen", 0.0);
-        let mut shutter_close = parameters.get_one_float("shutterclose", 1.0);
+    ) -> ParseResult<CameraBaseParameters> {
+        let mut shutter_open = parameters.get_one_float("shutteropen", 0.0)?;
+        let mut shutter_close = parameters.get_one_float("shutterclose", 1.0)?;
 
         if shutter_close < shutter_open {
             warn!(loc, "shutter close time [{}] < shutter open time [{}]. swapping them.", shutter_close, shutter_open);
             std::mem::swap(&mut shutter_close, &mut shutter_open);
         }
 
-        CameraBaseParameters {
+        Ok(CameraBaseParameters {
             camera_transform,
             shutter_open,
             shutter_close,
             film,
             medium,
-        }
+        })
     }
 }
 

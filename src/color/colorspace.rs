@@ -1,8 +1,8 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use once_cell::sync::Lazy;
 
-use crate::{color::rgb_to_spectra, error, mat::mul_mat_vec, Mat3, Point2f};
+use crate::{color::rgb_to_spectra, error, mat::mul_mat_vec, reader::error::{ParseError, ParseResult}, Mat3, Point2f};
 
 use super::{named_spectrum::NamedSpectrum, rgb_xyz::{Rgb, RgbSigmoidPolynomial, Xyz}, rgb_to_spectra::Gamut, spectrum::{DenselySampledSpectrum, Spectrum}};
 
@@ -107,14 +107,16 @@ pub enum NamedColorSpace {
     Aces2065_1,
 }
 
-impl From<&str> for NamedColorSpace {
-    fn from(value: &str) -> Self {
-        match value.to_ascii_lowercase().as_str() {
+impl FromStr for NamedColorSpace {
+    type Err = ParseError;
+
+    fn from_str(value: &str) -> Result<NamedColorSpace, ParseError> {
+        Ok(match value.to_ascii_lowercase().as_str() {
             "srgb" => NamedColorSpace::SRgb,
             "rec2020" => NamedColorSpace::Rec2020,
             "aces2065-1" => NamedColorSpace::Aces2065_1,
-            _ => { error!(@basic "unknown color space '{}'", value); },
-        }
+            _ => { error!(@noloc "unknown color space '{}'", value); },
+        })
     }
 }
 

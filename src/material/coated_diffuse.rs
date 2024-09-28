@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{dielectric::DielectricBxDF, diffuse::DiffuseBxDF, layered::CoatedDiffuseBxDF, BxDF}, color::{sampled::SampledSpectrum, spectrum::{AbstractSpectrum, ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, scattering::TrowbridgeReitzDistribution, texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Float};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{dielectric::DielectricBxDF, diffuse::DiffuseBxDF, layered::CoatedDiffuseBxDF, BxDF}, color::{sampled::SampledSpectrum, spectrum::{AbstractSpectrum, ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{error::ParseResult, paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, scattering::TrowbridgeReitzDistribution, texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Float};
 
 use super::{AbstractMaterial, AbstractTextureEvaluator, MaterialEvalContext};
 
@@ -57,30 +57,30 @@ impl CoatedDiffuseMaterial {
         loc: &FileLoc,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         textures: &NamedTextures,
-    ) -> CoatedDiffuseMaterial {
-        let reflectance = if let Some(reflectance) = parameters.get_spectrum_texture("reflectance", None, SpectrumType::Albedo, cached_spectra, textures) {
+    ) -> ParseResult<CoatedDiffuseMaterial> {
+        let reflectance = if let Some(reflectance) = parameters.get_spectrum_texture("reflectance", None, SpectrumType::Albedo, cached_spectra, textures)? {
             reflectance
         } else {
             Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture::new(Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.5))))))
         };
 
-        let u_roughness = if let Some(u_roughness) = parameters.get_float_texture_or_none("uroughness", textures) {
+        let u_roughness = if let Some(u_roughness) = parameters.get_float_texture_or_none("uroughness", textures)? {
             u_roughness
         } else {
-            parameters.get_float_texture("roughness", 0.0, textures)
+            parameters.get_float_texture("roughness", 0.0, textures)?
         };
-        let v_roughness = if let Some(v_roughness) = parameters.get_float_texture_or_none("vroughness", textures) {
+        let v_roughness = if let Some(v_roughness) = parameters.get_float_texture_or_none("vroughness", textures)? {
             v_roughness
         } else {
-            parameters.get_float_texture("roughness", 0.0, textures)
+            parameters.get_float_texture("roughness", 0.0, textures)?
         };
 
-        let thickness = parameters.get_float_texture("thickness", 0.01, textures);
+        let thickness = parameters.get_float_texture("thickness", 0.01, textures)?;
 
-        let eta = if !parameters.get_float_array("eta").is_empty() {
-            Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(parameters.get_float_array("eta")[0]))))
+        let eta = if !parameters.get_float_array("eta")?.is_empty() {
+            Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(parameters.get_float_array("eta")?[0]))))
         } else {
-            parameters.get_one_spectrum("eta", None, SpectrumType::Unbounded, cached_spectra)
+            parameters.get_one_spectrum("eta", None, SpectrumType::Unbounded, cached_spectra)?
         };
 
         let eta = if let Some(eta) = eta {
@@ -89,20 +89,20 @@ impl CoatedDiffuseMaterial {
             Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.5)))
         };
 
-        let max_depth = parameters.get_one_int("maxdepth", 10);
-        let n_samples = parameters.get_one_int("nsamples", 1);
+        let max_depth = parameters.get_one_int("maxdepth", 10)?;
+        let n_samples = parameters.get_one_int("nsamples", 1)?;
 
-        let g = parameters.get_float_texture("g", 0.0, textures);
-        let albedo = if let Some(albedo) = parameters.get_spectrum_texture("albedo", None, SpectrumType::Albedo, cached_spectra, textures) {
+        let g = parameters.get_float_texture("g", 0.0, textures)?;
+        let albedo = if let Some(albedo) = parameters.get_spectrum_texture("albedo", None, SpectrumType::Albedo, cached_spectra, textures)? {
             albedo
         } else {
             Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture::new(Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.0))))))
         };
 
-        let displacement = parameters.get_float_texture_or_none("displacement", textures);
-        let remap_roughness = parameters.get_one_bool("remaproughness", true);
+        let displacement = parameters.get_float_texture_or_none("displacement", textures)?;
+        let remap_roughness = parameters.get_one_bool("remaproughness", true)?;
 
-        CoatedDiffuseMaterial {
+        Ok(CoatedDiffuseMaterial {
             displacement,
             normal_map,
             reflectance,
@@ -115,7 +115,7 @@ impl CoatedDiffuseMaterial {
             remap_roughness,
             max_depth,
             n_samples,
-        }
+        })
     }
 }
 

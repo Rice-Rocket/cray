@@ -1,10 +1,10 @@
-use std::{collections::{HashMap, HashSet}, ops::{Index, IndexMut}, path::{Path, PathBuf}, sync::{atomic::{AtomicI32, Ordering}, Arc, Mutex}};
+use std::{collections::{HashMap, HashSet}, ops::{Index, IndexMut}, path::{Path, PathBuf}, str::FromStr as _, sync::{atomic::{AtomicI32, Ordering}, Arc, Mutex}};
 
 use string_interner::{symbol::SymbolU32, DefaultBackend, StringInterner};
 
 use crate::{camera::{film::{AbstractFilm, Film}, filter::Filter, AbstractCamera, Camera, CameraTransform}, clear_log, color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{ColorEncoding, ColorEncodingCache}, spectrum::Spectrum}, error, file::resolve_filename, image::Image, integrator::{AbstractIntegrator, Integrator}, light::Light, log, material::Material, media::{Medium, MediumInterface}, mipmap::MIPMap, options::{CameraRenderingSpace, Options}, primitive::{bvh::{create_accelerator, BvhAggregate, BvhSplitMethod}, geometric::GeometricPrimitive, simple::SimplePrimitive, transformed::TransformedPrimitive, Primitive}, sampler::Sampler, shape::Shape, texture::{FloatConstantTexture, FloatTexture, SpectrumTexture, TexInfo}, to_radians, transform::{ApplyTransform, Transform}, warn, Float, Mat4, Point3f, Vec3f};
 
-use super::{paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::{FileLoc, ParsedParameterVector, ParserTarget}, utils::normalize_arg};
+use super::{error::ParseResult, paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::{FileLoc, ParsedParameterVector, ParserTarget}, utils::normalize_arg};
 
 #[derive(Debug, Default)]
 pub struct BasicScene {
@@ -54,7 +54,7 @@ impl BasicScene {
         accel: SceneEntity,
         string_interner: &StringInterner<DefaultBackend>,
         options: &Options,
-    ) {
+    ) -> ParseResult<()> {
         self.film_color_space = Some(film.parameters.color_space.clone());
         self.integrator = Some(integ);
         self.accelerator = Some(accel);
@@ -63,10 +63,10 @@ impl BasicScene {
             string_interner.resolve(filter.name).expect("unresolved name"),
             &mut filter.parameters,
             &filter.loc,
-        );
+        )?;
 
-        let exposure_time = camera.base.parameters.get_one_float("shutterclose", 1.0)
-            - camera.base.parameters.get_one_float("shutteropen", 0.0);
+        let exposure_time = camera.base.parameters.get_one_float("shutterclose", 1.0)?
+            - camera.base.parameters.get_one_float("shutteropen", 0.0)?;
 
         if exposure_time <= 0.0 {
             error!(
@@ -83,7 +83,7 @@ impl BasicScene {
             filter,
             &film.loc,
             options,
-        ));
+        )?);
 
         let res = self.film.as_ref().unwrap().full_resolution();
         self.sampler = Some(Sampler::create(
@@ -92,7 +92,7 @@ impl BasicScene {
             res,
             options,
             &sampler.loc,
-        ));
+        )?);
 
         self.camera = Some(Camera::create(
             string_interner.resolve(camera.base.name).unwrap(),
@@ -102,7 +102,9 @@ impl BasicScene {
             Arc::new(self.film.as_ref().unwrap().clone()),
             options,
             &camera.base.loc,
-        ));
+        )?);
+
+        Ok(())
     }
 
     fn add_named_material(&mut self, name: &str, mut material: SceneEntity, options: &Options) {
@@ -120,8 +122,13 @@ impl BasicScene {
         self.media.get(name).cloned()
     }
 
-    fn add_medium(&mut self, mut medium: MediumSceneEntity, string_interner: &mut StringInterner<DefaultBackend>, cached_spectra: &mut HashMap<String, Arc<Spectrum>>) {
-        let ty = medium.base.parameters.get_one_string("type", "");
+    fn add_medium(
+        &mut self,
+        mut medium: MediumSceneEntity,
+        string_interner: &mut StringInterner<DefaultBackend>,
+        cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
+    ) -> ParseResult<()> {
+        let ty = medium.base.parameters.get_one_string("type", "")?;
         if ty.is_empty() {
             error!(medium.base.loc, "no parameter \"string type\" found for medium");
         }
@@ -132,9 +139,11 @@ impl BasicScene {
             medium.render_from_object,
             cached_spectra,
             &medium.base.loc,
-        ));
+        )?);
 
         self.media.insert(string_interner.resolve(medium.base.name).expect("Unknown symbol").to_owned(), m);
+
+        Ok(())
     }
 
     fn add_float_texture(
@@ -145,7 +154,7 @@ impl BasicScene {
         options: &Options,
         texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
         gamma_encoding_cache: &mut ColorEncodingCache,
-    ) {
+    ) -> ParseResult<()> {
         // TODO: Check if animated once we add animated transforms.
 
         if string_interner
@@ -158,13 +167,13 @@ impl BasicScene {
                 != "ptex"
         {
             self.serial_float_textures.push((name.to_owned(), texture));
-            return;
+            return Ok(());
         }
 
         let filename = texture
             .base
             .parameters
-            .get_one_string("filename", "");
+            .get_one_string("filename", "")?;
 
         let filename = resolve_filename(options, filename.as_str());
         if filename.is_empty() {
@@ -178,7 +187,7 @@ impl BasicScene {
 
         if self.loading_texture_filenames.contains(&filename) {
             self.serial_float_textures.push((name.to_owned(), texture));
-            return;
+            return Ok(());
         }
 
         self.loading_texture_filenames.insert(filename);
@@ -198,11 +207,13 @@ impl BasicScene {
             options,
             texture_cache,
             gamma_encoding_cache,
-        );
+        )?;
 
         self.textures
             .float_textures
             .insert(name.to_owned(), Arc::new(float_texture));
+
+        Ok(())
     }
 
     fn add_spectrum_texture(
@@ -214,19 +225,19 @@ impl BasicScene {
         options: &Options,
         texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
         gamma_encoding_cache: &mut ColorEncodingCache,
-    ) {
+    ) -> ParseResult<()> {
         if string_interner.resolve(texture.base.name).unwrap() != "ptex"
             && string_interner.resolve(texture.base.name).unwrap() != "imagemap"
         {
             self.serial_spectrum_textures
                 .push((name.to_owned(), texture));
-            return;
+            return Ok(());
         }
 
         let filename = texture
             .base
             .parameters
-            .get_one_string("filename", "");
+            .get_one_string("filename", "")?;
         let filename = resolve_filename(options, filename.as_str());
 
         if filename.is_empty() {
@@ -241,7 +252,7 @@ impl BasicScene {
         if self.loading_texture_filenames.contains(&filename) {
             self.serial_spectrum_textures
                 .push((name.to_owned(), texture));
-            return;
+            return Ok(());
         }
         self.loading_texture_filenames.insert(filename);
 
@@ -262,10 +273,13 @@ impl BasicScene {
             options,
             texture_cache,
             gamma_encoding_cache,
-        );
+        )?;
+
         self.textures
             .albedo_spectrum_textures
             .insert(name.to_owned(), Arc::new(spectrum_texture));
+
+        Ok(())
     }
 
     fn add_light(
@@ -274,7 +288,7 @@ impl BasicScene {
         string_interner: &StringInterner<DefaultBackend>,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         options: &Options,
-    ) {
+    ) -> ParseResult<()> {
         let light_medium = self.get_medium(&light.medium);
         // TODO: Check for animated light and warn, when I add animated transforms.
 
@@ -291,7 +305,9 @@ impl BasicScene {
             &light.base.base.loc,
             cached_spectra,
             options,
-        )));
+        )?));
+
+        Ok(())
     }
 
     fn add_area_light(&mut self, light: SceneEntity) -> i32 {
@@ -317,10 +333,10 @@ impl BasicScene {
         // TODO: Check for unused textures, lights, etc and warn about them.
     }
 
-    fn load_normal_map(&mut self, parameters: &mut ParameterDictionary, options: &Options) {
-        let normal_map_filename = resolve_filename(options, &parameters.get_one_string("normalmap", ""));
+    fn load_normal_map(&mut self, parameters: &mut ParameterDictionary, options: &Options) -> ParseResult<()> {
+        let normal_map_filename = resolve_filename(options, &parameters.get_one_string("normalmap", "")?);
         if normal_map_filename.is_empty() {
-            return;
+            return Ok(());
         }
         let filename = PathBuf::from(&normal_map_filename);
         if !filename.exists() {
@@ -329,14 +345,14 @@ impl BasicScene {
 
         let image_and_metadata = Image::read(
             &filename,
-            Some(ColorEncoding::get("linear", None)),
-        ).unwrap();
+            Some(ColorEncoding::get("linear", None)?),
+        )?;
 
         let image = image_and_metadata.image;
         let rgb_desc = image.get_channel_desc(&["R", "G", "B"]);
         if rgb_desc.is_none() {
             error!(
-                @image
+                @file
                 filename.display(),
                 "normal map should have rgb channels.",
             );
@@ -344,13 +360,15 @@ impl BasicScene {
         let rgb_desc = rgb_desc.unwrap();
         if rgb_desc.size() != 3 {
             error!(
-                @image
+                @file
                 filename.display(),
                 "normal map should have rgb channels.",
             );
         }
         let image = Arc::new(image);
         self.normal_maps.insert(normal_map_filename, image);
+
+        Ok(())
     }
 
     pub fn create_media(&self) -> HashMap<String, Arc<Medium>> {
@@ -365,7 +383,7 @@ impl BasicScene {
         options: &Options,
         texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
         gamma_encoding_cache: &mut ColorEncodingCache,
-    ) -> NamedTextures {
+    ) -> ParseResult<NamedTextures> {
         // TODO: Note that albedo spectrum and float textures were created
         //  earlier; if we switch to asynch, we will want to resolve them here.
 
@@ -387,7 +405,7 @@ impl BasicScene {
                 options,
                 texture_cache,
                 gamma_encoding_cache,
-            );
+            )?;
 
             let illum_tex = SpectrumTexture::create(
                 string_interner
@@ -402,7 +420,7 @@ impl BasicScene {
                 options,
                 texture_cache,
                 gamma_encoding_cache,
-            );
+            )?;
 
             self.textures
                 .unbounded_spectrum_textures
@@ -430,7 +448,7 @@ impl BasicScene {
                 options,
                 texture_cache,
                 gamma_encoding_cache,
-            );
+            )?;
 
             self.textures
                 .float_textures
@@ -457,7 +475,7 @@ impl BasicScene {
                 options,
                 texture_cache,
                 gamma_encoding_cache,
-            );
+            )?;
 
             let unbounded_tex = SpectrumTexture::create(
                 string_interner
@@ -472,7 +490,7 @@ impl BasicScene {
                 options,
                 texture_cache,
                 gamma_encoding_cache,
-            );
+            )?;
 
             let illum_tex = SpectrumTexture::create(
                 string_interner
@@ -487,7 +505,7 @@ impl BasicScene {
                 options,
                 texture_cache,
                 gamma_encoding_cache,
-            );
+            )?;
 
             self.textures
                 .albedo_spectrum_textures
@@ -504,7 +522,7 @@ impl BasicScene {
         //  Can we return a reference?
         //  Storing self.textures as Arc or Rc doesn't work since we need it mutable.
         //  This is fine for now.
-        self.textures.clone()
+        Ok(self.textures.clone())
     }
 
     #[allow(clippy::type_complexity)]
@@ -513,14 +531,14 @@ impl BasicScene {
         textures: &NamedTextures,
         string_interner: &StringInterner<DefaultBackend>,
         options: &Options,
-    ) -> (Arc<[Arc<Light>]>, HashMap<usize, Vec<Arc<Light>>>) {
-        let find_medium = |s: &str, loc: &FileLoc| -> Option<&Arc<Medium>> {
+    ) -> ParseResult<(Arc<[Arc<Light>]>, HashMap<usize, Vec<Arc<Light>>>)> {
+        let find_medium = |s: &str, loc: &FileLoc| -> ParseResult<Option<&Arc<Medium>>> {
             if s.is_empty() {
-                return None;
+                return Ok(None);
             }
 
             match self.media.get(s) {
-                Some(m) => Some(m),
+                Some(m) => Ok(Some(m)),
                 None => { error!(loc, "medium '{}' not defined", s); },
             }
         };
@@ -546,9 +564,9 @@ impl BasicScene {
                     );
                 };
                 assert!(
-                    !material.1.parameters.get_one_string("type", "").is_empty()
+                    !material.1.parameters.get_one_string("type", "")?.is_empty()
                 );
-                material.1.parameters.get_one_string("type", "")
+                material.1.parameters.get_one_string("type", "")?
             } else {
                 let CurrentGraphicsMaterial::MaterialIndex(material_index) = shape.material else { unreachable!() };
                 assert!(
@@ -578,15 +596,15 @@ impl BasicScene {
                 &textures.float_textures,
                 &shape.base.loc,
                 options,
-            );
+            )?;
 
             // TODO: Support an alpha texture if parameters.get_texture("alpha") is specified.
-            let alpha = shape.base.parameters.get_one_float("alpha", 1.0);
+            let alpha = shape.base.parameters.get_one_float("alpha", 1.0)?;
             let alpha = Arc::new(FloatTexture::Constant(FloatConstantTexture::new(alpha)));
 
             let mi = Arc::new(MediumInterface::new(
-                find_medium(&shape.inside_medium, &shape.base.loc).cloned(),
-                find_medium(&shape.outside_medium, &shape.base.loc).cloned(),
+                find_medium(&shape.inside_medium, &shape.base.loc)?.cloned(),
+                find_medium(&shape.outside_medium, &shape.base.loc)?.cloned(),
             ));
 
             let mut shape_lights = Vec::new();
@@ -601,7 +619,7 @@ impl BasicScene {
                     alpha.clone(),
                     &area_light_entity.loc,
                     options,
-                ));
+                )?);
 
                 lights.push(area.clone());
                 shape_lights.push(area);
@@ -617,7 +635,7 @@ impl BasicScene {
         // TODO: We'd rather move self.lights out rather than an expensive clone.
         //   We can switch to make lights vec in this fn though when we parallelize,
         //   which obviates this issue.
-        (self.lights.clone().into(), shape_index_to_area_lights)
+        Ok((self.lights.clone().into(), shape_index_to_area_lights))
     }
 
     pub fn create_materials(
@@ -626,7 +644,7 @@ impl BasicScene {
         string_interner: &StringInterner<DefaultBackend>,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         options: &Options,
-    ) -> (HashMap<String, Arc<Material>>, Vec<Arc<Material>>) {
+    ) -> ParseResult<(HashMap<String, Arc<Material>>, Vec<Arc<Material>>)> {
         // TODO: Note that we'd create normal_maps here if/when we parallelize.
         //  For now they're already been loaded into self.normal_maps.
 
@@ -636,7 +654,7 @@ impl BasicScene {
                 error!(material.loc, "named material '{}' redefined", name);
             }
 
-            let ty = material.parameters.get_one_string("type", "");
+            let ty = material.parameters.get_one_string("type", "")?;
             if ty.is_empty() {
                 error!(material.loc, "no type specified for material '{}'", name);
             }
@@ -645,7 +663,7 @@ impl BasicScene {
                 options,
                 &material
                     .parameters
-                    .get_one_string("normalmap", ""),
+                    .get_one_string("normalmap", "")?,
             );
             let normal_map = if filename.is_empty() {
                 None
@@ -666,7 +684,7 @@ impl BasicScene {
                 &named_materials_out,
                 cached_spectra,
                 &material.loc,
-            ));
+            )?);
             named_materials_out.insert(name.to_string(), m);
         }
 
@@ -674,7 +692,7 @@ impl BasicScene {
         for mtl in &mut self.materials {
             let filename = resolve_filename(
                 options,
-                &mtl.parameters.get_one_string("normalmap", ""),
+                &mtl.parameters.get_one_string("normalmap", "")?,
             );
             let normal_map = if filename.is_empty() {
                 None
@@ -695,11 +713,11 @@ impl BasicScene {
                 &named_materials_out,
                 cached_spectra,
                 &mtl.loc,
-            ));
+            )?);
             materials_out.push(m);
         }
 
-        (named_materials_out, materials_out)
+        Ok((named_materials_out, materials_out))
     }
 
     pub fn create_aggregate(
@@ -711,14 +729,14 @@ impl BasicScene {
         materials: &[Arc<Material>],
         string_interner: &StringInterner<DefaultBackend>,
         options: &Options,
-    ) -> Arc<Primitive> {
-        let find_medium = |s: &str, loc: &FileLoc| -> Option<&Arc<Medium>> {
+    ) -> ParseResult<Arc<Primitive>> {
+        let find_medium = |s: &str, loc: &FileLoc| -> ParseResult<Option<&Arc<Medium>>> {
             if s.is_empty() {
-                return None;
+                return Ok(None);
             }
             
             match media.get(s) {
-                Some(m) => Some(m),
+                Some(m) => Ok(Some(m)),
                 None => { error!(loc, "medium '{}' not defined", s); },
             }
         };
@@ -726,7 +744,7 @@ impl BasicScene {
         // TODO: We'll need closure for get_alpha_texture.
 
         let create_primitives_for_shapes =
-            |shapes: &mut [ShapeSceneEntity]| -> Vec<Arc<Primitive>> {
+            |shapes: &mut [ShapeSceneEntity]| -> ParseResult<Vec<Arc<Primitive>>> {
                 let mut shape_vectors: Vec<Vec<Arc<Shape>>> = vec![Vec::new(); shapes.len()];
                 // TODO: parallelize
                 for i in 0..shapes.len() {
@@ -740,7 +758,7 @@ impl BasicScene {
                         &textures.float_textures,
                         &sh.base.loc,
                         options,
-                    );
+                    )?;
                 }
 
                 let mut primitives = Vec::new();
@@ -756,7 +774,7 @@ impl BasicScene {
                     let mtl = if let CurrentGraphicsMaterial::NamedMaterial(material_name) = &sh.material {
                         named_materials
                             .get(material_name.as_str())
-                            .unwrap_or_else(|| { error!(sh.base.loc, "no material name defined"); })
+                            .ok_or(error!(@create sh.base.loc, "material '{}' undefined", material_name))?
                     } else {
                         let CurrentGraphicsMaterial::MaterialIndex(material_index) = sh.material else { unreachable!() };
                         assert!(
@@ -767,8 +785,8 @@ impl BasicScene {
                     };
 
                     let mi = Arc::new(MediumInterface::new(
-                        find_medium(&sh.inside_medium, &sh.base.loc).cloned(),
-                        find_medium(&sh.outside_medium, &sh.base.loc).cloned(),
+                        find_medium(&sh.inside_medium, &sh.base.loc)?.cloned(),
+                        find_medium(&sh.outside_medium, &sh.base.loc)?.cloned(),
                     ));
 
                     let area_lights = shape_index_to_area_lights.get(&i);
@@ -798,11 +816,11 @@ impl BasicScene {
                         }
                     }
                 }
-                primitives
+                Ok(primitives)
             };
 
         log!("Creating shapes...");
-        let mut primitives = create_primitives_for_shapes(&mut self.shapes);
+        let mut primitives = create_primitives_for_shapes(&mut self.shapes)?;
 
         self.shapes.clear();
         self.shapes.shrink_to_fit();
@@ -814,7 +832,7 @@ impl BasicScene {
         // TODO: Can we use a SymbolU32 here for the key instead of String?
         let mut instance_definitions: HashMap<String, Option<Arc<Primitive>>> = HashMap::new();
         for inst in &mut self.instance_definitions {
-            let instance_primitives = create_primitives_for_shapes(&mut inst.shapes);
+            let instance_primitives = create_primitives_for_shapes(&mut inst.shapes)?;
             // TODO: animated instance primitives
 
             let instance_primitives = if instance_primitives.len() > 1 {
@@ -843,9 +861,10 @@ impl BasicScene {
         self.instance_definitions.shrink_to_fit();
 
         for inst in &self.instances {
+            let e = error!(@create @noloc "unknown instance name");
             let instance = instance_definitions
                 .get(string_interner.resolve(inst.name).unwrap())
-                .expect("unknown instance name");
+                .ok_or(error!(@create @noloc "unknown instance name"))?;
 
             if instance.is_none() {
                 continue;
@@ -873,10 +892,10 @@ impl BasicScene {
                 .unwrap(),
             primitives,
             &mut self.accelerator.as_mut().unwrap().parameters,
-        ));
+        )?);
         clear_log!();
 
-        aggregate
+        Ok(aggregate)
     }
 
     pub fn create_integrator(
@@ -886,7 +905,7 @@ impl BasicScene {
         accelerator: Arc<Primitive>,
         lights: Arc<[Arc<Light>]>,
         string_interner: &StringInterner<DefaultBackend>,
-    ) -> Integrator {
+    ) -> ParseResult<Integrator> {
         Integrator::create(
             string_interner
                 .resolve(self.integrator.as_ref().unwrap().name)
@@ -1135,12 +1154,14 @@ impl Default for GraphicsState {
 }
 
 impl GraphicsState {
-    pub fn for_active_transforms(&mut self, f: impl Fn(&mut Transform)) {
+    pub fn for_active_transforms(&mut self, f: impl Fn(&mut Transform) -> ParseResult<()>) -> ParseResult<()> {
         for i in 0..MAX_TRANSFORMS {
             if self.active_transform_bits & (1 << i) != 0 {
-                f(&mut self.ctm[i]);
+                f(&mut self.ctm[i])?;
             }
         }
+
+        Ok(())
     }
 }
 
@@ -1356,7 +1377,7 @@ impl ParserTarget for BasicSceneBuilder {
         }
     }
 
-    fn option(&mut self, name: &str, value: &str, options: &mut Options, loc: FileLoc) {
+    fn option(&mut self, name: &str, value: &str, options: &mut Options, loc: FileLoc) -> ParseResult<()> {
         let name = normalize_arg(name);
 
         match name.as_str() {
@@ -1377,7 +1398,7 @@ impl ParserTarget for BasicSceneBuilder {
             },
             "displacementedgescale" => {
                 options.displacement_edge_scale = value.parse()
-                    .unwrap_or_else(|_| { error!(loc, "unable to parse option value '{}'", value); });
+                    .map_err(|_| error!(@create loc, "unable to parse option value '{}'", value))?;
             },
             "msereferenceimage" => {
                 if value.len() < 3 || !value.starts_with('\"') || !value.ends_with('\"') {
@@ -1405,7 +1426,7 @@ impl ParserTarget for BasicSceneBuilder {
             },
             "seed" => {
                 options.seed = value.parse()
-                    .unwrap_or_else(|_| { error!(loc, "unable to parse option value '{}'", value); });
+                    .map_err(|_| error!(@create loc, "unable to parse option value '{}'", value))?;
             },
             "forcediffuse" => match value {
                 "true" => options.force_diffuse = true,
@@ -1424,28 +1445,33 @@ impl ParserTarget for BasicSceneBuilder {
             },
             _ => { error!(loc, "unknown option '{}'", name); },
         }
+
+        Ok(())
     }
 
-    fn identity(&mut self, loc: FileLoc) {
-        self.graphics_state.for_active_transforms(|t: &mut Transform| *t = Transform::default());
+    fn identity(&mut self, loc: FileLoc) -> ParseResult<()> {
+        self.graphics_state.for_active_transforms(|t: &mut Transform| { *t = Transform::default(); Ok(()) })
     }
 
-    fn translate(&mut self, dx: Float, dy: Float, dz: Float, loc: FileLoc) {
+    fn translate(&mut self, dx: Float, dy: Float, dz: Float, loc: FileLoc) -> ParseResult<()> {
         self.graphics_state.for_active_transforms(|t: &mut Transform| {
-            *t = t.apply(Transform::from_translation(Point3f::new(dx, dy, dz)))
+            *t = t.apply(Transform::from_translation(Point3f::new(dx, dy, dz)));
+            Ok(())
         })
     }
     
-    fn scale(&mut self, sx: Float, sy: Float, sz: Float, loc: FileLoc) {
+    fn scale(&mut self, sx: Float, sy: Float, sz: Float, loc: FileLoc) -> ParseResult<()> {
         self.graphics_state.for_active_transforms(|t: &mut Transform| {
-            *t = t.apply(Transform::from_scale(Vec3f::new(sx, sy, sz)))
+            *t = t.apply(Transform::from_scale(Vec3f::new(sx, sy, sz)));
+            Ok(())
         })
     }
 
-    fn rotate(&mut self, mut angle: Float, ax: Float, ay: Float, az: Float, loc: FileLoc) {
+    fn rotate(&mut self, mut angle: Float, ax: Float, ay: Float, az: Float, loc: FileLoc) -> ParseResult<()> {
         angle = to_radians(angle);
         self.graphics_state.for_active_transforms(|t: &mut Transform| {
-            *t = t.apply(Transform::from_rotation(angle.sin(), angle.cos(), Vec3f::new(ax, ay, az)))
+            *t = t.apply(Transform::from_rotation(angle.sin(), angle.cos(), Vec3f::new(ax, ay, az)));
+            Ok(())
         })
     }
 
@@ -1461,17 +1487,20 @@ impl ParserTarget for BasicSceneBuilder {
         uy: Float,
         uz: Float,
         loc: FileLoc,
-    ) {
+    ) -> ParseResult<()> {
         let transform = Transform::looking_at(
             Point3f::new(ex, ey, ez),
             Point3f::new(lx, ly, lz),
             Vec3f::new(ux, uy, uz),
         );
 
-        self.graphics_state.for_active_transforms(|t: &mut Transform| *t = t.apply(transform));
+        self.graphics_state.for_active_transforms(|t: &mut Transform| {
+            *t = t.apply(transform);
+            Ok(())
+        })
     }
 
-    fn transform(&mut self, transform: [Float; 16], loc: FileLoc) {
+    fn transform(&mut self, transform: [Float; 16], loc: FileLoc) -> ParseResult<()> {
         self.graphics_state.for_active_transforms(|t: &mut Transform| {
             let m = Mat4::from(transform);
             if let Some(m_inv) = m.try_inverse() {
@@ -1479,10 +1508,12 @@ impl ParserTarget for BasicSceneBuilder {
             } else {
                 error!(loc, "matrix {:?} is not inversible", transform);
             }
+            
+            Ok(())
         })
     }
 
-    fn concat_transform(&mut self, transform: [Float; 16], loc: FileLoc) {
+    fn concat_transform(&mut self, transform: [Float; 16], loc: FileLoc) -> ParseResult<()> {
         self.graphics_state.for_active_transforms(|t: &mut Transform| {
             let m = Mat4::from(transform);
             if let Some(m_inv) = m.try_inverse() {
@@ -1490,6 +1521,8 @@ impl ParserTarget for BasicSceneBuilder {
             } else {
                 error!(loc, "matrix {:?} is not inversible", transform);
             }
+
+            Ok(())
         })
     }
 
@@ -1525,9 +1558,10 @@ impl ParserTarget for BasicSceneBuilder {
         self.graphics_state.transform_end_time = end;
     }
 
-    fn color_space(&mut self, n: &str, loc: FileLoc) {
-        let cs = RgbColorSpace::get_named(n.into());
+    fn color_space(&mut self, n: &str, loc: FileLoc) -> ParseResult<()> {
+        let cs = RgbColorSpace::get_named(NamedColorSpace::from_str(n).map_err(|e| e.with_loc(loc))?);
         self.graphics_state.color_space = cs.clone();
+        Ok(())
     }
 
     fn pixel_filter(
@@ -1610,7 +1644,7 @@ impl ParserTarget for BasicSceneBuilder {
         string_interner: &mut StringInterner<DefaultBackend>,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         loc: FileLoc,
-    ) {
+    ) -> ParseResult<()> {
         // TODO: Normalize name to utf8
 
         let dict = ParameterDictionary::new_with_unowned(
@@ -1627,8 +1661,10 @@ impl ParserTarget for BasicSceneBuilder {
             );
         } else {
             // TODO: defer error instead
-            error!(loc, "named medium {} redefined", name);
+            error!(loc, "named medium '{}' redefined", name);
         }
+
+        Ok(())
     }
 
     fn medium_interface(&mut self, inside_name: &str, outside_name: &str, loc: FileLoc) {
@@ -1682,7 +1718,7 @@ impl ParserTarget for BasicSceneBuilder {
         self.push_stack.push((b'a', loc));
     }
 
-    fn attribute_end(&mut self, loc: FileLoc) {
+    fn attribute_end(&mut self, loc: FileLoc) -> ParseResult<()> {
         // TODO: verify world
         if self.push_stack.is_empty() {
             error!(loc, "unmatched attribute_end statement");
@@ -1698,9 +1734,11 @@ impl ParserTarget for BasicSceneBuilder {
         }
 
         self.push_stack.pop();
+
+        Ok(())
     }
 
-    fn attribute(&mut self, target: &str, mut params: ParsedParameterVector, loc: FileLoc) {
+    fn attribute(&mut self, target: &str, mut params: ParsedParameterVector, loc: FileLoc) -> ParseResult<()> {
         let current_attributes = match target {
             "shape" => &mut self.graphics_state.shape_attributes,
             "light" => &mut self.graphics_state.light_attributes,
@@ -1715,6 +1753,8 @@ impl ParserTarget for BasicSceneBuilder {
             p.color_space = Some(self.graphics_state.color_space.clone());
             current_attributes.push(p.to_owned());
         }
+
+        Ok(())
     }
 
     fn texture(
@@ -1729,7 +1769,7 @@ impl ParserTarget for BasicSceneBuilder {
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
         gamma_encoding_cache: &mut ColorEncodingCache,
-    ) {
+    ) -> ParseResult<()> {
         // TODO: normalize name to utf8
         // TODO: verify world
 
@@ -1765,7 +1805,7 @@ impl ParserTarget for BasicSceneBuilder {
                         options,
                         texture_cache,
                         gamma_encoding_cache,
-                    );
+                    )
                 },
                 "spectrum" => {
                     self.scene.add_spectrum_texture(
@@ -1782,7 +1822,7 @@ impl ParserTarget for BasicSceneBuilder {
                         options,
                         texture_cache,
                         gamma_encoding_cache,
-                    );
+                    )
                 },
                 _ => { error!(loc, "unknown texture type '{}'", texture_type); },
             }
@@ -1819,7 +1859,7 @@ impl ParserTarget for BasicSceneBuilder {
         string_interner: &mut StringInterner<DefaultBackend>,
         loc: FileLoc,
         options: &Options,
-    ) {
+    ) -> ParseResult<()> {
         // TODO: normalize name to utf8
         let dict = ParameterDictionary::new_with_unowned(
             params,
@@ -1833,6 +1873,8 @@ impl ParserTarget for BasicSceneBuilder {
             // TODO: defer error instead
             error!(loc, "named material '{}' redefined", name);
         }
+
+        Ok(())
     }
 
     fn named_material(&mut self, name: &str, loc: FileLoc) {
@@ -1888,7 +1930,7 @@ impl ParserTarget for BasicSceneBuilder {
         self.graphics_state.reverse_orientation = !self.graphics_state.reverse_orientation;
     }
 
-    fn object_begin(&mut self, name: &str, loc: FileLoc, string_interner: &mut StringInterner<DefaultBackend>) {
+    fn object_begin(&mut self, name: &str, loc: FileLoc, string_interner: &mut StringInterner<DefaultBackend>) -> ParseResult<()> {
         // TODO: verify world
         // TODO: normalize name to utf8
 
@@ -1904,10 +1946,12 @@ impl ParserTarget for BasicSceneBuilder {
             error!(loc, "ObjectBegin trying to redefine object instance '{}'", name);
         }
 
-        self.active_instance_definition = Some(ActiveInstanceDefinition::new(name, loc, string_interner))
+        self.active_instance_definition = Some(ActiveInstanceDefinition::new(name, loc, string_interner));
+
+        Ok(())
     }
 
-    fn object_end(&mut self, loc: FileLoc) {
+    fn object_end(&mut self, loc: FileLoc) -> ParseResult<()> {
         // TODO: verify world
         if self.active_instance_definition.is_none() {
             error!(loc, "ObjectEnd called outside an instance definition");
@@ -1940,9 +1984,11 @@ impl ParserTarget for BasicSceneBuilder {
         }
 
         self.active_instance_definition = None;
+
+        Ok(())
     }
 
-    fn object_instance(&mut self, name: &str, loc: FileLoc, string_interner: &mut StringInterner<DefaultBackend>) {
+    fn object_instance(&mut self, name: &str, loc: FileLoc, string_interner: &mut StringInterner<DefaultBackend>) -> ParseResult<()> {
         // TODO: normalize name to utf8
         // TODO: verify world
 
@@ -1960,15 +2006,17 @@ impl ParserTarget for BasicSceneBuilder {
         let render_from_instance = self.render_from_object().apply(world_from_render);
         let entity = InstanceSceneEntity::new(name, loc, string_interner, render_from_instance);
         self.instance_uses.push(entity);
+
+        Ok(())
     }
 
-    fn end_of_files(&mut self) {
+    fn end_of_files(&mut self) -> ParseResult<()> {
         if self.current_block != BlockState::WorldBlock {
-            error!(@basic "End of files before WorldBegin");
+            error!(@noloc "End of files before WorldBegin");
         }
 
         if !self.pushed_graphics_states.is_empty() {
-            error!(@basic "Missing end to AttributeBegin");
+            error!(@noloc "Missing end to AttributeBegin");
         }
 
         // TODO: when defered errors are implemented, check for them here.
@@ -1981,5 +2029,7 @@ impl ParserTarget for BasicSceneBuilder {
         }
 
         self.scene.done();
+
+        Ok(())
     }
 }

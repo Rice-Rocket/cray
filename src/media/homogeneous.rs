@@ -1,6 +1,6 @@
 use std::{collections::HashMap, mem::MaybeUninit, sync::Arc};
 
-use crate::{color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, ConstantSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, phase::{HGPhaseFunction, PhaseFunction}, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, warn, Float, Point3f, Ray};
+use crate::{color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, ConstantSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, phase::{HGPhaseFunction, PhaseFunction}, reader::{error::ParseResult, paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, warn, Float, Point3f, Ray};
 
 use super::{iterator::HomogeneousMajorantIterator, preset::get_medium_scattering_properties, AbstractMedium, MediumProperties, RayMajorantSegment};
 
@@ -17,9 +17,9 @@ impl HomogeneousMedium {
         parameters: &mut ParameterDictionary,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         loc: &FileLoc,
-    ) -> HomogeneousMedium {
+    ) -> ParseResult<HomogeneousMedium> {
         let (mut sig_a, mut sig_s) = (None, None);
-        let preset = parameters.get_one_string("preset", "");
+        let preset = parameters.get_one_string("preset", "")?;
 
         if !preset.is_empty() {
             if let Some((sa, ss)) = get_medium_scattering_properties(&preset) {
@@ -36,7 +36,7 @@ impl HomogeneousMedium {
                 None,
                 SpectrumType::Unbounded,
                 cached_spectra,
-            ).unwrap_or_else(|| Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)))));
+            )?.unwrap_or_else(|| Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)))));
         }
 
         if sig_s.is_none() {
@@ -45,28 +45,28 @@ impl HomogeneousMedium {
                 None,
                 SpectrumType::Unbounded,
                 cached_spectra,
-            ).unwrap_or_else(|| Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)))));
+            )?.unwrap_or_else(|| Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0)))));
         }
 
-        let mut le = parameters.get_one_spectrum("Le", None, SpectrumType::Illuminant, cached_spectra);
-        let mut le_scale = parameters.get_one_float("Lescale", 1.0);
+        let mut le = parameters.get_one_spectrum("Le", None, SpectrumType::Illuminant, cached_spectra)?;
+        let mut le_scale = parameters.get_one_float("Lescale", 1.0)?;
         if le.is_none() || le.as_ref().unwrap().max_value() == 0.0 {
             le = Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.0))));
         } else {
             le_scale /= spectrum_to_photometric(le.as_ref().unwrap());
         }
 
-        let sigma_scale = parameters.get_one_float("scale", 1.0);
-        let g = parameters.get_one_float("g", 0.0);
+        let sigma_scale = parameters.get_one_float("scale", 1.0)?;
+        let g = parameters.get_one_float("g", 0.0)?;
 
-        HomogeneousMedium::new(
+        Ok(HomogeneousMedium::new(
             DenselySampledSpectrum::new(&sig_a.unwrap()),
             DenselySampledSpectrum::new(&sig_s.unwrap()),
             sigma_scale,
             DenselySampledSpectrum::new(&le.unwrap()),
             le_scale,
             g,
-        )
+        ))
     }
 
     pub fn new(

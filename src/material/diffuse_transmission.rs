@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{diffuse_transmission::DiffuseTransmissionBxDF, BxDF}, color::{spectrum::{ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Float};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{diffuse_transmission::DiffuseTransmissionBxDF, BxDF}, color::{spectrum::{ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{error::ParseResult, paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Float};
 
 use super::{AbstractMaterial, AbstractTextureEvaluator, MaterialEvalContext};
 
@@ -36,14 +36,14 @@ impl DiffuseTransmissionMaterial {
         loc: &FileLoc,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         textures: &NamedTextures,
-    ) -> DiffuseTransmissionMaterial {
+    ) -> ParseResult<DiffuseTransmissionMaterial> {
         let reflectance = parameters.get_spectrum_texture(
             "reflectance",
             None,
             SpectrumType::Albedo,
             cached_spectra,
             textures,
-        );
+        )?;
 
         let reflectance = if let Some(reflectance) = reflectance {
             reflectance
@@ -59,7 +59,7 @@ impl DiffuseTransmissionMaterial {
             SpectrumType::Albedo,
             cached_spectra,
             textures,
-        );
+        )?;
 
         let transmittance = if let Some(transmittance) = transmittance {
             transmittance
@@ -69,16 +69,16 @@ impl DiffuseTransmissionMaterial {
             )))
         };
 
-        let displacement = parameters.get_float_texture_or_none("displacement", textures);
-        let scale = parameters.get_one_float("scale", 1.0);
+        let displacement = parameters.get_float_texture_or_none("displacement", textures)?;
+        let scale = parameters.get_one_float("scale", 1.0)?;
 
-        DiffuseTransmissionMaterial::new(
+        Ok(DiffuseTransmissionMaterial::new(
             displacement,
             normal_map,
             reflectance,
             transmittance,
             scale,
-        )
+        ))
     }
 }
 

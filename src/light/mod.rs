@@ -7,7 +7,7 @@ use point::PointLight;
 use portal_image_infinite::PortalImageInfiniteLight;
 use uniform_infinite::UniformInfiniteLight;
 
-use crate::{bounds::Union, camera::CameraTransform, clear_log, color::{colorspace::{NamedColorSpace, RgbColorSpace}, sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, spectrum_to_xyz, DenselySampledSpectrum, RgbIlluminantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, cos_theta, equal_area_square_to_sphere, error, file::resolve_filename, image::{Image, ImageAndMetadata, ImageMetadata, PixelFormat}, interaction::{Interaction, SurfaceInteraction}, log, media::{Medium, MediumInterface}, options::Options, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc, utils::truncate_filename}, safe, shape::Shape, sqr, texture::FloatTexture, transform::Transform, warn, Bounds3f, DirectionCone, Dot, Float, Normal3f, Point2f, Point2i, Point3f, Point3fi, Ray, Vec2f, Vec3f, PI};
+use crate::{bounds::Union, camera::CameraTransform, clear_log, color::{colorspace::{NamedColorSpace, RgbColorSpace}, sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, spectrum_to_xyz, DenselySampledSpectrum, RgbIlluminantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, cos_theta, equal_area_square_to_sphere, error, file::resolve_filename, image::{Image, ImageAndMetadata, ImageMetadata, PixelFormat}, interaction::{Interaction, SurfaceInteraction}, log, media::{Medium, MediumInterface}, options::Options, reader::{error::ParseResult, paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc, utils::truncate_filename}, safe, shape::Shape, sqr, texture::FloatTexture, transform::Transform, warn, Bounds3f, DirectionCone, Dot, Float, Normal3f, Point2f, Point2i, Point3f, Point3fi, Ray, Vec2f, Vec3f, PI};
 
 pub mod sampler;
 pub mod point;
@@ -68,8 +68,8 @@ impl Light {
         loc: &FileLoc,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         options: &Options,
-    ) -> Light {
-        match name {
+    ) -> ParseResult<Light> {
+        Ok(match name {
             "point" => Light::Point(PointLight::create(
                 render_from_light,
                 outside_medium,
@@ -77,23 +77,23 @@ impl Light {
                 parameters.color_space.clone(),
                 loc,
                 cached_spectra,
-            )),
+            )?),
             "infinite" => {
                 let color_space = parameters.color_space.clone();
                 let l = parameters.get_spectrum_array(
                     "L",
                     SpectrumType::Illuminant,
                     cached_spectra,
-                );
+                )?;
 
-                let mut scale = parameters.get_one_float("scale", 1.0);
-                let mut portal = parameters.get_point3f_array("portal");
+                let mut scale = parameters.get_one_float("scale", 1.0)?;
+                let mut portal = parameters.get_point3f_array("portal")?;
                 let filename = resolve_filename(
                     options,
-                    parameters.get_one_string("filename", "").as_str(),
+                    parameters.get_one_string("filename", "")?.as_str(),
                 );
                 
-                let e_v = parameters.get_one_float("illuminance", -1.0);
+                let e_v = parameters.get_one_float("illuminance", -1.0)?;
 
                 if l.is_empty() && filename.is_empty() && portal.is_empty() {
                     scale /= spectrum_to_photometric(&color_space.illuminant);
@@ -151,7 +151,7 @@ impl Light {
 
                         im
                     } else {
-                        let image_and_metadata = Image::read(&PathBuf::from(&filename), None).unwrap();
+                        let image_and_metadata = Image::read(&PathBuf::from(&filename), None)?;
                         for y in 0..image_and_metadata.image.resolution().y {
                             for x in 0..image_and_metadata.image.resolution().x {
                                 for c in 0..image_and_metadata.image.n_channels() {
@@ -224,7 +224,7 @@ impl Light {
                             &filename,
                             portal,
                             loc,
-                        ))
+                        )?)
                     } else {
                         Light::ImageInfinite(ImageInfiniteLight::new(
                             render_from_light,
@@ -233,12 +233,12 @@ impl Light {
                             scale,
                             &filename,
                             loc,
-                        ))
+                        )?)
                     }
                 }
             },
             _ => { error!(loc, "light '{}' unknown", name); },
-        }
+        })
     }
 
     pub fn create_area(
@@ -250,8 +250,8 @@ impl Light {
         alpha: Arc<FloatTexture>,
         loc: &FileLoc,
         options: &Options,
-    ) -> Light {
-        match name {
+    ) -> ParseResult<Light> {
+        Ok(match name {
             "diffuse" => Light::DiffuseArea(DiffuseAreaLight::create(
                 render_from_light,
                 medium_interface.outside.clone(),
@@ -261,9 +261,9 @@ impl Light {
                 shape,
                 alpha,
                 options,
-            )),
+            )?),
             _ => { error!(loc, "area light '{}' unknown", name); },
-        }
+        })
     }
 }
 

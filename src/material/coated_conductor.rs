@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{conductor::ConductorBxDF, dielectric::DielectricBxDF, layered::CoatedConductorBxDF, BxDF}, color::{named_spectrum::NamedSpectrum, sampled::SampledSpectrum, spectrum::{AbstractSpectrum, ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, scattering::TrowbridgeReitzDistribution, texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Float};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{conductor::ConductorBxDF, dielectric::DielectricBxDF, layered::CoatedConductorBxDF, BxDF}, color::{named_spectrum::NamedSpectrum, sampled::SampledSpectrum, spectrum::{AbstractSpectrum, ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, image::Image, reader::{error::ParseResult, paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, scattering::TrowbridgeReitzDistribution, texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Float};
 
 use super::{AbstractMaterial, AbstractTextureEvaluator, MaterialEvalContext};
 
@@ -69,24 +69,24 @@ impl CoatedConductorMaterial {
         loc: &FileLoc,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         textures: &NamedTextures,
-    ) -> CoatedConductorMaterial {
-        let interface_u_roughness = if let Some(u_rough) = parameters.get_float_texture_or_none("interface.uroughness", textures) {
+    ) -> ParseResult<CoatedConductorMaterial> {
+        let interface_u_roughness = if let Some(u_rough) = parameters.get_float_texture_or_none("interface.uroughness", textures)? {
             u_rough
         } else {
-            parameters.get_float_texture("interface.roughness", 0.0, textures)
+            parameters.get_float_texture("interface.roughness", 0.0, textures)?
         };
-        let interface_v_roughness = if let Some(v_rough) = parameters.get_float_texture_or_none("interface.vroughness", textures) {
+        let interface_v_roughness = if let Some(v_rough) = parameters.get_float_texture_or_none("interface.vroughness", textures)? {
             v_rough
         } else {
-            parameters.get_float_texture("interface.roughness", 0.0, textures)
+            parameters.get_float_texture("interface.roughness", 0.0, textures)?
         };
 
-        let thickness = parameters.get_float_texture("thickness", 0.01, textures);
+        let thickness = parameters.get_float_texture("thickness", 0.01, textures)?;
 
-        let interface_eta = if !parameters.get_float_array("interface.eta").is_empty() {
-            Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(parameters.get_float_array("interface.eta")[0]))))
+        let interface_eta = if !parameters.get_float_array("interface.eta")?.is_empty() {
+            Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(parameters.get_float_array("interface.eta")?[0]))))
         } else {
-            parameters.get_one_spectrum("interface.eta", None, SpectrumType::Unbounded, cached_spectra)
+            parameters.get_one_spectrum("interface.eta", None, SpectrumType::Unbounded, cached_spectra)?
         };
 
         let interface_eta = if let Some(eta) = interface_eta {
@@ -95,20 +95,20 @@ impl CoatedConductorMaterial {
             Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.5)))
         };
 
-        let conductor_u_roughness = if let Some(u_rough) = parameters.get_float_texture_or_none("conductor.uroughness", textures) {
+        let conductor_u_roughness = if let Some(u_rough) = parameters.get_float_texture_or_none("conductor.uroughness", textures)? {
             u_rough
         } else {
-            parameters.get_float_texture("conductor.roughness", 0.0, textures)
+            parameters.get_float_texture("conductor.roughness", 0.0, textures)?
         };
-        let conductor_v_roughness = if let Some(v_rough) = parameters.get_float_texture_or_none("conductor.vroughness", textures) {
+        let conductor_v_roughness = if let Some(v_rough) = parameters.get_float_texture_or_none("conductor.vroughness", textures)? {
             v_rough
         } else {
-            parameters.get_float_texture("conductor.roughness", 0.0, textures)
+            parameters.get_float_texture("conductor.roughness", 0.0, textures)?
         };
 
-        let mut conductor_eta = parameters.get_spectrum_texture_or_none("conductor.eta", SpectrumType::Unbounded, cached_spectra, textures);
-        let mut k = parameters.get_spectrum_texture("k", None, SpectrumType::Unbounded, cached_spectra, textures);
-        let reflectance = parameters.get_spectrum_texture("reflectance", None, SpectrumType::Albedo, cached_spectra, textures);
+        let mut conductor_eta = parameters.get_spectrum_texture_or_none("conductor.eta", SpectrumType::Unbounded, cached_spectra, textures)?;
+        let mut k = parameters.get_spectrum_texture("k", None, SpectrumType::Unbounded, cached_spectra, textures)?;
+        let reflectance = parameters.get_spectrum_texture("reflectance", None, SpectrumType::Albedo, cached_spectra, textures)?;
 
         if reflectance.is_some() && (conductor_eta.is_some() || k.is_some()) {
             error!(loc, "cannot specify both reflectance and conductor eta/k for conductor material");
@@ -122,8 +122,8 @@ impl CoatedConductorMaterial {
             k = Some(Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture::new(Spectrum::get_named_spectrum(NamedSpectrum::CuK)))))
         }
 
-        let max_depth = parameters.get_one_int("maxdepth", 10);
-        let n_samples = parameters.get_one_int("nsamples", 1);
+        let max_depth = parameters.get_one_int("maxdepth", 10)?;
+        let n_samples = parameters.get_one_int("nsamples", 1)?;
 
         if conductor_eta.is_some() {
             assert!(k.is_some());
@@ -131,17 +131,17 @@ impl CoatedConductorMaterial {
             assert!(reflectance.is_some());
         }
 
-        let g = parameters.get_float_texture("g", 0.0, textures);
-        let albedo = if let Some(albedo) = parameters.get_spectrum_texture("albedo", None, SpectrumType::Albedo, cached_spectra, textures) {
+        let g = parameters.get_float_texture("g", 0.0, textures)?;
+        let albedo = if let Some(albedo) = parameters.get_spectrum_texture("albedo", None, SpectrumType::Albedo, cached_spectra, textures)? {
             albedo
         } else {
             Arc::new(SpectrumTexture::Constant(SpectrumConstantTexture::new(Arc::new(Spectrum::Constant(ConstantSpectrum::new(0.0))))))
         };
 
-        let displacement = parameters.get_float_texture_or_none("displacement", textures);
-        let remap_roughness = parameters.get_one_bool("remaproughness", true);
+        let displacement = parameters.get_float_texture_or_none("displacement", textures)?;
+        let remap_roughness = parameters.get_one_bool("remaproughness", true)?;
 
-        CoatedConductorMaterial {
+        Ok(CoatedConductorMaterial {
             displacement,
             normal_map,
             interface_u_roughness,
@@ -158,7 +158,7 @@ impl CoatedConductorMaterial {
             remap_roughness,
             max_depth,
             n_samples,
-        }
+        })
     }
 }
 

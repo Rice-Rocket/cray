@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum}, wavelengths::SampledWavelengths}, equal_area_sphere_to_square, error, image::{Image, PixelFormat, WrapMode}, interaction::Interaction, light::{LightBase, LightType}, reader::target::FileLoc, sampling::WindowedPiecewiseConstant2D, sqr, transform::{ApplyInverseTransform, Transform}, Bounds2f, Bounds3f, Dot, Float, Frame, Normal3f, Point2f, Point2i, Point3f, Ray, Vec3f, PI};
+use crate::{color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum}, wavelengths::SampledWavelengths}, equal_area_sphere_to_square, error, image::{Image, PixelFormat, WrapMode}, interaction::Interaction, light::{LightBase, LightType}, reader::{error::ParseResult, target::FileLoc}, sampling::WindowedPiecewiseConstant2D, sqr, transform::{ApplyInverseTransform, Transform}, Bounds2f, Bounds3f, Dot, Float, Frame, Normal3f, Point2f, Point2i, Point3f, Ray, Vec3f, PI};
 
 use super::{AbstractLight, LightBounds, LightLiSample, LightSampleContext};
 
@@ -26,7 +26,7 @@ impl PortalImageInfiniteLight {
         filename: &str,
         p: Vec<Point3f>,
         loc: &FileLoc,
-    ) -> PortalImageInfiniteLight {
+    ) -> ParseResult<PortalImageInfiniteLight> {
         let base = LightBase {
             ty: LightType::Infinite,
             render_from_light,
@@ -34,14 +34,14 @@ impl PortalImageInfiniteLight {
         };
 
         let Some(channel_desc) = equal_area_image.get_channel_desc(&["R", "G", "B"]) else {
-            error!(@image filename, "image used for PortalImageInfiniteLight doesn't have R, G, B channels");
+            error!(@file filename, "image used for PortalImageInfiniteLight doesn't have R, G, B channels");
         };
 
         assert_eq!(channel_desc.size(), 3);
         assert!(channel_desc.is_identity());
 
         if equal_area_image.resolution().x != equal_area_image.resolution().y {
-            error!(@image filename, "image resolution ({}, {}), is non-square", equal_area_image.resolution().x, equal_area_image.resolution().y);
+            error!(@file filename, "image resolution ({}, {}), is non-square", equal_area_image.resolution().x, equal_area_image.resolution().y);
         }
 
         if p.len() != 4 {
@@ -101,7 +101,7 @@ impl PortalImageInfiniteLight {
         let d = image.get_sampling_distribution(duv_dw, &Bounds2f::new(Point2f::ZERO, Point2f::ONE));
         let distribution = WindowedPiecewiseConstant2D::new(d);
 
-        PortalImageInfiniteLight {
+        Ok(PortalImageInfiniteLight {
             base,
             portal,
             portal_frame,
@@ -111,7 +111,7 @@ impl PortalImageInfiniteLight {
             scale,
             scene_radius: 0.0,
             scene_center: Default::default(),
-        }
+        })
     }
 
     fn render_from_image(portal_frame: &Frame, uv: Point2f, duv_dw: Option<&mut Float>) -> Vec3f {

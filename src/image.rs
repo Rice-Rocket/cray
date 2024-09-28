@@ -4,7 +4,7 @@ use arrayvec::ArrayVec;
 use half::f16;
 use indicatif::{ProgressBar, ProgressIterator, ProgressStyle};
 
-use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{AbstractColorEncoding as _, ColorEncoding, ColorEncodingPtr}}, modulo, reader::utils::truncate_filename, tile::Tile, vec2d::Vec2D, warn, windowed_sinc, Bounds2f, Bounds2i, Float, Mat4, Point2f, Point2i};
+use crate::{color::{colorspace::{NamedColorSpace, RgbColorSpace}, rgb_xyz::{AbstractColorEncoding as _, ColorEncoding, ColorEncodingPtr}}, error, modulo, reader::{error::{ParseError, ParseErrorKind, ParseResult}, utils::truncate_filename}, tile::Tile, vec2d::Vec2D, warn, windowed_sinc, Bounds2f, Bounds2i, Float, Mat4, Point2f, Point2i};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum PixelFormat {
@@ -1036,9 +1036,10 @@ impl Image {
         dist
     }
 
-    pub fn read(path: &PathBuf, encoding: Option<ColorEncodingPtr>) -> io::Result<ImageAndMetadata> {
+    pub fn read(path: &PathBuf, encoding: Option<ColorEncodingPtr>) -> ParseResult<ImageAndMetadata> {
         if path.extension().is_none() {
-            return io::Result::Err(io::Error::new(io::ErrorKind::InvalidInput, format!("no file extension for {}", path.to_str().unwrap())))
+            // InvalidFile
+            error!(@file path.display(), "expected file extension");
         }
 
         if path.extension().unwrap().eq("png") {
@@ -1046,15 +1047,16 @@ impl Image {
         } else if path.extension().unwrap().eq("exr") {
             Self::read_exr(path, encoding)
         } else {
-            io::Result::Err(io::Error::new(io::ErrorKind::InvalidInput, format!("unsupported file extension for {}", path.to_str().unwrap())))
+            // InvalidFile
+            error!(@file path.display(), "unsupported file extension '{}'", path.extension().unwrap().to_str().unwrap_or(""));
         }
     }
     
-    fn read_png(path: &PathBuf, encoding: Option<ColorEncodingPtr>) -> io::Result<ImageAndMetadata> {
+    fn read_png(path: &PathBuf, encoding: Option<ColorEncodingPtr>) -> ParseResult<ImageAndMetadata> {
         let encoding = if let Some(encoding) = encoding {
             encoding
         } else {
-            ColorEncoding::get("srgb", None).clone()
+            ColorEncoding::get("srgb", None)?.clone()
         };
 
         let mut decoder = png::Decoder::new(File::open(path).unwrap());
@@ -1067,13 +1069,13 @@ impl Image {
 
         let mut reader = match decoder.read_info() {
             Ok(reader) => reader,
-            Err(_) => return Err(io::Error::new(io::ErrorKind::InvalidData, "failed to decode PNG image")),
+            Err(_) => { error!(@file path.display(), "failed to decode PNG image"); },
         };
 
         let mut im_data = vec![0; reader.output_buffer_size()];
         let info = match reader.next_frame(&mut im_data) {
             Ok(info) => info,
-            Err(_) => return Err(io::Error::new(io::ErrorKind::InvalidData, "failed to decode PNG image")),
+            Err(_) => { error!(@file path.display(), "failed to decode PNG image"); },
         };
 
         let image = match info.color_type {
@@ -1148,7 +1150,6 @@ impl Image {
                         &["Y".to_owned()],
                         encoding
                     ),
-                    // _ => return io::Result::Err(io::Error::new(io::ErrorKind::InvalidData, "unsupported bit depth"))
                 }
             },
             png::ColorType::Rgb | png::ColorType::Rgba => {
@@ -1221,7 +1222,7 @@ impl Image {
                             image
                         }
                     },
-                    _ => return io::Result::Err(io::Error::new(io::ErrorKind::InvalidData, "unsupported bit depth")),
+                    _ => { error!(@file path.display(), "unsupported bit depth"); },
                 }
             },
             png::ColorType::Indexed => unreachable!(),
@@ -1238,10 +1239,10 @@ impl Image {
             png::ColorType::Indexed => unreachable!(),
         };
 
-        io::Result::Ok(ImageAndMetadata { image, metadata })
+        Ok(ImageAndMetadata { image, metadata })
     }
 
-    fn read_exr(path: &PathBuf, encoding: Option<ColorEncodingPtr>) -> io::Result<ImageAndMetadata> {
+    fn read_exr(path: &PathBuf, encoding: Option<ColorEncodingPtr>) -> ParseResult<ImageAndMetadata> {
         use exr::prelude::{ReadChannels, ReadLayers};
 
         let image_name = truncate_filename(path);
@@ -1259,10 +1260,7 @@ impl Image {
             .first_valid_layer() // or all_layers()
             .all_attributes()
             .on_progress(|progress: f64| bar.set_position((progress * 1000.0) as u64))
-            .from_file(path) else { return io::Result::Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!("image file {} not found", path.to_str().unwrap()),
-            ))};
+            .from_file(path) else { error!(@file path.display(), "file not found"); /* NotFound */ };
 
         bar.finish_and_clear();
 
@@ -1272,10 +1270,7 @@ impl Image {
         let mut pixel_format = PixelFormat::Float32;
 
         if im_exr.layer_data.channel_data.list.is_empty() {
-            return io::Result::Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "EXR images with no channels not supported",
-            ));
+            error!(@file path.display(), "EXR images with no channels not supported");
         }
 
         for channel in im_exr.layer_data.channel_data.list.iter() {
@@ -1288,10 +1283,7 @@ impl Image {
         match sample_vec {
             exr::image::FlatSamples::F16(_) => pixel_format = PixelFormat::Float16,
             exr::image::FlatSamples::F32(_) => pixel_format = PixelFormat::Float32,
-            exr::image::FlatSamples::U32(_) => return io::Result::Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "unsupported image data format: U32",
-            )),
+            exr::image::FlatSamples::U32(_) => { error!(@file path.display(), "unsupported image data format U32"); },
         }
 
         let mut image = Image::new(
@@ -1333,7 +1325,7 @@ impl Image {
             ..Default::default()
         };
 
-        io::Result::Ok(ImageAndMetadata { image, metadata })
+        Ok(ImageAndMetadata { image, metadata })
     }
 
     pub fn write(&self, path: &PathBuf, metadata: &ImageMetadata) -> io::Result<()> {

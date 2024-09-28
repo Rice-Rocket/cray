@@ -11,7 +11,7 @@ use simple_vol_path::SimpleVolumetricPathIntegrator;
 use thread_local::ThreadLocal;
 use vol_path::VolumetricPathIntegrator;
 
-use crate::{camera::{film::{AbstractFilm, Film, VisibleSurface}, filter::get_camera_sample, AbstractCamera, Camera}, color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, wavelengths::SampledWavelengths}, error, image::ImageMetadata, interaction::Interaction, light::{sampler::{uniform::UniformLightSampler, LightSampler}, AbstractLight, Light, LightType}, material::{Material, MaterialEvalContext, SingleMaterial}, numeric::HasNan, options::Options, primitive::{AbstractPrimitive, Primitive}, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampler::{AbstractSampler, Sampler}, shape::ShapeIntersection, tile::Tile, Float, Normal3f, Point2f, Point2i, Ray, RayDifferential, Vec3f};
+use crate::{camera::{film::{AbstractFilm, Film, VisibleSurface}, filter::get_camera_sample, AbstractCamera, Camera}, color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, wavelengths::SampledWavelengths}, error, image::ImageMetadata, interaction::Interaction, light::{sampler::{uniform::UniformLightSampler, LightSampler}, AbstractLight, Light, LightType}, material::{Material, MaterialEvalContext, SingleMaterial}, numeric::HasNan, options::Options, primitive::{AbstractPrimitive, Primitive}, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, sampler::{AbstractSampler, Sampler}, shape::ShapeIntersection, tile::Tile, Float, Normal3f, Point2f, Point2i, Ray, RayDifferential, Vec3f};
 
 pub mod random_walk;
 pub mod simple_path;
@@ -37,28 +37,28 @@ impl Integrator {
         aggregate: Arc<Primitive>,
         lights: Arc<[Arc<Light>]>,
         color_space: Arc<RgbColorSpace>,
-    ) -> Integrator {
-        match name {
+    ) -> ParseResult<Integrator> {
+        Ok(match name {
             "randomwalk" => Integrator::ImageTile(ImageTileIntegrator::create_random_walk_integrator(
                 parameters, camera, sampler, aggregate, lights,
-            )),
+            )?),
             "simplepath" => Integrator::ImageTile(ImageTileIntegrator::create_simple_path_integrator(
                 parameters, camera, sampler, aggregate, lights,
-            )),
+            )?),
             "path" => Integrator::ImageTile(ImageTileIntegrator::create_path_integrator(
                 parameters, camera, sampler, aggregate, lights,
-            )),
+            )?),
             "simplevolpath" => Integrator::ImageTile(ImageTileIntegrator::create_simple_vol_path_integrator(
                 parameters, camera, sampler, aggregate, lights,
-            )),
+            )?),
             "volpath" => Integrator::ImageTile(ImageTileIntegrator::create_vol_path_integrator(
                 parameters, camera, sampler, aggregate, lights,
-            )),
+            )?),
             "debug" => Integrator::Debug(DebugIntegrator::create(
                 parameters, camera, sampler, aggregate, lights,
-            )),
-            _ => { error!(@basic "unknown integrator '{}'", name); },
-        }
+            )?),
+            _ => { error!(@noloc "unknown integrator '{}'", name); },
+        })
     }
 }
 
@@ -158,17 +158,17 @@ impl ImageTileIntegrator {
         sampler: Sampler,
         aggregate: Arc<Primitive>,
         lights: Arc<[Arc<Light>]>,
-    ) -> ImageTileIntegrator {
-        let max_depth = parameters.get_one_int("maxdepth", 5);
+    ) -> ParseResult<ImageTileIntegrator> {
+        let max_depth = parameters.get_one_int("maxdepth", 5)?;
         let ray_integrator = RayIntegrator::RandomWalk(RandomWalkIntegrator { max_depth });
 
-        ImageTileIntegrator::new(
+        Ok(ImageTileIntegrator::new(
             aggregate,
             lights,
             camera,
             sampler,
             ray_integrator,
-        )
+        ))
     }
 
     pub fn create_simple_path_integrator(
@@ -177,10 +177,10 @@ impl ImageTileIntegrator {
         sampler: Sampler,
         aggregate: Arc<Primitive>,
         lights: Arc<[Arc<Light>]>,
-    ) -> ImageTileIntegrator {
-        let max_depth = parameters.get_one_int("maxdepth", 5);
-        let sample_lights = parameters.get_one_bool("samplelights", true);
-        let sample_bsdf = parameters.get_one_bool("samplebsdf", true);
+    ) -> ParseResult<ImageTileIntegrator> {
+        let max_depth = parameters.get_one_int("maxdepth", 5)?;
+        let sample_lights = parameters.get_one_bool("samplelights", true)?;
+        let sample_bsdf = parameters.get_one_bool("samplebsdf", true)?;
         let light_sampler = UniformLightSampler { lights: lights.clone() };
 
         let pixel_sample_evaluator = RayIntegrator::SimplePath(SimplePathIntegrator {
@@ -190,13 +190,13 @@ impl ImageTileIntegrator {
             light_sampler,
         });
 
-        ImageTileIntegrator::new(
+        Ok(ImageTileIntegrator::new(
             aggregate,
             lights,
             camera,
             sampler,
             pixel_sample_evaluator,
-        )
+        ))
     }
 
     pub fn create_path_integrator(
@@ -205,26 +205,26 @@ impl ImageTileIntegrator {
         sampler: Sampler,
         aggregate: Arc<Primitive>,
         lights: Arc<[Arc<Light>]>,
-    ) -> ImageTileIntegrator {
-        let max_depth = parameters.get_one_int("maxdepth", 5);
-        let regularize = parameters.get_one_bool("regularize", false);
+    ) -> ParseResult<ImageTileIntegrator> {
+        let max_depth = parameters.get_one_int("maxdepth", 5)?;
+        let regularize = parameters.get_one_bool("regularize", false)?;
 
-        let light_strategy = parameters.get_one_string("lightsampler", "bvh");
-        let light_sampler = LightSampler::create(&light_strategy, lights.clone());
+        let light_strategy = parameters.get_one_string("lightsampler", "bvh")?;
+        let light_sampler = LightSampler::create(&light_strategy, lights.clone())?;
 
         let pixel_sample_evaluator = RayIntegrator::Path(PathIntegrator::new(
             max_depth,
             light_sampler,
             regularize,
-        ));
+        )?);
 
-        ImageTileIntegrator::new(
+        Ok(ImageTileIntegrator::new(
             aggregate,
             lights,
             camera,
             sampler,
             pixel_sample_evaluator,
-        )
+        ))
     }
 
     pub fn create_simple_vol_path_integrator(
@@ -233,17 +233,17 @@ impl ImageTileIntegrator {
         sampler: Sampler,
         aggregate: Arc<Primitive>,
         lights: Arc<[Arc<Light>]>,
-    ) -> ImageTileIntegrator {
-        let max_depth = parameters.get_one_int("maxdepth", 5);
+    ) -> ParseResult<ImageTileIntegrator> {
+        let max_depth = parameters.get_one_int("maxdepth", 5)?;
         let ray_integrator = RayIntegrator::SimpleVolumetricPath(SimpleVolumetricPathIntegrator { max_depth });
 
-        ImageTileIntegrator::new(
+        Ok(ImageTileIntegrator::new(
             aggregate,
             lights,
             camera,
             sampler,
             ray_integrator,
-        )
+        ))
     }
 
     pub fn create_vol_path_integrator(
@@ -252,26 +252,26 @@ impl ImageTileIntegrator {
         sampler: Sampler,
         aggregate: Arc<Primitive>,
         lights: Arc<[Arc<Light>]>,
-    ) -> ImageTileIntegrator {
-        let max_depth = parameters.get_one_int("maxdepth", 5);
-        let regularize = parameters.get_one_bool("regularize", false);
+    ) -> ParseResult<ImageTileIntegrator> {
+        let max_depth = parameters.get_one_int("maxdepth", 5)?;
+        let regularize = parameters.get_one_bool("regularize", false)?;
 
-        let light_strategy = parameters.get_one_string("lightsampler", "bvh");
-        let light_sampler = LightSampler::create(&light_strategy, lights.clone());
+        let light_strategy = parameters.get_one_string("lightsampler", "bvh")?;
+        let light_sampler = LightSampler::create(&light_strategy, lights.clone())?;
 
         let ray_integrator = RayIntegrator::VolumetricPath(VolumetricPathIntegrator::new(
             max_depth,
             light_sampler,
             regularize,
-        ));
+        )?);
 
-        ImageTileIntegrator::new(
+        Ok(ImageTileIntegrator::new(
             aggregate,
             lights,
             camera,
             sampler,
             ray_integrator,
-        )
+        ))
     }
 }
 
@@ -417,10 +417,10 @@ impl ImageTileIntegrator {
 
             if l.has_nan() {
                 l = SampledSpectrum::from_const(0.0);
-                error!(@basic "ray integrator produced NaN value");
+                error!(@panic "ray integrator produced NaN value");
             } else if l.y(&lambda).is_infinite() {
                 l = SampledSpectrum::from_const(0.0);
-                error!(@basic "ray integrator produced infinite value");
+                error!(@panic "ray integrator produced infinite value");
             }
 
             l
@@ -459,27 +459,27 @@ impl DebugIntegrator {
         sampler: Sampler,
         aggregate: Arc<Primitive>,
         lights: Arc<[Arc<Light>]>,
-    ) -> DebugIntegrator {
-        let mode = parameters.get_one_string("mode", "normal");
+    ) -> ParseResult<DebugIntegrator> {
+        let mode = parameters.get_one_string("mode", "normal")?;
         
         let mode = match mode.as_str() {
             "depth" => DebugMode::Depth,
             "normal" => DebugMode::Normal,
             "uv" => DebugMode::UV,
             "material" => DebugMode::Material,
-            s => { error!(@basic "unknown debug mode '{}'", s); },
+            s => { error!(@noloc "unknown debug mode '{}'", s); },
         };
         
         let Film::Debug(_) = camera.get_film().as_ref() else {
-            error!(@basic "debug integrator must be used with debug film");
+            error!(@noloc "debug integrator must be used with debug film");
         };
 
-        DebugIntegrator {
+        Ok(DebugIntegrator {
             base: IntegratorBase::new(aggregate, lights),
             camera,
             sampler_prototype: sampler,
             mode,
-        }
+        })
     }
 }
 

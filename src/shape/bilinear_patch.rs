@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{bounds::Union, error, gamma, interaction::{Interaction, SurfaceInteraction}, lerp, lerp_float, numeric::DifferenceOfProducts, quadratic, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::{bilinear_pdf, invert_bilinear, invert_spherical_rectangle_sample, sample_bilinear, sample_spherical_rectangle}, spherical_quad_area, transform::{ApplyTransform, Transform}, Bounds3f, DirectionCone, Dot, Float, Mat3, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
+use crate::{bounds::Union, error, gamma, interaction::{Interaction, SurfaceInteraction}, lerp, lerp_float, numeric::DifferenceOfProducts, quadratic, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, sampling::{bilinear_pdf, invert_bilinear, invert_spherical_rectangle_sample, sample_bilinear, sample_spherical_rectangle}, spherical_quad_area, transform::{ApplyTransform, Transform}, Bounds3f, DirectionCone, Dot, Float, Mat3, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
 
 use super::{mesh::BilinearPatchMesh, AbstractShape, Shape, ShapeIntersection, ShapeSample, ShapeSampleContext};
 
@@ -24,10 +24,10 @@ impl BilinearPatch {
         reverse_orientation: bool,
         parameters: &mut ParameterDictionary,
         loc: &FileLoc,
-    ) -> BilinearPatchMesh {
-        let mut vi = parameters.get_int_array("indices");
-        let p = parameters.get_point3f_array("P");
-        let uvs = parameters.get_point2f_array("uv");
+    ) -> ParseResult<BilinearPatchMesh> {
+        let mut vi = parameters.get_int_array("indices")?;
+        let p = parameters.get_point3f_array("P")?;
+        let uvs = parameters.get_point2f_array("uv")?;
 
         if vi.is_empty() {
             if p.len() == 4 {
@@ -49,7 +49,7 @@ impl BilinearPatch {
             // TODO: Could just dicard uvs instead of panicing + warn
         }
 
-        let n = parameters.get_normal3f_array("N");
+        let n = parameters.get_normal3f_array("N")?;
         if !n.is_empty() && n.len() != p.len() {
             error!(loc, "number of vertex positions 'P' and vertex normals 'N' do not match");
             // TODO: Could just discard instead of pancing + warn
@@ -61,7 +61,7 @@ impl BilinearPatch {
             }
         }
 
-        let face_indices = parameters.get_int_array("faceIndices");
+        let face_indices = parameters.get_int_array("faceIndices")?;
         if !face_indices.is_empty() && face_indices.len() != vi.len() / 4 {
             error!(loc, "number of face indices 'faceIndices' and vertex indices 'indices' do not match");
             // TODO: Could just discard instead of pancing + warn
@@ -69,7 +69,7 @@ impl BilinearPatch {
 
         // TODO: Handle image distributions
 
-        BilinearPatchMesh::new(
+        Ok(BilinearPatchMesh::new(
             render_from_object,
             reverse_orientation,
             vi.into_iter().map(|i| i as usize).collect(),
@@ -77,7 +77,7 @@ impl BilinearPatch {
             n,
             uvs,
             face_indices.into_iter().map(|i| i as usize).collect(),
-        )
+        ))
     }
 
     pub fn new(mesh: Arc<BilinearPatchMesh>, blp_index: usize) -> BilinearPatch {

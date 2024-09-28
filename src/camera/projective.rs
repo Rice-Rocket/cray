@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, media::Medium, options::Options, ray::AbstractRay, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::sample_uniform_disk_concentric, transform::{ApplyTransform, Transform}, warn, AuxiliaryRays, Bounds2f, Float, Normal3f, Point2f, Point3f, Ray, RayDifferential, Vec3f};
+use crate::{color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, image::ImageMetadata, media::Medium, options::Options, ray::AbstractRay, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, sampling::sample_uniform_disk_concentric, transform::{ApplyTransform, Transform}, warn, AuxiliaryRays, Bounds2f, Float, Normal3f, Point2f, Point3f, Ray, RayDifferential, Vec3f};
 
 use super::{film::{Film, AbstractFilm as _}, filter::AbstractFilter as _, AbstractCamera, CameraBase, CameraBaseParameters, CameraRay, CameraRayDifferential, CameraSample, CameraTransform};
 
@@ -90,15 +90,15 @@ impl OrthographicCamera {
         medium: Option<Arc<Medium>>,
         options: &Options,
         loc: &FileLoc
-    ) -> OrthographicCamera {
-        let camera_base_params = CameraBaseParameters::new(camera_transform, film, medium, parameters, loc);
+    ) -> ParseResult<OrthographicCamera> {
+        let camera_base_params = CameraBaseParameters::new(camera_transform, film, medium, parameters, loc)?;
 
-        let lens_radius = parameters.get_one_float("lensradius", 0.0);
-        let focal_distance = parameters.get_one_float("focaldistance", 1e6);
+        let lens_radius = parameters.get_one_float("lensradius", 0.0)?;
+        let focal_distance = parameters.get_one_float("focaldistance", 1e6)?;
 
         let x = camera_base_params.film.full_resolution().x as Float;
         let y = camera_base_params.film.full_resolution().y as Float;
-        let frame = parameters.get_one_float("frameaspectratio", x / y);
+        let frame = parameters.get_one_float("frameaspectratio", x / y)?;
 
         let mut screen = if frame > 1.0 {
             Bounds2f::new(Point2f::new(-frame, -1.0), Point2f::new(frame, 1.0))
@@ -106,7 +106,7 @@ impl OrthographicCamera {
             Bounds2f::new(Point2f::new(-1.0, -1.0 / frame), Point2f::new(1.0, 1.0 / frame))
         };
 
-        let sw = parameters.get_float_array("screenwindow");
+        let sw = parameters.get_float_array("screenwindow")?;
 
         if !sw.is_empty() {
             if options.fullscreen {
@@ -122,7 +122,7 @@ impl OrthographicCamera {
             }
         }
 
-        OrthographicCamera::new(camera_base_params, lens_radius, focal_distance, screen)
+        Ok(OrthographicCamera::new(camera_base_params, lens_radius, focal_distance, screen))
     }
 
     pub fn new(
@@ -280,15 +280,15 @@ impl PerspectiveCamera {
         medium: Option<Arc<Medium>>,
         options: &Options,
         loc: &FileLoc
-    ) -> PerspectiveCamera {
-        let camera_base_params = CameraBaseParameters::new(camera_transform, film, medium, parameters, loc);
+    ) -> ParseResult<PerspectiveCamera> {
+        let camera_base_params = CameraBaseParameters::new(camera_transform, film, medium, parameters, loc)?;
 
-        let lens_radius = parameters.get_one_float("lensradius", 0.0);
-        let focal_distance = parameters.get_one_float("focaldistance", 1e6);
+        let lens_radius = parameters.get_one_float("lensradius", 0.0)?;
+        let focal_distance = parameters.get_one_float("focaldistance", 1e6)?;
 
         let x = camera_base_params.film.full_resolution().x as Float;
         let y = camera_base_params.film.full_resolution().y as Float;
-        let frame = parameters.get_one_float("frameaspectratio", x / y);
+        let frame = parameters.get_one_float("frameaspectratio", x / y)?;
 
         let mut screen = if frame > 1.0 {
             Bounds2f::new(Point2f::new(-frame, -1.0), Point2f::new(frame, 1.0))
@@ -296,7 +296,7 @@ impl PerspectiveCamera {
             Bounds2f::new(Point2f::new(-1.0, -1.0 / frame), Point2f::new(1.0, 1.0 / frame))
         };
 
-        let sw = parameters.get_float_array("screenwindow");
+        let sw = parameters.get_float_array("screenwindow")?;
 
         if !sw.is_empty() {
             if options.fullscreen {
@@ -312,9 +312,9 @@ impl PerspectiveCamera {
             }
         }
         
-        let fov = parameters.get_one_float("fov", 90.0);
+        let fov = parameters.get_one_float("fov", 90.0)?;
 
-        PerspectiveCamera::new(camera_base_params, fov, screen, lens_radius, focal_distance)
+        Ok(PerspectiveCamera::new(camera_base_params, fov, screen, lens_radius, focal_distance))
     }
 
     pub fn new(

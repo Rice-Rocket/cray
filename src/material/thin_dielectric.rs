@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{thin_dielectric::ThinDielectricBxDF, BxDF}, color::{spectrum::{AbstractSpectrum, ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, texture::FloatTexture};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{thin_dielectric::ThinDielectricBxDF, BxDF}, color::{spectrum::{AbstractSpectrum, ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{error::ParseResult, paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, texture::FloatTexture};
 
 use super::{AbstractMaterial, AbstractTextureEvaluator, MaterialEvalContext};
 
@@ -30,11 +30,11 @@ impl ThinDielectricMaterial {
         loc: &FileLoc,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         textures: &NamedTextures,
-    ) -> ThinDielectricMaterial {
-        let eta = if !parameters.get_float_array("eta").is_empty() {
-            Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(parameters.get_float_array("eta")[0]))))
+    ) -> ParseResult<ThinDielectricMaterial> {
+        let eta = if !parameters.get_float_array("eta")?.is_empty() {
+            Some(Arc::new(Spectrum::Constant(ConstantSpectrum::new(parameters.get_float_array("eta")?[0]))))
         } else {
-            parameters.get_one_spectrum("eta", None, SpectrumType::Unbounded, cached_spectra)
+            parameters.get_one_spectrum("eta", None, SpectrumType::Unbounded, cached_spectra)?
         };
 
         let eta = if let Some(eta) = eta {
@@ -43,8 +43,8 @@ impl ThinDielectricMaterial {
             Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.5)))
         };
 
-        let displacement = parameters.get_float_texture_or_none("displacement", textures);
-        ThinDielectricMaterial::new(displacement, normal_map, eta)
+        let displacement = parameters.get_float_texture_or_none("displacement", textures)?;
+        Ok(ThinDielectricMaterial::new(displacement, normal_map, eta))
     }
 }
 

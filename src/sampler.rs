@@ -2,7 +2,7 @@ use hexf::hexf32;
 use num::integer::Roots;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 
-use crate::{error, hash, hashing::{combine_bits_64, encode_morton_2, fmix, ihash21, ihash41, mix_bits, mur, permutation_element, split_u64}, lowdiscrepancy::{sobol_sample, BinaryPermuteScrambler, FastOwenScrambler, NoScrambler, OwenScrambler}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, round_up_pow_2, transmute, warn, Float, Point2f, Point2i, Vec2u, ONE_MINUS_EPSILON};
+use crate::{error, hash, hashing::{combine_bits_64, encode_morton_2, fmix, ihash21, ihash41, mix_bits, mur, permutation_element, split_u64}, lowdiscrepancy::{sobol_sample, BinaryPermuteScrambler, FastOwenScrambler, NoScrambler, OwenScrambler}, options::Options, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, round_up_pow_2, transmute, warn, Float, Point2f, Point2i, Vec2u, ONE_MINUS_EPSILON};
 
 pub trait AbstractSampler {
     fn samples_per_pixel(&self) -> i32;
@@ -28,17 +28,17 @@ impl Sampler {
         full_res: Point2i,
         options: &Options,
         loc: &FileLoc,
-    ) -> Sampler {
-        match name {
-            "zsobol" => Sampler::ZSobol(ZSobolSampler::create(parameters, full_res, options, loc)),
+    ) -> ParseResult<Sampler> {
+        Ok(match name {
+            "zsobol" => Sampler::ZSobol(ZSobolSampler::create(parameters, full_res, options, loc)?),
             // "paddedsobol" => Sampler::PaddedSobol(PaddedSobolSampler::create(parameters, options, loc)),
             // "halton" => Sampler::Halton(HaltonSampler::create(parameters, options, loc)),
             // "sobol" => Sampler::Sobol(SobolSampler::create(parameters, options, loc)),
             // "pmj02bn" => Sampler::PMJ02BN(PMJ02BNSampler::create(parameters, options, loc)),
-            "independent" => Sampler::Independent(IndependentSampler::create(parameters, options, loc)),
-            "stratified" => Sampler::Stratified(StratifiedSampler::create(parameters, options, loc)),
+            "independent" => Sampler::Independent(IndependentSampler::create(parameters, options, loc)?),
+            "stratified" => Sampler::Stratified(StratifiedSampler::create(parameters, options, loc)?),
             _ => { error!(loc, "unknown sampler type '{}'", name); }
-        }
+        })
     }
 }
 
@@ -104,14 +104,14 @@ impl IndependentSampler {
         parameters: &mut ParameterDictionary,
         options: &Options,
         loc: &FileLoc,
-    ) -> IndependentSampler {
-        let mut ns = parameters.get_one_int("pixelsamples", 4);
+    ) -> ParseResult<IndependentSampler> {
+        let mut ns = parameters.get_one_int("pixelsamples", 4)?;
         if let Some(pixel_samples) = options.pixel_samples {
             ns = pixel_samples;
         }
 
-        let seed = parameters.get_one_int("seed", options.seed) as u64;
-        IndependentSampler::new(seed, ns)
+        let seed = parameters.get_one_int("seed", options.seed)? as u64;
+        Ok(IndependentSampler::new(seed, ns))
     }
 }
 
@@ -170,10 +170,10 @@ impl StratifiedSampler {
         parameters: &mut ParameterDictionary,
         options: &Options,
         loc: &FileLoc,
-    ) -> StratifiedSampler {
-        let jitter = parameters.get_one_bool("jitter", true);
-        let mut x_samples = parameters.get_one_int("xsamples", 4);
-        let mut y_samples = parameters.get_one_int("ysamples", 4);
+    ) -> ParseResult<StratifiedSampler> {
+        let jitter = parameters.get_one_bool("jitter", true)?;
+        let mut x_samples = parameters.get_one_int("xsamples", 4)?;
+        let mut y_samples = parameters.get_one_int("ysamples", 4)?;
         
         if let Some(n_samples) = options.pixel_samples {
             let mut div = n_samples.sqrt();
@@ -192,8 +192,8 @@ impl StratifiedSampler {
             y_samples = 1;
         }
 
-        let seed = parameters.get_one_int("seed", options.seed) as u32;
-        StratifiedSampler::new(x_samples, y_samples, jitter, seed)
+        let seed = parameters.get_one_int("seed", options.seed)? as u32;
+        Ok(StratifiedSampler::new(x_samples, y_samples, jitter, seed))
     }
 }
 
@@ -262,8 +262,8 @@ impl ZSobolSampler {
         full_res: Point2i,
         options: &Options,
         loc: &FileLoc,
-    ) -> ZSobolSampler {
-        let mut n_samples = parameters.get_one_int("pixelsamples", 16);
+    ) -> ParseResult<ZSobolSampler> {
+        let mut n_samples = parameters.get_one_int("pixelsamples", 16)?;
         if let Some(samples) = options.pixel_samples {
             n_samples = samples;
         }
@@ -272,9 +272,9 @@ impl ZSobolSampler {
             n_samples = 1;
         }
 
-        let seed = parameters.get_one_int("seed", options.seed);
+        let seed = parameters.get_one_int("seed", options.seed)?;
 
-        let randomize = match parameters.get_one_string("randomization", "fastowen").as_str() {
+        let randomize = match parameters.get_one_string("randomization", "fastowen")?.as_str() {
             "none" => RandomizeStrategy::None,
             "permutedigits" => RandomizeStrategy::PermuteDigits,
             "fastowen" => RandomizeStrategy::FastOwen,
@@ -282,7 +282,7 @@ impl ZSobolSampler {
             s => { error!(loc, "unknown randomization strategy given to ZSobolSampler '{}'", s); },
         };
 
-        ZSobolSampler::new(n_samples, full_res, randomize, seed)
+        Ok(ZSobolSampler::new(n_samples, full_res, randomize, seed))
     }
 
     pub fn new(

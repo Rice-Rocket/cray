@@ -1,6 +1,6 @@
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
-use crate::{color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, BlackbodySpectrum, ConstantSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, phase::{HGPhaseFunction, PhaseFunction}, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, sampling::SampledGrid, transform::{ApplyInverseTransform, ApplyRayInverseTransform, Transform}, Bounds3f, Float, Point3f, Point3i, Ray};
+use crate::{color::{sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, BlackbodySpectrum, ConstantSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, phase::{HGPhaseFunction, PhaseFunction}, reader::{error::ParseResult, paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, sampling::SampledGrid, transform::{ApplyInverseTransform, ApplyRayInverseTransform, Transform}, Bounds3f, Float, Point3f, Point3i, Ray};
 
 use super::{iterator::{DDAMajorantIterator, MajorantGrid}, AbstractMedium, MediumProperties};
 
@@ -27,9 +27,9 @@ impl GridMedium {
         render_from_medium: Transform,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         loc: &FileLoc,
-    ) -> GridMedium {
-        let density = parameters.get_float_array("density");
-        let temperature = parameters.get_float_array("temperature");
+    ) -> ParseResult<GridMedium> {
+        let density = parameters.get_float_array("density")?;
+        let temperature = parameters.get_float_array("temperature")?;
 
         if density.is_empty() {
             error!(loc, "no 'density' value provided for grid medium");
@@ -41,9 +41,9 @@ impl GridMedium {
             error!(loc, "different number of samples ({} vs {}) provided for 'density' and 'temperature'", n_density, temperature.len());
         }
 
-        let nx = parameters.get_one_int("nx", 1);
-        let ny = parameters.get_one_int("ny", 1);
-        let nz = parameters.get_one_int("nz", 1);
+        let nx = parameters.get_one_int("nx", 1)?;
+        let ny = parameters.get_one_int("ny", 1)?;
+        let nz = parameters.get_one_int("nz", 1)?;
 
         if n_density as i32 != nx * ny * nz {
             error!(loc, "grid medium has {} density values; expected nx*ny*nz = {}", n_density, nx * ny * nz);
@@ -56,7 +56,7 @@ impl GridMedium {
             None
         };
 
-        let mut le = parameters.get_one_spectrum("Le", None, SpectrumType::Illuminant, cached_spectra);
+        let mut le = parameters.get_one_spectrum("Le", None, SpectrumType::Illuminant, cached_spectra)?;
 
         if le.is_some() && temperature_grid.is_some() {
             error!(loc, "both 'Le' and 'temperature' values were provided");
@@ -69,7 +69,7 @@ impl GridMedium {
             le_norm = 1.0 / spectrum_to_photometric(le.as_ref().unwrap());
         };
 
-        let mut le_scale = parameters.get_float_array("Lescale");
+        let mut le_scale = parameters.get_float_array("Lescale")?;
         let le_grid = if le_scale.is_empty() {
             SampledGrid::new(vec![le_norm], 1, 1, 1)
         } else {
@@ -83,31 +83,31 @@ impl GridMedium {
             SampledGrid::new(le_scale, nx, ny, nz)
         };
 
-        let p0 = parameters.get_one_point3f("p0", Point3f::new(0.0, 0.0, 0.0));
-        let p1 = parameters.get_one_point3f("p1", Point3f::new(1.0, 1.0, 1.0));
+        let p0 = parameters.get_one_point3f("p0", Point3f::new(0.0, 0.0, 0.0))?;
+        let p1 = parameters.get_one_point3f("p1", Point3f::new(1.0, 1.0, 1.0))?;
 
-        let g = parameters.get_one_float("g", 0.0);
+        let g = parameters.get_one_float("g", 0.0)?;
 
         let sigma_a = parameters.get_one_spectrum(
             "sigma_a",
             None,
             SpectrumType::Unbounded,
             cached_spectra,
-        ).unwrap_or_else(|| Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0))));
+        )?.unwrap_or_else(|| Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0))));
 
         let sigma_s = parameters.get_one_spectrum(
             "sigma_s",
             None,
             SpectrumType::Unbounded,
             cached_spectra,
-        ).unwrap_or_else(|| Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0))));
+        )?.unwrap_or_else(|| Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.0))));
 
-        let sigma_scale = parameters.get_one_float("scale", 1.0);
-        let temperature_cutoff = parameters.get_one_float("temperaturecutoff", 0.0);
-        let temperature_offset = parameters.get_one_float("temperatureoffset", temperature_cutoff);
-        let temperature_scale = parameters.get_one_float("temperaturescale", 1.0);
+        let sigma_scale = parameters.get_one_float("scale", 1.0)?;
+        let temperature_cutoff = parameters.get_one_float("temperaturecutoff", 0.0)?;
+        let temperature_offset = parameters.get_one_float("temperatureoffset", temperature_cutoff)?;
+        let temperature_scale = parameters.get_one_float("temperaturescale", 1.0)?;
 
-        GridMedium::new(
+        Ok(GridMedium::new(
             Bounds3f::new(p0, p1),
             render_from_medium,
             DenselySampledSpectrum::new(sigma_a.as_ref()),
@@ -120,7 +120,7 @@ impl GridMedium {
             temperature_offset,
             DenselySampledSpectrum::new(le.unwrap().as_ref()),
             le_grid,
-        )
+        ))
     }
 
     pub fn new(

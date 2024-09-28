@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bumpalo::Bump;
 use rand::{rngs::SmallRng, Rng};
 
-use crate::{bsdf::BSDF, bssrdf::{AbstractBSSRDF, SubsurfaceInteraction}, bxdf::{BxDFReflTransFlags, TransportMode}, camera::{film::VisibleSurface, Camera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, float_to_bits, interaction::{GeneralInteraction, Interaction, MediumInteraction, SurfaceInteraction}, light::{sampler::{AbstractLightSampler, LightSampler}, AbstractLight, LightSampleContext}, media::{sample_t_maj, MediumProperties}, hashing::mix_bits, options::Options, phase::AbstractPhaseFunction, sampler::{AbstractSampler, Sampler}, sampling::{sample_discrete, WeightedReservoirSampler}, Dot, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, RayDifferential, Vec3f};
+use crate::{bsdf::BSDF, bssrdf::{AbstractBSSRDF, SubsurfaceInteraction}, bxdf::{BxDFReflTransFlags, TransportMode}, camera::{film::VisibleSurface, Camera}, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, float_to_bits, hashing::mix_bits, interaction::{GeneralInteraction, Interaction, MediumInteraction, SurfaceInteraction}, light::{sampler::{AbstractLightSampler, LightSampler}, AbstractLight, LightSampleContext}, media::{sample_t_maj, MediumProperties}, options::Options, phase::AbstractPhaseFunction, reader::error::ParseResult, sampler::{AbstractSampler, Sampler}, sampling::{sample_discrete, WeightedReservoirSampler}, Dot, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, RayDifferential, Vec3f};
 
 use super::{AbstractRayIntegrator, IntegratorBase};
 
@@ -16,12 +16,12 @@ pub struct VolumetricPathIntegrator {
 impl VolumetricPathIntegrator {
     const SHADOW_EPSILON: Float = 0.0001;
 
-    pub fn new(max_depth: i32, light_sampler: LightSampler, regularize: bool) -> VolumetricPathIntegrator {
-        VolumetricPathIntegrator {
+    pub fn new(max_depth: i32, light_sampler: LightSampler, regularize: bool) -> ParseResult<VolumetricPathIntegrator> {
+        Ok(VolumetricPathIntegrator {
             max_depth,
             light_sampler,
             regularize,
-        }
+        })
     }
 
     pub fn sample_ld(

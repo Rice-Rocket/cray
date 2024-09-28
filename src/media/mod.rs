@@ -6,7 +6,7 @@ use iterator::{HomogeneousMajorantIterator, RayMajorantIterator};
 use rand::{rngs::SmallRng, Rng};
 use rgb::RgbGridMedium;
 
-use crate::{color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, error, phase::PhaseFunction, ray::AbstractRay, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::sample_exponential, transform::Transform, Float, Point3f, Ray};
+use crate::{color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, error, phase::PhaseFunction, ray::AbstractRay, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, sampling::sample_exponential, transform::Transform, Float, Point3f, Ray};
 
 pub mod iterator;
 pub mod homogeneous;
@@ -40,13 +40,13 @@ impl Medium {
         render_from_medium: Transform,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         loc: &FileLoc,
-    ) -> Medium {
-        match name {
-            "homogeneous" => Medium::Homogeneous(Box::new(HomogeneousMedium::create(parameters, cached_spectra, loc))),
-            "uniformgrid" => Medium::Grid(Box::new(GridMedium::create(parameters, render_from_medium, cached_spectra, loc))),
-            "rgbgrid" => Medium::RgbGrid(Box::new(RgbGridMedium::create(parameters, render_from_medium, cached_spectra, loc))),
+    ) -> ParseResult<Medium> {
+        Ok(match name {
+            "homogeneous" => Medium::Homogeneous(Box::new(HomogeneousMedium::create(parameters, cached_spectra, loc)?)),
+            "uniformgrid" => Medium::Grid(Box::new(GridMedium::create(parameters, render_from_medium, cached_spectra, loc)?)),
+            "rgbgrid" => Medium::RgbGrid(Box::new(RgbGridMedium::create(parameters, render_from_medium, cached_spectra, loc)?)),
             _ => { error!(loc, "unknown medium '{}'", name); },
-        }
+        })
     }
 }
 

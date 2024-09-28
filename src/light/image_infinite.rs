@@ -2,7 +2,7 @@ use std::{io::Write, sync::Arc};
 
 use num::Zero;
 
-use crate::{clear_log, color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum}, wavelengths::SampledWavelengths}, equal_area_sphere_to_square, equal_area_square_to_sphere, error, image::{Image, WrapMode}, interaction::Interaction, log, reader::{target::FileLoc, utils::truncate_filename}, sampling::PiecewiseConstant2D, sqr, transform::{ApplyInverseTransform, ApplyTransform, Transform}, Bounds2f, Bounds3f, Float, Normal3f, Point2f, Point2i, Point3f, Ray, Vec3f, PI};
+use crate::{clear_log, color::{colorspace::RgbColorSpace, rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum}, wavelengths::SampledWavelengths}, equal_area_sphere_to_square, equal_area_square_to_sphere, error, image::{Image, WrapMode}, interaction::Interaction, log, reader::{error::ParseResult, target::FileLoc, utils::truncate_filename}, sampling::PiecewiseConstant2D, sqr, transform::{ApplyInverseTransform, ApplyTransform, Transform}, Bounds2f, Bounds3f, Float, Normal3f, Point2f, Point2i, Point3f, Ray, Vec3f, PI};
 
 use super::{AbstractLight, LightBase, LightBounds, LightLiSample, LightSampleContext, LightType};
 
@@ -119,7 +119,7 @@ impl ImageInfiniteLight {
         scale: Float,
         filename: &str,
         loc: &FileLoc,
-    ) -> ImageInfiniteLight {
+    ) -> ParseResult<ImageInfiniteLight> {
         let base = LightBase{
             ty: LightType::Infinite,
             render_from_light,
@@ -129,13 +129,13 @@ impl ImageInfiniteLight {
         log!("Creating image infinite light from file '{}'...", truncate_filename(filename));
 
         let Some(channel_desc) = image.get_channel_desc(&["R", "G", "B"]) else {
-            error!(@image filename, "image used for ImageInfiniteLight doesn't have RGB channels");
+            error!(@file filename, "image used for ImageInfiniteLight doesn't have RGB channels");
         };
 
         assert!(channel_desc.size() == 3);
         assert!(channel_desc.is_identity());
         if image.resolution().x != image.resolution().y {
-            error!(@image filename, "image resolution is non-square; it is unlikely that it is an environment map");
+            error!(@file filename, "image resolution is non-square; it is unlikely that it is an environment map");
         }
 
         let mut d = image.get_default_sampling_distribution();
@@ -151,7 +151,7 @@ impl ImageInfiniteLight {
 
         clear_log!();
 
-        ImageInfiniteLight {
+        Ok(ImageInfiniteLight {
             base,
             image,
             image_color_space,
@@ -160,7 +160,7 @@ impl ImageInfiniteLight {
             scene_radius: 0.0,
             distribution,
             compensated_distribution,
-        }
+        })
     }
 
     fn image_le(&self, uv: Point2f, lambda: &SampledWavelengths) -> SampledSpectrum {

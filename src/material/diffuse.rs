@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{diffuse::DiffuseBxDF, BxDF}, color::{spectrum::{ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture}};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{diffuse::DiffuseBxDF, BxDF}, color::{spectrum::{ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, image::Image, reader::{error::ParseResult, paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture}};
 
 use super::{AbstractMaterial, AbstractTextureEvaluator, MaterialEvalContext};
 
@@ -18,14 +18,14 @@ impl DiffuseMaterial {
         normal_map: Option<Arc<Image>>,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         _loc: &FileLoc,
-    ) -> DiffuseMaterial {
+    ) -> ParseResult<DiffuseMaterial> {
         let reflectance = parameters.get_spectrum_texture(
             "reflectance",
             None,
             SpectrumType::Albedo,
             cached_spectra,
             textures,
-        );
+        )?;
 
         let reflectance = if let Some(reflectance) = reflectance {
             reflectance
@@ -35,9 +35,9 @@ impl DiffuseMaterial {
             )))
         };
 
-        let displacement = Some(parameters.get_float_texture("displacement", 0.0, textures));
+        let displacement = Some(parameters.get_float_texture("displacement", 0.0, textures)?);
 
-        DiffuseMaterial::new(reflectance, displacement, normal_map)
+        Ok(DiffuseMaterial::new(reflectance, displacement, normal_map))
     }
 
     pub fn new(

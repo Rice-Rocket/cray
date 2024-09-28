@@ -67,9 +67,9 @@ macro_rules! warn {
 
 #[macro_export]
 macro_rules! error {
-    (@basic $($arg:tt)*) => {
+    (@panic $($arg:tt)*) => {
         print!(
-            "{}{}error: {}", 
+            "{}{}error: {}",
             termion::color::Fg(termion::color::Red),
             termion::style::Bold,
             termion::color::Fg(termion::color::Reset),
@@ -79,44 +79,92 @@ macro_rules! error {
         std::io::Write::flush(&mut std::io::stdout());
         panic!();
     };
+    (@noloc $($arg:tt)*) => {
+        return Err(error!(@create @noloc $($arg)*));
+    };
+    (@create @noloc $($arg:tt)*) => {
+        {
+            $crate::reader::error::ParseError::new(
+                $crate::reader::error::ParseErrorKind::InvalidParameter,
+                $crate::reader::target::FileLoc::default(),
+                Some(format!($($arg)*)),
+            )
+        }
+    };
     ($loc:expr, $($arg:tt)*) => {
-        print!(
-            "{}{}error: {}", 
-            termion::color::Fg(termion::color::Red),
-            termion::style::Bold,
-            termion::color::Fg(termion::color::Reset),
-        );
-        print!($($arg)*);
-        print!(
-            "\n  {}-->{}{} {}:{}:{}\n",
-            termion::color::Fg(termion::color::Blue),
-            termion::color::Fg(termion::color::Reset),
-            termion::style::Reset,
-            $loc.filename,
-            $loc.line,
-            $loc.start,
-        );
-        std::io::Write::flush(&mut std::io::stdout());
-        panic!();
+        return Err(error!(@create $loc, $($arg)*));
     };
-    (@image $file:expr, $($arg:tt)*) => {
-        print!(
-            "{}{}error: {}", 
-            termion::color::Fg(termion::color::Red),
-            termion::style::Bold,
-            termion::color::Fg(termion::color::Reset),
-        );
-        print!($($arg)*);
-        print!(
-            "\n  {}-->{}{} {}\n",
-            termion::color::Fg(termion::color::Blue),
-            termion::color::Fg(termion::color::Reset),
-            termion::style::Reset,
-            $file,
-        );
-        std::io::Write::flush(&mut std::io::stdout());
-        panic!();
+    (@create $loc:expr, $($arg:tt)*) => {
+        {
+            $crate::reader::error::ParseError::new(
+                $crate::reader::error::ParseErrorKind::InvalidParameter,
+                $loc.clone(),
+                Some(format!($($arg)*)),
+            )
+        }
     };
+    (@file $file:expr, $($arg:tt)*) => {
+        return Err(error!(@create @file $file, $($arg)*))
+    };
+    (@create @file $file:expr, $($arg:tt)*) => {
+        {
+            $crate::reader::error::ParseError::new(
+                $crate::reader::error::ParseErrorKind::InvalidParameter,
+                $crate::reader::target::FileLoc::from_file($file),
+                Some(format!($($arg)*)),
+            )
+        }
+    };
+    // (@basic $($arg:tt)*) => {
+    //     print!(
+    //         "{}{}error: {}", 
+    //         termion::color::Fg(termion::color::Red),
+    //         termion::style::Bold,
+    //         termion::color::Fg(termion::color::Reset),
+    //     );
+    //     print!($($arg)*);
+    //     print!("\n\n");
+    //     std::io::Write::flush(&mut std::io::stdout());
+    //     panic!();
+    // };
+    // ($loc:expr, $($arg:tt)*) => {
+    //     print!(
+    //         "{}{}error: {}", 
+    //         termion::color::Fg(termion::color::Red),
+    //         termion::style::Bold,
+    //         termion::color::Fg(termion::color::Reset),
+    //     );
+    //     print!($($arg)*);
+    //     print!(
+    //         "\n  {}-->{}{} {}:{}:{}\n",
+    //         termion::color::Fg(termion::color::Blue),
+    //         termion::color::Fg(termion::color::Reset),
+    //         termion::style::Reset,
+    //         $loc.filename,
+    //         $loc.line,
+    //         $loc.start,
+    //     );
+    //     std::io::Write::flush(&mut std::io::stdout());
+    //     panic!();
+    // };
+    // (@image $file:expr, $($arg:tt)*) => {
+    //     print!(
+    //         "{}{}error: {}", 
+    //         termion::color::Fg(termion::color::Red),
+    //         termion::style::Bold,
+    //         termion::color::Fg(termion::color::Reset),
+    //     );
+    //     print!($($arg)*);
+    //     print!(
+    //         "\n  {}-->{}{} {}\n",
+    //         termion::color::Fg(termion::color::Blue),
+    //         termion::color::Fg(termion::color::Reset),
+    //         termion::style::Reset,
+    //         $file,
+    //     );
+    //     std::io::Write::flush(&mut std::io::stdout());
+    //     panic!();
+    // };
 }
 
 #[macro_export]

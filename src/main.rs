@@ -173,7 +173,7 @@ fn main() {
         PathBuf::from(&cli.scene_file).file_name().and_then(|s| s.to_str()).unwrap_or(""),
     );
 
-    parse_files(
+    let parse_result = parse_files(
         &[&cli.scene_file],
         &mut scene_builder,
         &mut options,
@@ -183,10 +183,31 @@ fn main() {
         &mut gamma_encoding_cache,
     );
 
+    match parse_result {
+        Ok(_) => (),
+        Err(err) => {
+            if let Some(msg) = err.msg {
+                println!("error: {}", msg);
+            }
+            return;
+        }
+    }
+
     let scene = scene_builder.done();
     let start_time = Instant::now();
-    render_cpu(scene, &options, &mut string_interner, &mut cached_spectra, &texture_cache, &mut gamma_encoding_cache);
+    let render_result = render_cpu(scene, &options, &mut string_interner, &mut cached_spectra, &texture_cache, &mut gamma_encoding_cache);
     let elapsed = start_time.elapsed();
+
+    match render_result {
+        Ok(_) => (),
+        Err(err) => {
+            if let Some(msg) = err.msg {
+                println!("error: {}", msg);
+            }
+            return;
+        }
+    }
+
     println!(
         "Finished rendering in {}.{:03} seconds",
         elapsed.as_secs(),

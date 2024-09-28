@@ -2,7 +2,7 @@ use std::{collections::HashMap, num::{ParseFloatError, ParseIntError}, str::{Fro
 
 use crate::new_syntax_err;
 
-use super::{error::{ParseOk, ParseResult, SyntaxError}, target::FileLoc};
+use super::{error::{ParseResult, SyntaxError}, target::FileLoc};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum ParamType {

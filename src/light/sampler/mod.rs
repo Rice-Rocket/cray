@@ -3,7 +3,7 @@ use std::sync::Arc;
 use bvh::BvhLightSampler;
 use uniform::UniformLightSampler;
 
-use crate::{error, reader::target::FileLoc, Float};
+use crate::{error, reader::{error::ParseResult, target::FileLoc}, Float};
 
 use super::{Light, LightSampleContext};
 
@@ -62,13 +62,13 @@ impl AbstractLightSampler for LightSampler {
 }
 
 impl LightSampler {
-    pub fn create(name: &str, lights: Arc<[Arc<Light>]>) -> LightSampler {
-        match name {
+    pub fn create(name: &str, lights: Arc<[Arc<Light>]>) -> ParseResult<LightSampler> {
+        Ok(match name {
             "uniform" => LightSampler::Uniform(UniformLightSampler {
                 lights,
             }),
             "bvh" => LightSampler::Bvh(BvhLightSampler::new(lights)),
-            _ => { error!(@basic "unknown light sampler: '{}'", name); },
-        }
+            _ => { error!(@noloc "unknown light sampler: '{}'", name); },
+        })
     }
 }

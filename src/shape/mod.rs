@@ -5,7 +5,7 @@ use mesh::{BilinearPatchMesh, TriQuadMesh, TriangleMesh};
 use sphere::Sphere;
 use triangle::Triangle;
 
-use crate::{error, file::resolve_filename, interaction::{Interaction, SurfaceInteraction}, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
+use crate::{error, file::resolve_filename, interaction::{Interaction, SurfaceInteraction}, options::Options, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, texture::FloatTexture, transform::Transform, Bounds3f, DirectionCone, Float, Normal3f, Point2f, Point3f, Point3fi, Ray, Vec3f};
 
 pub mod sphere;
 pub mod mesh;
@@ -65,8 +65,8 @@ impl Shape {
         _float_textures: &HashMap<String, Arc<FloatTexture>>,
         loc: &FileLoc,
         options: &Options,
-    ) -> Vec<Arc<Shape>> {
-        match name {
+    ) -> ParseResult<Vec<Arc<Shape>>> {
+        Ok(match name {
             "sphere" => {
                 let sphere = Sphere::create(
                     render_from_object,
@@ -74,7 +74,7 @@ impl Shape {
                     reverse_orientation,
                     parameters,
                     loc,
-                );
+                )?;
                 vec![Arc::new(Shape::Sphere(Box::new(sphere)))]
             },
             "trianglemesh" => {
@@ -83,7 +83,7 @@ impl Shape {
                     reverse_orientation,
                     parameters,
                     loc,
-                ));
+                )?);
                 Triangle::create_triangles(trianglemesh)
             },
             "bilinearmesh" => {
@@ -92,12 +92,12 @@ impl Shape {
                     reverse_orientation,
                     parameters,
                     loc,
-                ));
+                )?);
                 BilinearPatch::create_patches(mesh)
             },
             "plymesh" => {
-                let filename = resolve_filename(options, &parameters.get_one_string("filename", ""));
-                let ply_mesh = TriQuadMesh::read_ply(&filename);
+                let filename = resolve_filename(options, &parameters.get_one_string("filename", "")?);
+                let ply_mesh = TriQuadMesh::read_ply(&filename)?;
 
                 // TODO: Handle displacement texture
 
@@ -133,7 +133,7 @@ impl Shape {
                 tri_quad_shapes
             },
             _ => { error!(loc, "unknown shape '{}'", name); },
-        }
+        })
     }
 }
 

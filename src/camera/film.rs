@@ -4,7 +4,7 @@ use half::f16;
 use once_cell::sync::Lazy;
 use rgb2spec::{LAMBDA_MAX, LAMBDA_MIN};
 
-use crate::{color::{cie::Cie, colorspace::{NamedColorSpace, RgbColorSpace}, named_spectrum::NamedSpectrum, rgb_xyz::{white_balance, Rgb, Xyz}, sampled::SampledSpectrum, spectrum::{inner_product, AbstractSpectrum, DenselySampledSpectrum, PiecewiseLinearSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, image::{Image, ImageMetadata, PixelFormat}, interaction::SurfaceInteraction, linear_least_squares_3, numeric::HasNan, options::Options, reader::{paramdict::ParameterDictionary, target::FileLoc}, vec2d::Vec2D, warn, Bounds2f, Bounds2i, Float, Mat3, Normal3f, Point2f, Point2i, Point3f, Vec2f, Vec3f};
+use crate::{color::{cie::Cie, colorspace::{NamedColorSpace, RgbColorSpace}, named_spectrum::NamedSpectrum, rgb_xyz::{white_balance, Rgb, Xyz}, sampled::SampledSpectrum, spectrum::{inner_product, AbstractSpectrum, DenselySampledSpectrum, PiecewiseLinearSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, image::{Image, ImageMetadata, PixelFormat}, interaction::SurfaceInteraction, linear_least_squares_3, numeric::HasNan, options::Options, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, vec2d::Vec2D, warn, Bounds2f, Bounds2i, Float, Mat3, Normal3f, Point2f, Point2i, Point3f, Vec2f, Vec3f};
 
 use super::{filter::{Filter, AbstractFilter as _}, CameraTransform};
 
@@ -62,8 +62,8 @@ impl Film {
         filter: Filter,
         loc: &FileLoc,
         options: &Options,
-    ) -> Film {
-        match name {
+    ) -> ParseResult<Film> {
+        Ok(match name {
             "rgb" => Film::RgbFilm(Box::new(RgbFilm::create(
                 parameters,
                 exposure_time,
@@ -71,7 +71,7 @@ impl Film {
                 parameters.color_space.clone(),
                 loc,
                 options,
-            ))),
+            )?)),
             "debug" => Film::Debug(Box::new(DebugFilm::create(
                 parameters,
                 exposure_time,
@@ -79,9 +79,9 @@ impl Film {
                 parameters.color_space.clone(),
                 loc,
                 options,
-            ))),
+            )?)),
             _ => { error!(loc, "unknown film type '{}'", name); },
-        }
+        })
     }
 }
 
@@ -215,8 +215,8 @@ impl FilmBaseParameters {
         sensor: PixelSensor,
         loc: &FileLoc,
         options: &Options,
-    ) -> FilmBaseParameters {
-        let filename = parameters.get_one_string("filename", "");
+    ) -> ParseResult<FilmBaseParameters> {
+        let filename = parameters.get_one_string("filename", "")?;
 
         let filename = if let Some(image_file) = options.image_file.as_ref() {
             if !filename.is_empty() {
@@ -231,8 +231,8 @@ impl FilmBaseParameters {
 
         // TODO: Fullscreen option, if we get to GUI.
         let full_resolution = Point2i::new(
-            parameters.get_one_int("xresolution", 1280),
-            parameters.get_one_int("yresolution", 720),
+            parameters.get_one_int("xresolution", 1280)?,
+            parameters.get_one_int("yresolution", 720)?,
         );
 
         let full_resolution = if options.quick_render {
@@ -243,11 +243,11 @@ impl FilmBaseParameters {
 
         let pixel_bounds = Bounds2i::new(Point2i::ZERO, full_resolution);
 
-        let pb = parameters.get_int_array("pixelbounds");
+        let pb = parameters.get_int_array("pixelbounds")?;
 
         let pixel_bounds = if let Some(new_bounds) = options.pixel_bounds {
             let intersect = new_bounds.intersect(pixel_bounds);
-            if intersect.is_empty() { panic!("pixel bounds extend past image!") };
+            if intersect.is_empty() { error!(loc, "pixel bounds extend past image!"); };
 
             if intersect != new_bounds {
                 warn!(
@@ -286,7 +286,7 @@ impl FilmBaseParameters {
         };
 
         // Compute pixel bounds based on crop
-        let cr = parameters.get_float_array("cropwindow");
+        let cr = parameters.get_float_array("cropwindow")?;
 
         let pixel_bounds = if let Some(crop) = options.crop_window {
             let crop = if crop.intersect(Bounds2f::new(Point2f::ZERO, Point2f::ONE)) != crop {
@@ -295,7 +295,7 @@ impl FilmBaseParameters {
                     "film crop window is not in [0,1]; did you mean to use pixel_bounds instead? clamping to valid range.",
                 );
                 let intersect = crop.intersect(Bounds2f::new(Point2f::ZERO, Point2f::ONE));
-                if intersect.is_empty() { panic!("expected some overlap") };
+                if intersect.is_empty() { error!(loc, "expected some overlap"); };
                 intersect
             } else {
                 crop
@@ -374,16 +374,16 @@ impl FilmBaseParameters {
             error!(loc, "{} degenerate pixel bounds provided to film", loc);
         }
 
-        let diagonal = parameters.get_one_float("diagonal", 35.0);
+        let diagonal = parameters.get_one_float("diagonal", 35.0)?;
 
-        FilmBaseParameters {
+        Ok(FilmBaseParameters {
             full_resolution,
             pixel_bounds,
             filter,
             diagonal,
             sensor,
             filename,
-        }
+        })
     }
 }
 
@@ -457,14 +457,14 @@ impl RgbFilm {
         color_space: Arc<RgbColorSpace>,
         loc: &FileLoc,
         options: &Options,
-    ) -> RgbFilm {
-        let max_component_value = parameters.get_one_float("maxcomponentvalue", Float::INFINITY);
-        let write_fp16 = parameters.get_one_bool("savefp16", true);
+    ) -> ParseResult<RgbFilm> {
+        let max_component_value = parameters.get_one_float("maxcomponentvalue", Float::INFINITY)?;
+        let write_fp16 = parameters.get_one_bool("savefp16", true)?;
 
-        let sensor = PixelSensor::create(parameters, color_space.clone(), exposure_time, loc);
-        let film_base_parameters = FilmBaseParameters::create(parameters, filter, sensor, loc, options);
+        let sensor = PixelSensor::create(parameters, color_space.clone(), exposure_time, loc)?;
+        let film_base_parameters = FilmBaseParameters::create(parameters, filter, sensor, loc, options)?;
 
-        RgbFilm::new(
+        Ok(RgbFilm::new(
             film_base_parameters.full_resolution,
             film_base_parameters.pixel_bounds,
             film_base_parameters.filter,
@@ -474,7 +474,7 @@ impl RgbFilm {
             color_space,
             max_component_value,
             write_fp16,
-        )
+        ))
     }
 
     pub fn new(
@@ -736,13 +736,13 @@ impl DebugFilm {
         color_space: Arc<RgbColorSpace>,
         loc: &FileLoc,
         options: &Options,
-    ) -> DebugFilm {
-        let write_fp16 = parameters.get_one_bool("savefp16", true);
+    ) -> ParseResult<DebugFilm> {
+        let write_fp16 = parameters.get_one_bool("savefp16", true)?;
 
-        let sensor = PixelSensor::create(parameters, color_space.clone(), exposure_time, loc);
-        let film_base_parameters = FilmBaseParameters::create(parameters, filter, sensor, loc, options);
+        let sensor = PixelSensor::create(parameters, color_space.clone(), exposure_time, loc)?;
+        let film_base_parameters = FilmBaseParameters::create(parameters, filter, sensor, loc, options)?;
 
-        DebugFilm::new(
+        Ok(DebugFilm::new(
             film_base_parameters.full_resolution,
             film_base_parameters.pixel_bounds,
             film_base_parameters.filter,
@@ -750,7 +750,7 @@ impl DebugFilm {
             film_base_parameters.sensor,
             &film_base_parameters.filename,
             write_fp16,
-        )
+        ))
     }
 
     pub fn new(
@@ -957,12 +957,12 @@ impl PixelSensor {
         colorspace: Arc<RgbColorSpace>,
         exposure_time: Float,
         loc: &FileLoc
-    ) -> PixelSensor {
-        let iso = parameters.get_one_float("iso", 100.0);
+    ) -> ParseResult<PixelSensor> {
+        let iso = parameters.get_one_float("iso", 100.0)?;
 
-        let white_balance_temp = parameters.get_one_float("whitebalance", 0.0);
+        let white_balance_temp = parameters.get_one_float("whitebalance", 0.0)?;
 
-        let sensor_name = parameters.get_one_string("sensor", "cie1931");
+        let sensor_name = parameters.get_one_string("sensor", "cie1931")?;
 
         let white_balance_temp = if sensor_name != "cie1931" && white_balance_temp == 0.0 {
             6500.0
@@ -984,16 +984,16 @@ impl PixelSensor {
         } else { None };
 
         if sensor_name == "cie1931" {
-            PixelSensor::new(&colorspace, &sensor_illum, imaging_ratio)
+            Ok(PixelSensor::new(&colorspace, &sensor_illum, imaging_ratio))
         } else {
             let r = Spectrum::get_named_spectrum(NamedSpectrum::from_str(&(sensor_name.to_string() + "_r"))
-                .unwrap_or_else(|()| { error!(loc, "unknown sensor type '{}'", sensor_name); }));
+                .map_err(|_| error!(@create loc, "unknown sensor type '{}'", sensor_name))?);
             let g = Spectrum::get_named_spectrum(NamedSpectrum::from_str(&(sensor_name.to_string() + "_g"))
-                .unwrap_or_else(|()| { error!(loc, "unknown sensor type '{}'", sensor_name); }));
+                .map_err(|_| error!(@create loc, "unknown sensor type '{}'", sensor_name))?);
             let b = Spectrum::get_named_spectrum(NamedSpectrum::from_str(&(sensor_name.to_string() + "_b"))
-                .unwrap_or_else(|()| { error!(loc, "unknown sensor type '{}'", sensor_name); }));
+                .map_err(|_| error!(@create loc, "unknown sensor type '{}'", sensor_name))?);
 
-            PixelSensor::new_with_rgb(r, g, b, &colorspace, &sensor_illum.unwrap(), imaging_ratio)
+            Ok(PixelSensor::new_with_rgb(r, g, b, &colorspace, &sensor_illum.unwrap(), imaging_ratio))
         }
     }
 

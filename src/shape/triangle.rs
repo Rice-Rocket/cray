@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{bounds::Union, difference_of_products_float_vec, error, gamma, interaction::{Interaction, SurfaceInteraction}, math::numeric::DifferenceOfProducts, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::{bilinear_pdf, invert_spherical_triangle_sample, sample_bilinear, sample_spherical_triangle, sample_uniform_triangle}, spherical_triangle_area, transform::Transform, Bounds3f, DirectionCone, Dot, Float, Normal3f, Point2f, Point3, Point3f, Point3fi, Ray, Vec2f, Vec3f};
+use crate::{bounds::Union, difference_of_products_float_vec, error, gamma, interaction::{Interaction, SurfaceInteraction}, math::numeric::DifferenceOfProducts, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, sampling::{bilinear_pdf, invert_spherical_triangle_sample, sample_bilinear, sample_spherical_triangle, sample_uniform_triangle}, spherical_triangle_area, transform::Transform, Bounds3f, DirectionCone, Dot, Float, Normal3f, Point2f, Point3, Point3f, Point3fi, Ray, Vec2f, Vec3f};
 
 use super::{mesh::TriangleMesh, AbstractShape, Shape, ShapeIntersection, ShapeSample, ShapeSampleContext};
 
@@ -19,10 +19,10 @@ impl Triangle {
         reverse_orientation: bool,
         parameters: &mut ParameterDictionary,
         loc: &FileLoc,
-    ) -> TriangleMesh {
-        let mut vi = parameters.get_int_array("indices");
-        let p = parameters.get_point3f_array("P");
-        let uvs = parameters.get_point2f_array("uv");
+    ) -> ParseResult<TriangleMesh> {
+        let mut vi = parameters.get_int_array("indices")?;
+        let p = parameters.get_point3f_array("P")?;
+        let uvs = parameters.get_point2f_array("uv")?;
 
         if vi.is_empty() {
             if p.len() == 3 {
@@ -44,13 +44,13 @@ impl Triangle {
             // TODO: Could just discard uvs instead of panicing + warn
         }
 
-        let s = parameters.get_vector3f_array("S");
+        let s = parameters.get_vector3f_array("S")?;
         if !s.is_empty() && s.len() != p.len() {
             error!(loc, "number of vertex positions 'P' and vertex tangents 'S' do not match");
             // TODO: Could just discard instead of panicing + warn
         }
 
-        let n = parameters.get_normal3f_array("N");
+        let n = parameters.get_normal3f_array("N")?;
         if !n.is_empty() && n.len() != p.len() {
             error!(loc, "number of vertex positions 'P' and vertex normals 'N' do not match");
             // TODO: Could just discard instead of panicing + warn
@@ -62,13 +62,13 @@ impl Triangle {
             }
         }
 
-        let face_indices = parameters.get_int_array("faceIndices");
+        let face_indices = parameters.get_int_array("faceIndices")?;
         if !face_indices.is_empty() && face_indices.len() != vi.len() / 3 {
             error!(loc, "number of face indices 'faceIndices' and vertex indices 'indices' do not match");
             // TODO: Could just discard instead of panicing + warn
         }
 
-        TriangleMesh::new(
+        Ok(TriangleMesh::new(
             render_from_object,
             reverse_orientation,
             vi.into_iter().map(|i| i as usize).collect(),
@@ -77,7 +77,7 @@ impl Triangle {
             n,
             uvs,
             face_indices.into_iter().map(|i| i as usize).collect(),
-        )
+        ))
     }
     
     pub fn create_triangles(mesh: Arc<TriangleMesh>) -> Vec<Arc<Shape>> {

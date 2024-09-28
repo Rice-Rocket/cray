@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{color::{colorspace::RgbColorSpace, sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, file::resolve_filename, image::Image, media::Medium, options::Options, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, shape::{AbstractShape, Shape, ShapeSampleContext}, texture::FloatTexture, transform::Transform, warn, Bounds3f, Dot, Float, Normal3f, Point2f, Point3f, Ray, Vec3f, PI};
+use crate::{color::{colorspace::RgbColorSpace, sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, file::resolve_filename, image::Image, media::Medium, options::Options, reader::{error::ParseResult, paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, shape::{AbstractShape, Shape, ShapeSampleContext}, texture::FloatTexture, transform::Transform, warn, Bounds3f, Dot, Float, Normal3f, Point2f, Point3f, Ray, Vec3f, PI};
 
 use super::{AbstractLight, LightBase, LightBounds, LightLiSample, LightSampleContext, LightType};
 
@@ -51,21 +51,21 @@ impl DiffuseAreaLight {
         shape: Arc<Shape>,
         alpha_tex: Arc<FloatTexture>,
         options: &Options,
-    ) -> DiffuseAreaLight {
+    ) -> ParseResult<DiffuseAreaLight> {
         // TODO: Use cached_spectra
         let l = parameters.get_one_spectrum(
             "L",
             None,
             SpectrumType::Illuminant,
             &mut HashMap::new(),
-        );
+        )?;
 
-        let mut scale = parameters.get_one_float("scale", 1.0);
-        let two_sided = parameters.get_one_bool("twosided", false);
+        let mut scale = parameters.get_one_float("scale", 1.0)?;
+        let two_sided = parameters.get_one_bool("twosided", false)?;
 
         let filename = resolve_filename(
             options,
-            &parameters.get_one_string("filename", ""),
+            &parameters.get_one_string("filename", "")?,
         );
 
         let image: Option<Image> = None;
@@ -84,7 +84,7 @@ impl DiffuseAreaLight {
 
         scale /= spectrum_to_photometric(&l);
 
-        let phi_v = parameters.get_one_float("power", -1.0);
+        let phi_v = parameters.get_one_float("power", -1.0)?;
         if phi_v > 0.0 {
             let mut k_e = 1.0;
 
@@ -96,7 +96,7 @@ impl DiffuseAreaLight {
             scale *= phi_v / k_e;
         }
 
-        DiffuseAreaLight::new(render_from_light, l, scale, shape.clone(), two_sided)
+        Ok(DiffuseAreaLight::new(render_from_light, l, scale, shape.clone(), two_sided))
     }
 }
 

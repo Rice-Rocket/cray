@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{color::{sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, phase::{HGPhaseFunction, PhaseFunction}, reader::{paramdict::ParameterDictionary, target::FileLoc}, sampling::SampledGrid, transform::{ApplyInverseTransform, ApplyRayInverseTransform, Transform}, Bounds3f, Float, Point3f, Point3i, Ray};
+use crate::{color::{sampled::SampledSpectrum, spectrum::{AbstractSpectrum, RgbIlluminantSpectrum, RgbUnboundedSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, phase::{HGPhaseFunction, PhaseFunction}, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, sampling::SampledGrid, transform::{ApplyInverseTransform, ApplyRayInverseTransform, Transform}, Bounds3f, Float, Point3f, Point3i, Ray};
 
 use super::{iterator::{DDAMajorantIterator, MajorantGrid}, AbstractMedium, MediumProperties};
 
@@ -23,10 +23,10 @@ impl RgbGridMedium {
         render_from_medium: Transform,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         loc: &FileLoc,
-    ) -> RgbGridMedium {
-        let sigma_a = parameters.get_rgb_array("sigma_a");
-        let sigma_s = parameters.get_rgb_array("sigma_s");
-        let le = parameters.get_rgb_array("Le");
+    ) -> ParseResult<RgbGridMedium> {
+        let sigma_a = parameters.get_rgb_array("sigma_a")?;
+        let sigma_s = parameters.get_rgb_array("sigma_s")?;
+        let le = parameters.get_rgb_array("Le")?;
 
         if sigma_a.is_empty() && sigma_s.is_empty() {
             error!(loc, "rgb grid requires 'sigma_a' and/or 'sigma_s' parameter values");
@@ -50,9 +50,9 @@ impl RgbGridMedium {
             error!(loc, "expected {} values for 'Le' parameter but was given {}", n_density, le.len());
         }
 
-        let nx = parameters.get_one_int("nx", 1);
-        let ny = parameters.get_one_int("ny", 1);
-        let nz = parameters.get_one_int("nz", 1);
+        let nx = parameters.get_one_int("nx", 1)?;
+        let ny = parameters.get_one_int("ny", 1)?;
+        let nz = parameters.get_one_int("nz", 1)?;
 
         if n_density as i32 != nx * ny * nz {
             error!(loc, "rgb grid medium has {} density values; expected nx*ny*nz = {}", n_density, nx * ny * nz);
@@ -97,13 +97,13 @@ impl RgbGridMedium {
             None
         };
 
-        let p0 = parameters.get_one_point3f("p0", Point3f::ZERO);
-        let p1 = parameters.get_one_point3f("p1", Point3f::ONE);
-        let le_scale = parameters.get_one_float("Lescale", 1.0);
-        let g = parameters.get_one_float("g", 0.0);
-        let sigma_scale = parameters.get_one_float("scale", 1.0);
+        let p0 = parameters.get_one_point3f("p0", Point3f::ZERO)?;
+        let p1 = parameters.get_one_point3f("p1", Point3f::ONE)?;
+        let le_scale = parameters.get_one_float("Lescale", 1.0)?;
+        let g = parameters.get_one_float("g", 0.0)?;
+        let sigma_scale = parameters.get_one_float("scale", 1.0)?;
 
-        RgbGridMedium::new(
+        Ok(RgbGridMedium::new(
             Bounds3f::new(p0, p1),
             render_from_medium,
             g,
@@ -112,7 +112,7 @@ impl RgbGridMedium {
             sigma_scale,
             le_grid,
             le_scale,
-        )
+        ))
     }
 
     pub fn new(

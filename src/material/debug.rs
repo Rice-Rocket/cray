@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{diffuse::DiffuseBxDF, BxDF}, color::{rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractTextureMapping2D, FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Vec2f};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{diffuse::DiffuseBxDF, BxDF}, color::{rgb_xyz::Rgb, sampled::SampledSpectrum, spectrum::{ConstantSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, image::Image, reader::{error::ParseResult, paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractTextureMapping2D, FloatTexture, SpectrumConstantTexture, SpectrumTexture}, Vec2f};
 
 use super::{AbstractMaterial, AbstractTextureEvaluator, MaterialEvalContext};
 
@@ -35,14 +35,14 @@ impl DebugMaterial {
         normal_map: Option<Arc<Image>>,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         loc: &FileLoc,
-    ) -> DebugMaterial {
+    ) -> ParseResult<DebugMaterial> {
         let color = parameters.get_spectrum_texture(
             "color",
             None,
             SpectrumType::Albedo,
             cached_spectra,
             textures,
-        );
+        )?;
 
         let color = if let Some(color) = color {
             color
@@ -52,9 +52,9 @@ impl DebugMaterial {
             )))
         };
 
-        let displacement = Some(parameters.get_float_texture("displacement", 0.0, textures));
+        let displacement = Some(parameters.get_float_texture("displacement", 0.0, textures)?);
 
-        let mode = match parameters.get_one_string("mode", "normal").as_str() {
+        let mode = match parameters.get_one_string("mode", "normal")?.as_str() {
             "normal" => DebugMaterialMode::Normal,
             "position" => DebugMaterialMode::Position,
             "uv" => DebugMaterialMode::Uv,
@@ -70,7 +70,7 @@ impl DebugMaterial {
             s => { error!(loc, "unknown debug material mode '{}'", s); },
         };
 
-        DebugMaterial::new(color, displacement, normal_map, mode)
+        Ok(DebugMaterial::new(color, displacement, normal_map, mode))
     }
 
     pub fn new(

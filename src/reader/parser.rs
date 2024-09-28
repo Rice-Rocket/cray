@@ -5,7 +5,7 @@ use string_interner::{DefaultBackend, StringInterner};
 
 use crate::{clear_log, color::{rgb_xyz::ColorEncodingCache, spectrum::Spectrum}, file::set_search_directory, log, mipmap::MIPMap, new_syntax_err, options::Options, texture::TexInfo, Float};
 
-use super::{error::{SyntaxError, SyntaxErrorKind}, param::{Param, ParamList}, target::{FileLoc, ParserTarget}, token::{Directive, Token}, tokenizer::Tokenizer};
+use super::{error::{ParseResult, SyntaxError, SyntaxErrorKind}, param::{Param, ParamList}, target::{FileLoc, ParserTarget}, token::{Directive, Token}, tokenizer::Tokenizer};
 
 pub fn parse_files<T: ParserTarget>(
     files: &[&str],
@@ -15,7 +15,7 @@ pub fn parse_files<T: ParserTarget>(
     cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
     texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
     gamma_encoding_cache: &mut ColorEncodingCache,
-) {
+) -> ParseResult<()> {
     if files.is_empty() {
         todo!("read from stdin when no files are provided")
     }
@@ -26,8 +26,10 @@ pub fn parse_files<T: ParserTarget>(
         }
 
         let data = fs::read_to_string(file).unwrap();
-        parse_str(&data, target, options, string_interner, cached_spectra, texture_cache, gamma_encoding_cache, file.to_string());
+        parse_str(&data, target, options, string_interner, cached_spectra, texture_cache, gamma_encoding_cache, file.to_string())?;
     }
+
+    Ok(())
 }
 
 pub fn parse_str<T: ParserTarget>(
@@ -39,7 +41,7 @@ pub fn parse_str<T: ParserTarget>(
     texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
     gamma_encoding_cache: &mut ColorEncodingCache,
     filename: String,
-) {
+) -> ParseResult<()> {
     let mut parsers = Vec::new();
     parsers.push(Parser::new(data, filename));
 
@@ -119,26 +121,26 @@ pub fn parse_str<T: ParserTarget>(
                 parsers.push(parser);
             },
             Element::Import { .. } => todo!("Support import directive"),
-            Element::Option { param, loc } => target.option(param.name, param.value, options, loc),
-            Element::Film { ty, params, loc } => target.film(ty, params.into(), string_interner, loc),
-            Element::ColorSpace { ty, loc } => target.color_space(ty, loc),
-            Element::Camera { ty, params, loc } => target.camera(ty, params.into(), string_interner, loc, options),
-            Element::Sampler { ty, params, loc } => target.sampler(ty, params.into(), string_interner, loc),
-            Element::Integrator { ty, params, loc } => target.integrator(ty, params.into(), string_interner, loc),
-            Element::Accelerator { ty, params, loc } => target.accelerator(ty, params.into(), string_interner, loc),
+            Element::Option { param, loc } => target.option(param.name, param.value, options, loc)?,
+            Element::Film { ty, params, loc } => target.film(ty, params.parse()?, string_interner, loc),
+            Element::ColorSpace { ty, loc } => target.color_space(ty, loc)?,
+            Element::Camera { ty, params, loc } => target.camera(ty, params.parse()?, string_interner, loc, options),
+            Element::Sampler { ty, params, loc } => target.sampler(ty, params.parse()?, string_interner, loc),
+            Element::Integrator { ty, params, loc } => target.integrator(ty, params.parse()?, string_interner, loc),
+            Element::Accelerator { ty, params, loc } => target.accelerator(ty, params.parse()?, string_interner, loc),
             Element::CoordinateSystem { name, loc } => target.coordinate_system(name, loc),
             Element::CoordSysTransform { name, loc } => target.coordinate_sys_transform(name, loc),
-            Element::PixelFilter { name, params, loc } => target.pixel_filter(name, params.into(), string_interner, loc),
-            Element::Identity { loc } => target.identity(loc),
-            Element::Translate { v, loc } => target.translate(v[0], v[1], v[2], loc),
-            Element::Scale { v, loc } => target.scale(v[0], v[1], v[2], loc),
-            Element::Rotate { angle, v, loc } => target.rotate(angle, v[0], v[1], v[2], loc),
+            Element::PixelFilter { name, params, loc } => target.pixel_filter(name, params.parse()?, string_interner, loc),
+            Element::Identity { loc } => target.identity(loc)?,
+            Element::Translate { v, loc } => target.translate(v[0], v[1], v[2], loc)?,
+            Element::Scale { v, loc } => target.scale(v[0], v[1], v[2], loc)?,
+            Element::Rotate { angle, v, loc } => target.rotate(angle, v[0], v[1], v[2], loc)?,
             Element::LookAt { eye, look_at, up, loc } => target.look_at(
                 eye[0], eye[1], eye[2], look_at[0], look_at[1], look_at[2],
                 up[0], up[1], up[2], loc,
-            ),
-            Element::Transform { m, loc } => target.transform(m, loc),
-            Element::ConcatTransform { m, loc } => target.concat_transform(m, loc),
+            )?,
+            Element::Transform { m, loc } => target.transform(m, loc)?,
+            Element::ConcatTransform { m, loc } => target.concat_transform(m, loc)?,
             Element::TransformTimes { start, end, loc } => target.transform_times(start, end, loc),
             Element::ActiveTransform { ty, loc } => match ty {
                 "StartTime" => target.active_transform_start_time(loc),
@@ -149,25 +151,25 @@ pub fn parse_str<T: ParserTarget>(
             Element::ReverseOrientation { loc } => target.reverse_orientation(loc),
             Element::WorldBegin { loc } => target.world_begin(string_interner, loc, options),
             Element::AttributeBegin { loc } => target.attribute_begin(loc),
-            Element::AttributeEnd { loc } => target.attribute_end(loc),
-            Element::Attribute { attr_target, params, loc } => target.attribute(attr_target, params.into(), loc),
+            Element::AttributeEnd { loc } => target.attribute_end(loc)?,
+            Element::Attribute { attr_target, params, loc } => target.attribute(attr_target, params.parse()?, loc)?,
             Element::LightSource { ty, params, loc } => target.light_source(
-                ty, params.into(), string_interner, loc,
+                ty, params.parse()?, string_interner, loc,
                 cached_spectra, options,
             ),
-            Element::AreaLightSource { ty, params, loc } => target.area_light_source(ty, params.into(), loc),
-            Element::Material { ty, params, loc } => target.material(ty, params.into(), string_interner, loc, options),
-            Element::MakeNamedMaterial { name, params, loc } => target.make_named_material(name, params.into(), string_interner, loc, options),
+            Element::AreaLightSource { ty, params, loc } => target.area_light_source(ty, params.parse()?, loc),
+            Element::Material { ty, params, loc } => target.material(ty, params.parse()?, string_interner, loc, options),
+            Element::MakeNamedMaterial { name, params, loc } => target.make_named_material(name, params.parse()?, string_interner, loc, options)?,
             Element::NamedMaterial { name, loc } => target.named_material(name, loc),
             Element::Texture { name, ty, class, params, loc } => target.texture(
-                name, ty, class, params.into(), string_interner, loc,
+                name, ty, class, params.parse()?, string_interner, loc,
                 options, cached_spectra, texture_cache, gamma_encoding_cache,
-            ),
-            Element::Shape { name, params, loc } => target.shape(name, params.into(), string_interner, loc),
-            Element::ObjectBegin { name, loc } => target.object_begin(name, loc, string_interner),
-            Element::ObjectEnd { loc } => target.object_end(loc),
-            Element::ObjectInstance { name, loc } => target.object_instance(name, loc, string_interner),
-            Element::MakeNamedMedium { name, params, loc } => target.make_named_medium(name, params.into(), string_interner, cached_spectra, loc),
+            )?,
+            Element::Shape { name, params, loc } => target.shape(name, params.parse()?, string_interner, loc),
+            Element::ObjectBegin { name, loc } => target.object_begin(name, loc, string_interner)?,
+            Element::ObjectEnd { loc } => target.object_end(loc)?,
+            Element::ObjectInstance { name, loc } => target.object_instance(name, loc, string_interner)?,
+            Element::MakeNamedMedium { name, params, loc } => target.make_named_medium(name, params.parse()?, string_interner, cached_spectra, loc)?,
             Element::MediumInterface { interior, exterior, loc } => target.medium_interface(interior, exterior, loc),
         }
     }

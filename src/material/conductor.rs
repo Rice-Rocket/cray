@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{conductor::ConductorBxDF, BxDF}, color::{named_spectrum::NamedSpectrum, sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, image::Image, reader::{paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, scattering::TrowbridgeReitzDistribution, texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture}};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{conductor::ConductorBxDF, BxDF}, color::{named_spectrum::NamedSpectrum, sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, image::Image, reader::{error::ParseResult, paramdict::{NamedTextures, SpectrumType, TextureParameterDictionary}, target::FileLoc}, scattering::TrowbridgeReitzDistribution, texture::{FloatTexture, SpectrumConstantTexture, SpectrumTexture}};
 
 use super::{AbstractMaterial, AbstractTextureEvaluator, MaterialEvalContext};
 
@@ -23,27 +23,27 @@ impl ConductorMaterial {
         loc: &FileLoc,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         textures: &NamedTextures,
-    ) -> ConductorMaterial {
+    ) -> ParseResult<ConductorMaterial> {
         let mut eta = parameters.get_spectrum_texture_or_none(
             "eta",
             SpectrumType::Unbounded,
             cached_spectra,
             textures,
-        );
+        )?;
         let mut k = parameters.get_spectrum_texture(
             "k",
             None,
             SpectrumType::Unbounded,
             cached_spectra,
             textures,
-        );
+        )?;
         let reflectance = parameters.get_spectrum_texture(
             "reflectance",
             None,
             SpectrumType::Albedo,
             cached_spectra,
             textures,
-        );
+        )?;
 
         if reflectance.is_none() {
             if eta.is_none() {
@@ -60,21 +60,21 @@ impl ConductorMaterial {
             }
         }
 
-        let u_roughness = if let Some(roughness) = parameters.get_float_texture_or_none("uroughness", textures) {
+        let u_roughness = if let Some(roughness) = parameters.get_float_texture_or_none("uroughness", textures)? {
             roughness
         } else {
-            parameters.get_float_texture("roughness", 0.0, textures)
+            parameters.get_float_texture("roughness", 0.0, textures)?
         };
-        let v_roughness = if let Some(roughness) = parameters.get_float_texture_or_none("vroughness", textures) {
+        let v_roughness = if let Some(roughness) = parameters.get_float_texture_or_none("vroughness", textures)? {
             roughness
         } else {
-            parameters.get_float_texture("roughness", 0.0, textures)
+            parameters.get_float_texture("roughness", 0.0, textures)?
         };
 
-        let displacement = parameters.get_float_texture_or_none("displacement", textures);
-        let remap_roughness = parameters.get_one_bool("remaproughness", true);
+        let displacement = parameters.get_float_texture_or_none("displacement", textures)?;
+        let remap_roughness = parameters.get_one_bool("remaproughness", true)?;
 
-        ConductorMaterial::new(
+        Ok(ConductorMaterial::new(
             displacement,
             normal_map,
             eta,
@@ -83,7 +83,7 @@ impl ConductorMaterial {
             u_roughness,
             v_roughness,
             remap_roughness,
-        )
+        ))
     }
 
     pub fn new(

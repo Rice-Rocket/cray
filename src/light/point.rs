@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{color::{colorspace::RgbColorSpace, sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, interaction::Interaction, media::{Medium, MediumInterface}, reader::{paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, transform::{ApplyTransform, Transform}, Bounds3f, Float, Normal3f, Point2f, Point3f, Ray, Vec3f, PI};
+use crate::{color::{colorspace::RgbColorSpace, sampled::SampledSpectrum, spectrum::{spectrum_to_photometric, AbstractSpectrum, DenselySampledSpectrum, Spectrum}, wavelengths::SampledWavelengths}, error, interaction::Interaction, media::{Medium, MediumInterface}, reader::{error::ParseResult, paramdict::{ParameterDictionary, SpectrumType}, target::FileLoc}, transform::{ApplyTransform, Transform}, Bounds3f, Float, Normal3f, Point2f, Point3f, Ray, Vec3f, PI};
 
 use super::{AbstractLight, LightBase, LightBounds, LightLiSample, LightSampleContext, LightType};
 
@@ -31,30 +31,30 @@ impl PointLight {
         medium: Option<Arc<MediumInterface>>,
         parameters: &mut ParameterDictionary,
         color_space: Arc<RgbColorSpace>,
-        _loc: &FileLoc,
+        loc: &FileLoc,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
-    ) -> PointLight {
+    ) -> ParseResult<PointLight> {
         let i = parameters.get_one_spectrum(
             "I",
             Some(color_space.illuminant.clone()),
             SpectrumType::Illuminant,
             cached_spectra,
-        ).expect("PointLight requires I parameter");
+        )?.ok_or(error!(@create loc, "point light requires 'i' parameter"))?;
 
-        let mut sc = parameters.get_one_float("scale", 1.0);
+        let mut sc = parameters.get_one_float("scale", 1.0)?;
         sc /= spectrum_to_photometric(&i);
 
-        let phi_v = parameters.get_one_float("power", -1.0);
+        let phi_v = parameters.get_one_float("power", -1.0)?;
         if phi_v > 0.0 {
             let k_e = 4.0 * PI;
             sc *= phi_v / k_e;
         }
 
-        let from = parameters.get_one_point3f("from", Point3f::ZERO);
+        let from = parameters.get_one_point3f("from", Point3f::ZERO)?;
         let tf = Transform::from_translation(from);
         let final_render_from_light = render_from_light.apply(tf);
 
-        PointLight::new(final_render_from_light, medium, i, sc)
+        Ok(PointLight::new(final_render_from_light, medium, i, sc))
     }
 }
 

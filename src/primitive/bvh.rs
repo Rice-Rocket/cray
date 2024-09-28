@@ -1,6 +1,6 @@
 use std::{mem::MaybeUninit, sync::{atomic::{AtomicUsize, Ordering}, Arc}};
 
-use crate::{bounds::Union, error, light::Light, material::Material, reader::{paramdict::ParameterDictionary, target::FileLoc}, shape::{AbstractShape, Shape, ShapeIntersection}, Bounds3, Bounds3f, Float, Point3f, Ray, Vec3f};
+use crate::{bounds::Union, error, light::Light, material::Material, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, shape::{AbstractShape, Shape, ShapeIntersection}, Bounds3, Bounds3f, Float, Point3f, Ray, Vec3f};
 
 use super::{Primitive, AbstractPrimitive};
 
@@ -8,11 +8,11 @@ pub fn create_accelerator(
     name: &str,
     prims: Vec<Arc<Primitive>>,
     parameters: &mut ParameterDictionary,
-) -> Primitive {
-    match name {
-        "bvh" => Primitive::BvhAggregate(BvhAggregate::create(prims, parameters)),
-        _ => { error!(@basic "accelerator '{}' unknown.", name); },
-    }
+) -> ParseResult<Primitive> {
+    Ok(match name {
+        "bvh" => Primitive::BvhAggregate(BvhAggregate::create(prims, parameters)?),
+        _ => { error!(@noloc "accelerator '{}' unknown.", name); },
+    })
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -35,18 +35,18 @@ impl BvhAggregate {
     pub fn create(
         primitives: Vec<Arc<Primitive>>,
         parameters: &mut ParameterDictionary,
-    ) -> BvhAggregate {
-        let split_method_name = parameters.get_one_string("splitmethod", "sah");
+    ) -> ParseResult<BvhAggregate> {
+        let split_method_name = parameters.get_one_string("splitmethod", "sah")?;
         let split_method = match split_method_name.as_str() {
             "sah" => BvhSplitMethod::SAH,
             "hlbvh" => BvhSplitMethod::HLBVH,
             "middle" => BvhSplitMethod::Middle,
             "equal" => BvhSplitMethod::EqualCounts,
-            _ => { error!(@basic "unknown bvh split method '{}'", split_method_name); },
+            _ => { error!(@noloc "unknown bvh split method '{}'", split_method_name); },
         };
 
-        let max_prims_in_node = parameters.get_one_int("maxnodeprims", 4) as usize;
-        BvhAggregate::new(primitives, max_prims_in_node, split_method)
+        let max_prims_in_node = parameters.get_one_int("maxnodeprims", 4)? as usize;
+        Ok(BvhAggregate::new(primitives, max_prims_in_node, split_method))
     }
 
     pub fn new(mut primitives: Vec<Arc<Primitive>>, max_prims_in_node: usize, split_method: BvhSplitMethod) -> BvhAggregate {

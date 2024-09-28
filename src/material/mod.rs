@@ -10,7 +10,7 @@ use diffuse_transmission::DiffuseTransmissionMaterial;
 use rand::{rngs::SmallRng, Rng};
 use thin_dielectric::ThinDielectricMaterial;
 
-use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{AbstractBxDF, BxDF}, color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, error, image::{Image, WrapMode, WrapMode2D}, interaction::SurfaceInteraction, reader::{paramdict::{NamedTextures, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractFloatTexture, AbstractSpectrumTexture, FloatTexture, SpectrumTexture, TextureEvalContext}, Float, Frame, Normal3f, Point2f, Point3f, Vec2f, Vec3f};
+use crate::{bsdf::BSDF, bssrdf::BSSRDF, bxdf::{AbstractBxDF, BxDF}, color::{sampled::SampledSpectrum, spectrum::Spectrum, wavelengths::SampledWavelengths}, error, image::{Image, WrapMode, WrapMode2D}, interaction::SurfaceInteraction, reader::{error::ParseResult, paramdict::{NamedTextures, TextureParameterDictionary}, target::FileLoc}, texture::{AbstractFloatTexture, AbstractSpectrumTexture, FloatTexture, SpectrumTexture, TextureEvalContext}, Float, Frame, Normal3f, Point2f, Point3f, Vec2f, Vec3f};
 
 pub mod diffuse;
 pub mod diffuse_transmission;
@@ -70,13 +70,13 @@ impl Material {
         named_materials: &HashMap<String, Arc<Material>>,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         loc: &FileLoc,
-    ) -> Material {
-        match name {
+    ) -> ParseResult<Material> {
+        Ok(match name {
             "interface" => {
                 Material::Interface
             },
             "mix" => {
-                let material_names = parameters.get_string_array("materials");
+                let material_names = parameters.get_string_array("materials")?;
                 if material_names.len() != 2 {
                     error!(loc, "expected exactly two materials for mix material");
                 }
@@ -93,7 +93,7 @@ impl Material {
                     named_material[1].clone()
                 ];
 
-                Material::Mix(MixMaterial::create(materials, parameters, loc, textures))
+                Material::Mix(MixMaterial::create(materials, parameters, loc, textures)?)
             },
             _ => Material::Single(SingleMaterial::create(
                 name,
@@ -103,8 +103,8 @@ impl Material {
                 named_materials,
                 cached_spectra,
                 loc,
-            ))
-        }
+            )?)
+        })
     }
 }
 
@@ -129,66 +129,66 @@ impl SingleMaterial {
         named_materials: &HashMap<String, Arc<Material>>,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         loc: &FileLoc,
-    ) -> SingleMaterial {
-        match name {
+    ) -> ParseResult<SingleMaterial> {
+        Ok(match name {
             "diffuse" => SingleMaterial::Diffuse(DiffuseMaterial::create(
                 parameters,
                 textures,
                 normal_map,
                 cached_spectra,
                 loc,
-            )),
+            )?),
             "diffusetransmission" => SingleMaterial::DiffuseTransmission(DiffuseTransmissionMaterial::create(
                 parameters,
                 normal_map,
                 loc,
                 cached_spectra,
                 textures,
-            )),
+            )?),
             "conductor" => SingleMaterial::Conductor(ConductorMaterial::create(
                 parameters,
                 normal_map,
                 loc,
                 cached_spectra,
                 textures,
-            )),
+            )?),
             "dielectric" => SingleMaterial::Dielectric(DielectricMaterial::create(
                 parameters,
                 normal_map,
                 loc,
                 cached_spectra,
                 textures,
-            )),
+            )?),
             "thindielectric" => SingleMaterial::ThinDielectric(ThinDielectricMaterial::create(
                 parameters,
                 normal_map,
                 loc,
                 cached_spectra,
                 textures,
-            )),
+            )?),
             "coateddiffuse" => SingleMaterial::CoatedDiffuse(CoatedDiffuseMaterial::create(
                 parameters,
                 normal_map,
                 loc,
                 cached_spectra,
                 textures,
-            )),
+            )?),
             "coatedconductor" => SingleMaterial::CoatedConductor(CoatedConductorMaterial::create(
                 parameters,
                 normal_map,
                 loc,
                 cached_spectra,
                 textures,
-            )),
+            )?),
             "debug" => SingleMaterial::Debug(DebugMaterial::create(
                 parameters,
                 textures,
                 normal_map,
                 cached_spectra,
                 loc,
-            )),
+            )?),
             _ => { error!(loc, "material '{}' unknown", name); },
-        }
+        })
     }
 }
 
@@ -314,9 +314,9 @@ impl MixMaterial {
         parameters: &mut TextureParameterDictionary,
         _loc: &FileLoc,
         textures: &NamedTextures,
-    ) -> MixMaterial {
-        let amount = parameters.get_float_texture("amount", 0.5, textures);
-        MixMaterial { amount, materials }
+    ) -> ParseResult<MixMaterial> {
+        let amount = parameters.get_float_texture("amount", 0.5, textures)?;
+        Ok(MixMaterial { amount, materials })
     }
 
     pub fn choose_material(&self, tex_eval: &UniversalTextureEvaluator, ctx: &MaterialEvalContext, rng: &mut SmallRng) -> Arc<Material> {

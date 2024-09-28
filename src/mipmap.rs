@@ -2,7 +2,7 @@ use std::{ops::{Add, Div, Mul}, path::PathBuf, sync::Arc};
 
 use ordered_float::OrderedFloat;
 
-use crate::{color::{colorspace::RgbColorSpace, rgb_xyz::{ColorEncodingPtr, Rgb}}, error, image::{Image, WrapMode}, lerp_float, options::Options, safe, sqr, Float, Point2f, Point2i, Vec2f};
+use crate::{color::{colorspace::RgbColorSpace, rgb_xyz::{ColorEncodingPtr, Rgb}}, error, image::{Image, WrapMode}, lerp_float, options::Options, reader::error::ParseResult, safe, sqr, Float, Point2f, Point2i, Vec2f};
 
 #[derive(Debug)]
 pub struct MIPMap {
@@ -41,8 +41,8 @@ impl MIPMap {
         wrap_mode: WrapMode,
         encoding: ColorEncodingPtr,
         options: &Options,
-    ) -> MIPMap {
-        let image_and_metadata = Image::read(&PathBuf::from(filename), Some(encoding)).unwrap();
+    ) -> ParseResult<MIPMap> {
+        let image_and_metadata = Image::read(&PathBuf::from(filename), Some(encoding))?;
         let mut image = image_and_metadata.image;
 
         if image.n_channels() != 1 {
@@ -62,7 +62,7 @@ impl MIPMap {
                     if let Some(rgb_desc) = rgb_desc {
                         image = image.select_channels(&rgb_desc);
                     } else {
-                        error!(@image filename, "expected rgb channels");
+                        error!(@file filename, "expected rgb channels");
                     }
                 } else {
                     image = image.select_channels(&rgba_desc);
@@ -70,19 +70,19 @@ impl MIPMap {
             } else if let Some(rgb_desc) = rgb_desc {
                 image = image.select_channels(&rgb_desc);
             } else {
-                error!(@image filename, "image doesn't have rgb channels");
+                error!(@file filename, "image doesn't have rgb channels");
             }
         }
 
         let color_space = image_and_metadata.metadata.color_space;
 
-        MIPMap::new(
+        Ok(MIPMap::new(
             image,
             color_space,
             wrap_mode,
             filter_options,
             options,
-        )
+        ))
     }
 
     pub fn get_color_space(&self) -> Option<Arc<RgbColorSpace>> {

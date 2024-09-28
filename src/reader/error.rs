@@ -6,67 +6,94 @@ use crate::Wrap;
 
 use super::target::FileLoc;
 
-pub type ParseResult<T, const W: bool> = std::result::Result<ParseOk<T, W>, ParseError>;
+pub type ParseResult<T> = std::result::Result<T, ParseError>;
 
-pub struct ParseDiagnostic {
-    pub msg: Option<String>,
-    pub loc: FileLoc,
-}
-
-pub struct ParseOk<T, const W: bool> {
-    pub v: T,
-    pub warns: Vec<ParseDiagnostic>,
-}
-
-impl<T, const W: bool> ParseOk<T, W> {
-    #[inline]
-    pub const fn new(v: T) -> ParseOk<T, W> {
-        ParseOk { v, warns: vec![] }
-    }
-
-    #[inline]
-    pub const fn ok(v: T) -> ParseResult<T, W> {
-        Ok(Self::new(v))
-    }
-}
-
-impl<T> ParseOk<T, false> {
-    #[inline]
-    pub fn unwrap(self) -> T {
-        self.v
-    }
-}
-
-impl<T> ParseOk<T, true> {
-    #[inline]
-    pub fn split(self) -> (T, ParseOk<(), true>) {
-        (self.v, ParseOk::<(), true> { v: (), warns: self.warns })
-    }
-}
-
+#[derive(PartialEq, PartialOrd)]
 pub struct ParseError {
-    pub errs: Vec<(ParseErrorKind, ParseDiagnostic)>,
+    pub kind: ParseErrorKind,
+    pub loc: FileLoc,
+    pub msg: Option<String>,
 }
 
 impl ParseError {
     #[inline]
     pub fn new(kind: ParseErrorKind, loc: FileLoc, msg: Option<String>) -> ParseError {
-        ParseError { errs: vec![(kind, ParseDiagnostic { msg, loc })] }
+        ParseError { kind, loc, msg }
     }
 
     #[inline]
-    pub fn last_loc(&self) -> Option<&FileLoc> {
-        self.errs.last().map(|e| &e.1.loc)
+    pub fn with_loc(self, loc: FileLoc) -> ParseError {
+        ParseError {
+            kind: self.kind,
+            loc,
+            msg: self.msg,
+        }
     }
 
-    #[inline]
-    pub fn last_loc_mut(&mut self) -> Option<&mut FileLoc> {
-        self.errs.last_mut().map(|e| &mut e.1.loc)
+    pub fn format(&self, s: &str) -> String {
+        use termion::{color, style};
+
+        let line_digits = self.loc.line.checked_ilog10().unwrap_or(0) + 1;
+        let indent = " ".repeat(line_digits as usize);
+
+        let mut res = format!(
+            // error: [reason]
+            //     --> [filename]:[line]:[col]
+            //      |
+            "{}{}error: {}{}\n{indent}{}-->{}{} {}:{}:{}\n{indent} {}{}|\n",
+            color::Fg(color::Red),
+            style::Bold,
+            color::Fg(color::Reset),
+            self.kind,
+            color::Fg(color::Blue),
+            color::Fg(color::Reset),
+            style::Reset,
+            self.loc.filename,
+            self.loc.line,
+            self.loc.start,
+            color::Fg(color::Blue),
+            style::Bold,
+        );
+
+        let line_contents = s.lines().nth(self.loc.line as usize).unwrap_or("");
+
+        res += &format!(
+            "{}{}{} |{}{} {}\n",
+            color::Fg(color::Blue),
+            style::Bold,
+            self.loc.line,
+            color::Fg(color::Reset),
+            style::Reset,
+            line_contents,
+        );
+
+        let indent_offset = " ".repeat(self.loc.start as usize);
+        let arrows = "^".repeat(self.loc.len as usize);
+
+        res += &format!(
+            "{indent} {}{}|{} {indent_offset}{arrows}\n",
+            color::Fg(color::Blue),
+            style::Bold,
+            color::Fg(color::Yellow),
+        );
+
+        res
     }
 }
 
+#[derive(Error, Debug, PartialEq, PartialOrd)]
 pub enum ParseErrorKind {
+    #[error("invalid parameter")]
+    InvalidParameter,
 
+    #[error("invalid file")]
+    InvalidFile,
+
+    #[error("invalid image")]
+    InvalidImage,
+
+    #[error("file not found")]
+    NotFound,
 }
 
 pub struct SyntaxError {

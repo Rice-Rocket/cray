@@ -1,4 +1,4 @@
-use crate::{gamma, interaction::{Interaction, SurfaceInteraction}, numeric::DifferenceOfProducts as _, reader::{paramdict::ParameterDictionary, target::FileLoc}, safe, sampling::sample_uniform_sphere, spherical_direction, sqr, to_radians, transform::{ApplyTransform, Transform}, Bounds3f, DirectionCone, Dot, Float, Frame, Interval, Normal3f, NumericFloat, Point2f, Point3f, Point3fi, Ray, Vec3f, Vec3fi, PI, TAU};
+use crate::{gamma, interaction::{Interaction, SurfaceInteraction}, numeric::DifferenceOfProducts as _, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, safe, sampling::sample_uniform_sphere, spherical_direction, sqr, to_radians, transform::{ApplyTransform, Transform}, Bounds3f, DirectionCone, Dot, Float, Frame, Interval, Normal3f, NumericFloat, Point2f, Point3f, Point3fi, Ray, Vec3f, Vec3fi, PI, TAU};
 
 use super::{QuadricIntersection, ShapeIntersection, AbstractShape, ShapeSample, ShapeSampleContext};
 
@@ -23,13 +23,13 @@ impl Sphere {
         reverse_orientation: bool,
         parameters: &mut ParameterDictionary,
         _loc: &FileLoc,
-    ) -> Sphere {
-        let radius = parameters.get_one_float("radius", 1.0);
-        let z_min = parameters.get_one_float("zmin", -radius);
-        let z_max = parameters.get_one_float("zmax", radius);
-        let phi_max = parameters.get_one_float("phimax", 360.0);
+    ) -> ParseResult<Sphere> {
+        let radius = parameters.get_one_float("radius", 1.0)?;
+        let z_min = parameters.get_one_float("zmin", -radius)?;
+        let z_max = parameters.get_one_float("zmax", radius)?;
+        let phi_max = parameters.get_one_float("phimax", 360.0)?;
 
-        Sphere::new(
+        Ok(Sphere::new(
             render_from_object,
             object_from_render,
             reverse_orientation,
@@ -37,7 +37,7 @@ impl Sphere {
             z_min,
             z_max,
             phi_max,
-        )
+        ))
     }
 
     pub fn new(

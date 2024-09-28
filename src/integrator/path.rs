@@ -1,7 +1,7 @@
 use bumpalo::Bump;
 use rand::rngs::SmallRng;
 
-use crate::{bsdf::BSDF, bxdf::{BxDFReflTransFlags, TransportMode}, camera::Camera, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, interaction::SurfaceInteraction, light::{sampler::{AbstractLightSampler, LightSampler}, AbstractLight, LightSampleContext}, options::Options, sampler::{AbstractSampler, Sampler}, sampling::power_heuristic, Dot, Float, RayDifferential};
+use crate::{bsdf::BSDF, bxdf::{BxDFReflTransFlags, TransportMode}, camera::Camera, color::{sampled::SampledSpectrum, wavelengths::SampledWavelengths}, interaction::SurfaceInteraction, light::{sampler::{AbstractLightSampler, LightSampler}, AbstractLight, LightSampleContext}, options::Options, reader::error::ParseResult, sampler::{AbstractSampler, Sampler}, sampling::power_heuristic, Dot, Float, RayDifferential};
 
 use super::{AbstractRayIntegrator, IntegratorBase};
 
@@ -12,12 +12,12 @@ pub struct PathIntegrator {
 }
 
 impl PathIntegrator {
-    pub fn new(max_depth: i32, light_sampler: LightSampler, regularize: bool) -> PathIntegrator {
-        PathIntegrator {
+    pub fn new(max_depth: i32, light_sampler: LightSampler, regularize: bool) -> ParseResult<PathIntegrator> {
+        Ok(PathIntegrator {
             max_depth,
             light_sampler,
             regularize,
-        }
+        })
     }
 
     fn sample_ld(

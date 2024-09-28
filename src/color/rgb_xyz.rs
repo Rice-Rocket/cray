@@ -5,7 +5,7 @@ use fast_polynomial::poly;
 use once_cell::sync::Lazy;
 use ordered_float::OrderedFloat;
 
-use crate::{error, mat::mul_mat_vec, math::safe, numeric::HasNan, Float, Mat3, Point2f};
+use crate::{error, mat::mul_mat_vec, math::safe, numeric::HasNan, reader::error::ParseResult, Float, Mat3, Point2f};
 
 use super::{cie::{Cie, CIE_Y_INTEGRAL}, spectrum::{inner_product, Spectrum, AbstractSpectrum, LAMBDA_MAX, LAMBDA_MIN}};
 
@@ -446,35 +446,35 @@ static LINEAR_PTR: Lazy<ColorEncodingPtr> = Lazy::new(|| { ColorEncodingPtr(Arc:
 static SRGB_PTR: Lazy<ColorEncodingPtr> = Lazy::new(|| { ColorEncodingPtr(Arc::new(ColorEncoding::SRgb(SRgbColorEncoding))) });
 
 impl ColorEncoding {
-    pub fn get(name: &str, gamma_encoding_cache: Option<&mut ColorEncodingCache>) -> ColorEncodingPtr {
+    pub fn get(name: &str, gamma_encoding_cache: Option<&mut ColorEncodingCache>) -> ParseResult<ColorEncodingPtr> {
         if name == "linear" {
-            Lazy::force(&LINEAR_PTR).clone()
+            Ok(Lazy::force(&LINEAR_PTR).clone())
         } else if name == "srgb" || name == "sRGB" {
-            Lazy::force(&SRGB_PTR).clone()
+            Ok(Lazy::force(&SRGB_PTR).clone())
         } else {
             let params = name.split_whitespace().collect::<Vec<&str>>();
 
             if params.len() != 2 || params[0] != "gamma" {
-                error!(@basic "expected gamma <value> for color encoding");
+                error!(@noloc "expected gamma <value> for color encoding");
             }
 
             let gamma = params[1].parse::<Float>().expect("unable to parse gamma float value");
             if gamma == 0.0 {
-                error!(@basic "gamma value cannot be 0.0");
+                error!(@noloc "gamma value cannot be 0.0");
             }
 
             let gamma = OrderedFloat(gamma);
 
             if let Some(gamma_encoding_cache) = gamma_encoding_cache {
                 if let Some(encoding) = gamma_encoding_cache.0.get(&gamma) {
-                    encoding.clone()
+                    Ok(encoding.clone())
                 } else {
                     let encoding = ColorEncodingPtr(Arc::new(ColorEncoding::Gamma(GammaColorEncoding::new(gamma.0))));
                     gamma_encoding_cache.0.insert(gamma, encoding.clone());
-                    encoding
+                    Ok(encoding)
                 }
             } else {
-                error!(@basic "no gamma encoded cache provided");
+                error!(@noloc "no gamma encoded cache provided");
             }
         }
     }
