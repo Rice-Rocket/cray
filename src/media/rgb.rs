@@ -29,12 +29,12 @@ impl RgbGridMedium {
         let le = parameters.get_rgb_array("Le")?;
 
         if sigma_a.is_empty() && sigma_s.is_empty() {
-            error!(loc, "rgb grid requires 'sigma_a' and/or 'sigma_s' parameter values");
+            error!(loc, MissingParameter, "rgb grid requires 'sigma_a' and/or 'sigma_s' parameter values");
         }
 
         let n_density = if !sigma_a.is_empty() {
             if !sigma_s.is_empty() && sigma_a.len() != sigma_s.len() {
-                error!(loc, "different number of samples ({} vs {}) provided for 'sigma_a' and 'sigma_s'", sigma_a.len(), sigma_s.len());
+                error!(loc, InvalidValueCount, "different number of samples ({} vs {}) provided for 'sigma_a' and 'sigma_s'", sigma_a.len(), sigma_s.len());
             }
 
             sigma_a.len()
@@ -43,11 +43,11 @@ impl RgbGridMedium {
         };
 
         if !le.is_empty() && sigma_a.is_empty() {
-            error!(loc, "rgb grid requires 'sigma_a' if 'Le' value provided");
+            error!(loc, MissingParameter, "rgb grid requires 'sigma_a' if 'Le' value provided");
         }
 
         if !le.is_empty() && n_density != le.len() {
-            error!(loc, "expected {} values for 'Le' parameter but was given {}", n_density, le.len());
+            error!(loc, InvalidValueCount, "expected {} values for 'Le' parameter but was given {}", n_density, le.len());
         }
 
         let nx = parameters.get_one_int("nx", 1)?;
@@ -55,7 +55,7 @@ impl RgbGridMedium {
         let nz = parameters.get_one_int("nz", 1)?;
 
         if n_density as i32 != nx * ny * nz {
-            error!(loc, "rgb grid medium has {} density values; expected nx*ny*nz = {}", n_density, nx * ny * nz);
+            error!(loc, InvalidValueCount, "rgb grid medium has {} density values; expected nx*ny*nz = {}", n_density, nx * ny * nz);
         }
 
         let sigma_a_grid = if !sigma_a.is_empty() {

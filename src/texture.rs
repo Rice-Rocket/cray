@@ -110,7 +110,7 @@ impl FloatTexture {
                 let t = FloatImageTexture::create(&render_from_texture, parameters, loc, options, texture_cache, gamma_encoding_cache)?;
                 FloatTexture::Image(t)
             }
-            _ => { error!(loc, "texture '{}' unknown", name); },
+            _ => { error!(loc, UnknownValue, "texture '{}' unknown", name); },
         })
     }
 }
@@ -317,17 +317,17 @@ impl FloatImageTexture {
         let max_aniso = parameters.get_one_float("maxanisotropy", 8.0)?;
         let filter = parameters.get_one_string("filter", "bilinear")?;
         
-        let ff = FilterFunction::parse(&filter).ok_or(error!(@create loc, "unknown filter function '{}'", filter))?;
+        let ff = FilterFunction::parse(&filter).ok_or(error!(@create loc, UnknownValue, "unknown filter function '{}'", filter))?;
         let filter_options = MIPMapFilterOptions::new(ff, max_aniso);
 
         let wrap = parameters.get_one_string("wrap", "repeat")?;
-        let wrap = WrapMode::parse(&wrap).ok_or(error!(@create loc, "unknown wrap mode '{}'", wrap))?;
+        let wrap = WrapMode::parse(&wrap).ok_or(error!(@create loc, UnknownValue, "unknown wrap mode '{}'", wrap))?;
 
         let scale = parameters.get_one_float("scale", 1.0)?;
         let invert = parameters.get_one_bool("invert", false)?;
         let filename = resolve_filename(options, &parameters.get_one_string("filename", "")?);
 
-        let default_encoding = if PathBuf::from(&filename).extension().ok_or(error!(@create @file &filename, "expected extension"))? == "png" {
+        let default_encoding = if PathBuf::from(&filename).extension().ok_or(error!(@create @file &filename, InvalidFilename, "expected extension"))? == "png" {
             "sRGB"
         } else {
             "linear"
@@ -443,7 +443,7 @@ impl SpectrumTexture {
                 )?;
                 SpectrumTexture::Image(t)
             }
-            _ => { error!(loc, "texture '{}' unknown", name); },
+            _ => { error!(loc, UnknownValue, "texture '{}' unknown", name); },
         })
     }
 }
@@ -480,7 +480,7 @@ impl SpectrumConstantTexture {
         let one = Spectrum::Constant(ConstantSpectrum::new(1.0));
         let c = parameters
             .get_one_spectrum("value", Some(Arc::new(one)), spectrum_type, cached_spectra)?
-            .ok_or(error!(@create loc, "expected spectrum 'value'"))?;
+            .ok_or(error!(@create loc, MissingParameter, "expected spectrum 'value'"))?;
         Ok(SpectrumConstantTexture::new(c))
     }
 }
@@ -701,17 +701,17 @@ impl SpectrumImageTexture {
         let max_aniso = parameters.get_one_float("maxanisotropy", 8.0)?;
         let filter = parameters.get_one_string("filter", "bilinear")?;
 
-        let ff = FilterFunction::parse(&filter).ok_or(error!(@create loc, "unknown filter function '{}'", filter))?;
+        let ff = FilterFunction::parse(&filter).ok_or(error!(@create loc, UnknownValue, "unknown filter function '{}'", filter))?;
         let filter_options = MIPMapFilterOptions::new(ff, max_aniso);
 
         let wrap = parameters.get_one_string("wrap", "repeat")?;
-        let wrap = WrapMode::parse(&wrap).ok_or(error!(@create loc, "unknown wrap mode '{}'", wrap))?;
+        let wrap = WrapMode::parse(&wrap).ok_or(error!(@create loc, UnknownValue, "unknown wrap mode '{}'", wrap))?;
 
         let scale = parameters.get_one_float("scale", 1.0)?;
         let invert = parameters.get_one_bool("invert", false)?;
         let filename = resolve_filename(options, &parameters.get_one_string("filename", "")?);
         
-        let default_encoding = if PathBuf::from(&filename).extension().ok_or(error!(@create @file &filename, "expected extension"))? == "png" {
+        let default_encoding = if PathBuf::from(&filename).extension().ok_or(error!(@create @file &filename, InvalidFilename, "expected extension"))? == "png" {
             "sRGB"
         } else {
             "linear"
@@ -807,7 +807,7 @@ impl TextureMapping2D {
                 ds: parameters.get_one_float("udelta", 0.0)?,
                 dt: parameters.get_one_float("vdelta", 0.0)?,
             }),
-            _ => { error!(loc, "unknown texture mapping type '{}'", ty); },
+            _ => { error!(loc, UnknownValue, "unknown texture mapping type '{}'", ty); },
         })
     }
 }

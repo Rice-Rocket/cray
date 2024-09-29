@@ -33,37 +33,37 @@ impl BilinearPatch {
             if p.len() == 4 {
                 vi = vec![0, 1, 2, 3];
             } else {
-                error!(loc, "vertex indices 'indices' not provided with bilinear patch mesh shape");
+                error!(loc, MissingParameter, "vertex indices 'indices' not provided with bilinear patch mesh shape");
             }
         } else if vi.len() % 4 != 0 {
-            error!(loc, "number of vertex indices 'indices' not multiple of 4 as expected");
+            error!(loc, InvalidValueCount, "number of vertex indices 'indices' not multiple of 4 as expected");
             // TODO: Could just pop excess and warn
         }
 
         if p.is_empty() {
-            error!(loc, "vertex positions 'P' not provided with bilinear path mesh shape");
+            error!(loc, MissingParameter, "vertex positions 'P' not provided with bilinear path mesh shape");
         }
 
         if !uvs.is_empty() && uvs.len() != p.len() {
-            error!(loc, "number of vertex positions 'P' and vertex UVs 'uv' do not match");
+            error!(loc, InvalidValueCount, "number of vertex positions 'P' and vertex UVs 'uv' do not match");
             // TODO: Could just dicard uvs instead of panicing + warn
         }
 
         let n = parameters.get_normal3f_array("N")?;
         if !n.is_empty() && n.len() != p.len() {
-            error!(loc, "number of vertex positions 'P' and vertex normals 'N' do not match");
+            error!(loc, InvalidValueCount, "number of vertex positions 'P' and vertex normals 'N' do not match");
             // TODO: Could just discard instead of pancing + warn
         }
 
         for v in vi.iter() {
             if *v as usize >= p.len() {
-                error!(loc, "vertex indices {} out of bounds 'P' array length {}", v, p.len());
+                error!(loc, InvalidValue, "vertex indices {} out of bounds 'P' array length {}", v, p.len());
             }
         }
 
         let face_indices = parameters.get_int_array("faceIndices")?;
         if !face_indices.is_empty() && face_indices.len() != vi.len() / 4 {
-            error!(loc, "number of face indices 'faceIndices' and vertex indices 'indices' do not match");
+            error!(loc, InvalidValueCount, "number of face indices 'faceIndices' and vertex indices 'indices' do not match");
             // TODO: Could just discard instead of pancing + warn
         }
 

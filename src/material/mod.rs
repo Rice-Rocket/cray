@@ -78,7 +78,7 @@ impl Material {
             "mix" => {
                 let material_names = parameters.get_string_array("materials")?;
                 if material_names.len() != 2 {
-                    error!(loc, "expected exactly two materials for mix material");
+                    error!(loc, InvalidValueCount, "expected exactly two materials for mix material");
                 }
 
                 let named_material: Vec<Arc<Material>> = material_names.iter()
@@ -187,7 +187,7 @@ impl SingleMaterial {
                 cached_spectra,
                 loc,
             )?),
-            _ => { error!(loc, "material '{}' unknown", name); },
+            _ => { error!(loc, UnknownValue, "material '{}' unknown", name); },
         })
     }
 }

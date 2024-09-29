@@ -115,7 +115,7 @@ impl FromStr for NamedColorSpace {
             "srgb" => NamedColorSpace::SRgb,
             "rec2020" => NamedColorSpace::Rec2020,
             "aces2065-1" => NamedColorSpace::Aces2065_1,
-            _ => { error!(@noloc "unknown color space '{}'", value); },
+            _ => { error!(@noloc UnknownValue, "unknown color space '{}'", value); },
         })
     }
 }

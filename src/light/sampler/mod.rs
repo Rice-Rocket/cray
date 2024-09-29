@@ -68,7 +68,7 @@ impl LightSampler {
                 lights,
             }),
             "bvh" => LightSampler::Bvh(BvhLightSampler::new(lights)),
-            _ => { error!(@noloc "unknown light sampler: '{}'", name); },
+            _ => { error!(@noloc UnknownValue, "unknown light sampler: '{}'", name); },
         })
     }
 }

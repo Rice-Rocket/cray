@@ -31,7 +31,7 @@ impl Filter {
             "gaussian" => Filter::Gaussian(GaussianFilter::create(parameters, loc)?),
             "mitchell" => Filter::Mitchell(MitchellFilter::create(parameters, loc)?),
             "sinc" => Filter::LanczosSinc(LanczosSincFilter::create(parameters, loc)?),
-            _ => { error!(loc, "unknown filter type '{}'", name); },
+            _ => { error!(loc, UnknownValue, "unknown filter type '{}'", name); },
         })
     }
 }

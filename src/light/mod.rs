@@ -109,7 +109,7 @@ impl Light {
                     ))
                 } else if !l.is_empty() && portal.is_empty() {
                     if !filename.is_empty() {
-                        error!(loc, "can't specify both emission L and filename with ImageInfiniteLight");
+                        error!(loc, ValueConflict, "can't specify both emission L and filename with ImageInfiniteLight");
                     }
 
                     scale /= spectrum_to_photometric(&l[0]);
@@ -156,11 +156,11 @@ impl Light {
                             for x in 0..image_and_metadata.image.resolution().x {
                                 for c in 0..image_and_metadata.image.n_channels() {
                                     if image_and_metadata.image.get_channel(Point2i::new(x, y), c).is_nan() {
-                                        error!(loc, "image '{}' contains NaN values", truncate_filename(&filename));
+                                        error!(loc, InvalidImage, "image '{}' contains NaN values", truncate_filename(&filename));
                                     }
 
                                     if image_and_metadata.image.get_channel(Point2i::new(x, y), c).is_infinite() {
-                                        error!(loc, "image '{}' contains infinite values", truncate_filename(&filename));
+                                        error!(loc, InvalidImage, "image '{}' contains infinite values", truncate_filename(&filename));
                                     }
                                 }
                             }
@@ -170,7 +170,7 @@ impl Light {
 
                     let color_space = image_and_metadata.metadata.color_space.expect("expected color space");
                     let Some(channel_desc) = image_and_metadata.image.get_channel_desc(&["R", "G", "B"]) else {
-                        error!(loc, "infinite image light sources must have RGB channels");
+                        error!(loc, InvalidImage, "infinite image light sources must have RGB channels");
                     };
 
                     scale /= spectrum_to_photometric(&color_space.illuminant);
@@ -237,7 +237,7 @@ impl Light {
                     }
                 }
             },
-            _ => { error!(loc, "light '{}' unknown", name); },
+            _ => { error!(loc, UnknownValue, "light '{}' unknown", name); },
         })
     }
 
@@ -262,7 +262,7 @@ impl Light {
                 alpha,
                 options,
             )?),
-            _ => { error!(loc, "area light '{}' unknown", name); },
+            _ => { error!(loc, UnknownValue, "area light '{}' unknown", name); },
         })
     }
 }

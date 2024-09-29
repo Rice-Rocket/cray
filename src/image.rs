@@ -1038,8 +1038,7 @@ impl Image {
 
     pub fn read(path: &PathBuf, encoding: Option<ColorEncodingPtr>) -> ParseResult<ImageAndMetadata> {
         if path.extension().is_none() {
-            // InvalidFile
-            error!(@file path.display(), "expected file extension");
+            error!(@file path.display(), InvalidFilename, "expected file extension");
         }
 
         if path.extension().unwrap().eq("png") {
@@ -1047,8 +1046,7 @@ impl Image {
         } else if path.extension().unwrap().eq("exr") {
             Self::read_exr(path, encoding)
         } else {
-            // InvalidFile
-            error!(@file path.display(), "unsupported file extension '{}'", path.extension().unwrap().to_str().unwrap_or(""));
+            error!(@file path.display(), InvalidFilename, "unsupported file extension '{}'", path.extension().unwrap().to_str().unwrap_or(""));
         }
     }
     
@@ -1069,13 +1067,13 @@ impl Image {
 
         let mut reader = match decoder.read_info() {
             Ok(reader) => reader,
-            Err(_) => { error!(@file path.display(), "failed to decode PNG image"); },
+            Err(_) => { error!(@file path.display(), InvalidImage, "failed to decode PNG image"); },
         };
 
         let mut im_data = vec![0; reader.output_buffer_size()];
         let info = match reader.next_frame(&mut im_data) {
             Ok(info) => info,
-            Err(_) => { error!(@file path.display(), "failed to decode PNG image"); },
+            Err(_) => { error!(@file path.display(), InvalidImage, "failed to decode PNG image"); },
         };
 
         let image = match info.color_type {
@@ -1222,7 +1220,7 @@ impl Image {
                             image
                         }
                     },
-                    _ => { error!(@file path.display(), "unsupported bit depth"); },
+                    _ => { error!(@file path.display(), InvalidImage, "unsupported bit depth"); },
                 }
             },
             png::ColorType::Indexed => unreachable!(),
@@ -1260,7 +1258,7 @@ impl Image {
             .first_valid_layer() // or all_layers()
             .all_attributes()
             .on_progress(|progress: f64| bar.set_position((progress * 1000.0) as u64))
-            .from_file(path) else { error!(@file path.display(), "file not found"); /* NotFound */ };
+            .from_file(path) else { error!(@file path.display(), FileNotFound, "file not found") };
 
         bar.finish_and_clear();
 
@@ -1270,7 +1268,7 @@ impl Image {
         let mut pixel_format = PixelFormat::Float32;
 
         if im_exr.layer_data.channel_data.list.is_empty() {
-            error!(@file path.display(), "EXR images with no channels not supported");
+            error!(@file path.display(), InvalidImage, "EXR images with no channels not supported");
         }
 
         for channel in im_exr.layer_data.channel_data.list.iter() {
@@ -1283,7 +1281,7 @@ impl Image {
         match sample_vec {
             exr::image::FlatSamples::F16(_) => pixel_format = PixelFormat::Float16,
             exr::image::FlatSamples::F32(_) => pixel_format = PixelFormat::Float32,
-            exr::image::FlatSamples::U32(_) => { error!(@file path.display(), "unsupported image data format U32"); },
+            exr::image::FlatSamples::U32(_) => { error!(@file path.display(), InvalidImage, "unsupported image data format U32"); },
         }
 
         let mut image = Image::new(

@@ -71,7 +71,7 @@ impl DiffuseAreaLight {
         let image: Option<Image> = None;
         if !filename.is_empty() {
             if l.is_some() {
-                error!(loc, "both L and filename specified for diffuse area light");
+                error!(loc, ValueConflict, "both L and filename specified for diffuse area light");
             }
             todo!("Image area lights not yet implemented");
         }

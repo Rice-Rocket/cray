@@ -80,7 +80,7 @@ impl Film {
                 loc,
                 options,
             )?)),
-            _ => { error!(loc, "unknown film type '{}'", name); },
+            _ => { error!(loc, UnknownValue, "unknown film type '{}'", name); },
         })
     }
 }
@@ -247,7 +247,7 @@ impl FilmBaseParameters {
 
         let pixel_bounds = if let Some(new_bounds) = options.pixel_bounds {
             let intersect = new_bounds.intersect(pixel_bounds);
-            if intersect.is_empty() { error!(loc, "pixel bounds extend past image!"); };
+            if intersect.is_empty() { error!(loc, InvalidValue, "pixel bounds extend past image!"); };
 
             if intersect != new_bounds {
                 warn!(
@@ -266,6 +266,7 @@ impl FilmBaseParameters {
             if pb.len() != 4 {
                 error!(
                     loc,
+                    InvalidValueCount,
                     "too many values ({}) supplied for pixel bounds, expected 4",
                     pb.len()
                 );
@@ -290,12 +291,12 @@ impl FilmBaseParameters {
 
         let pixel_bounds = if let Some(crop) = options.crop_window {
             let crop = if crop.intersect(Bounds2f::new(Point2f::ZERO, Point2f::ONE)) != crop {
-                error!(
+                warn!(
                     loc,
                     "film crop window is not in [0,1]; did you mean to use pixel_bounds instead? clamping to valid range.",
                 );
                 let intersect = crop.intersect(Bounds2f::new(Point2f::ZERO, Point2f::ONE));
-                if intersect.is_empty() { error!(loc, "expected some overlap"); };
+                if intersect.is_empty() { error!(loc, InvalidValue, "expected some overlap"); };
                 intersect
             } else {
                 crop
@@ -361,7 +362,8 @@ impl FilmBaseParameters {
             } else {
                 error!(
                     loc,
-                    "{} Values provided for cropwindow, expected 4.",
+                    InvalidValueCount,
+                    "{} values provided for cropwindow, expected 4.",
                     cr.len()
                 );
                 pixel_bounds
@@ -371,7 +373,7 @@ impl FilmBaseParameters {
         };
 
         if pixel_bounds.is_empty() {
-            error!(loc, "{} degenerate pixel bounds provided to film", loc);
+            error!(loc, InvalidValue, "degenerate pixel bounds provided to film");
         }
 
         let diagonal = parameters.get_one_float("diagonal", 35.0)?;
@@ -987,11 +989,11 @@ impl PixelSensor {
             Ok(PixelSensor::new(&colorspace, &sensor_illum, imaging_ratio))
         } else {
             let r = Spectrum::get_named_spectrum(NamedSpectrum::from_str(&(sensor_name.to_string() + "_r"))
-                .map_err(|_| error!(@create loc, "unknown sensor type '{}'", sensor_name))?);
+                .map_err(|_| error!(@create loc, UnknownValue, "unknown sensor type '{}'", sensor_name))?);
             let g = Spectrum::get_named_spectrum(NamedSpectrum::from_str(&(sensor_name.to_string() + "_g"))
-                .map_err(|_| error!(@create loc, "unknown sensor type '{}'", sensor_name))?);
+                .map_err(|_| error!(@create loc, UnknownValue, "unknown sensor type '{}'", sensor_name))?);
             let b = Spectrum::get_named_spectrum(NamedSpectrum::from_str(&(sensor_name.to_string() + "_b"))
-                .map_err(|_| error!(@create loc, "unknown sensor type '{}'", sensor_name))?);
+                .map_err(|_| error!(@create loc, UnknownValue, "unknown sensor type '{}'", sensor_name))?);
 
             Ok(PixelSensor::new_with_rgb(r, g, b, &colorspace, &sensor_illum.unwrap(), imaging_ratio))
         }

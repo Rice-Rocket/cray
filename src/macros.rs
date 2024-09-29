@@ -77,37 +77,37 @@ macro_rules! error {
         std::io::Write::flush(&mut std::io::stdout());
         panic!();
     };
-    (@noloc $($arg:tt)*) => {
-        return Err(error!(@create @noloc $($arg)*));
+    (@noloc $kind:ident, $($arg:tt)*) => {
+        return Err(error!(@create @noloc $kind, $($arg)*));
     };
-    (@create @noloc $($arg:tt)*) => {
+    (@create @noloc $kind:ident, $($arg:tt)*) => {
         {
             $crate::reader::error::ParseError::new(
-                $crate::reader::error::ParseErrorKind::InvalidParameter,
+                $crate::reader::error::ParseErrorKind::$kind,
                 $crate::reader::target::FileLoc::default(),
                 Some(format!($($arg)*)),
             )
         }
     };
-    ($loc:expr, $($arg:tt)*) => {
-        return Err(error!(@create $loc, $($arg)*));
+    ($loc:expr, $kind:ident, $($arg:tt)*) => {
+        return Err(error!(@create $loc, $kind, $($arg)*));
     };
-    (@create $loc:expr, $($arg:tt)*) => {
+    (@create $loc:expr, $kind:ident, $($arg:tt)*) => {
         {
             $crate::reader::error::ParseError::new(
-                $crate::reader::error::ParseErrorKind::InvalidParameter,
+                $crate::reader::error::ParseErrorKind::$kind,
                 $loc.clone(),
                 Some(format!($($arg)*)),
             )
         }
     };
-    (@file $file:expr, $($arg:tt)*) => {
-        return Err(error!(@create @file $file, $($arg)*))
+    (@file $file:expr, $kind:ident, $($arg:tt)*) => {
+        return Err(error!(@create @file $file, $kind, $($arg)*))
     };
-    (@create @file $file:expr, $($arg:tt)*) => {
+    (@create @file $file:expr, $kind:ident, $($arg:tt)*) => {
         {
             $crate::reader::error::ParseError::new(
-                $crate::reader::error::ParseErrorKind::InvalidParameter,
+                $crate::reader::error::ParseErrorKind::$kind,
                 $crate::reader::target::FileLoc::from_file($file),
                 Some(format!($($arg)*)),
             )

@@ -11,7 +11,7 @@ pub fn create_accelerator(
 ) -> ParseResult<Primitive> {
     Ok(match name {
         "bvh" => Primitive::BvhAggregate(BvhAggregate::create(prims, parameters)?),
-        _ => { error!(@noloc "accelerator '{}' unknown.", name); },
+        _ => { error!(@noloc UnknownValue, "accelerator '{}' unknown.", name); },
     })
 }
 
@@ -42,7 +42,7 @@ impl BvhAggregate {
             "hlbvh" => BvhSplitMethod::HLBVH,
             "middle" => BvhSplitMethod::Middle,
             "equal" => BvhSplitMethod::EqualCounts,
-            _ => { error!(@noloc "unknown bvh split method '{}'", split_method_name); },
+            _ => { error!(@noloc UnknownValue, "unknown bvh split method '{}'", split_method_name); },
         };
 
         let max_prims_in_node = parameters.get_one_int("maxnodeprims", 4)? as usize;

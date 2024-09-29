@@ -62,7 +62,7 @@ impl MIPMap {
                     if let Some(rgb_desc) = rgb_desc {
                         image = image.select_channels(&rgb_desc);
                     } else {
-                        error!(@file filename, "expected rgb channels");
+                        error!(@file filename, InvalidImage, "expected rgb channels");
                     }
                 } else {
                     image = image.select_channels(&rgba_desc);
@@ -70,7 +70,7 @@ impl MIPMap {
             } else if let Some(rgb_desc) = rgb_desc {
                 image = image.select_channels(&rgb_desc);
             } else {
-                error!(@file filename, "image doesn't have rgb channels");
+                error!(@file filename, InvalidImage, "image doesn't have rgb channels");
             }
         }
 

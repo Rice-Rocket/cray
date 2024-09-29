@@ -132,7 +132,7 @@ impl Shape {
 
                 tri_quad_shapes
             },
-            _ => { error!(loc, "unknown shape '{}'", name); },
+            _ => { error!(loc, UnknownValue, "unknown shape '{}'", name); },
         })
     }
 }

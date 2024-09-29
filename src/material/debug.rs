@@ -67,7 +67,7 @@ impl DebugMaterial {
             "dvdxy" => DebugMaterialMode::Dvdxy,
             "st" => DebugMaterialMode::St,
             "texture" => DebugMaterialMode::Texture,
-            s => { error!(loc, "unknown debug material mode '{}'", s); },
+            s => { error!(loc, UnknownValue, "unknown debug material mode '{}'", s); },
         };
 
         Ok(DebugMaterial::new(color, displacement, normal_map, mode))

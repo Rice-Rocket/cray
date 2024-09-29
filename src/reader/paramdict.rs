@@ -305,21 +305,21 @@ impl<'a> Param<'a> {
                 match val_type {
                     ValueType::Unknown => val_type = ValueType::String,
                     ValueType::String => (),
-                    _ => { error!(&self.loc, "parameter '{}' has mixed types", name); },
+                    _ => { error!(&self.loc, InvalidParameter, "parameter '{}' has mixed types", name); },
                 }
                 param.add_string(dequote_string(v.as_str()).to_owned());
             } else if v.starts_with('t') && v == "true" {
                 match val_type {
                     ValueType::Unknown => val_type = ValueType::Boolean,
                     ValueType::Boolean => {}
-                    _ => { error!(&self.loc, "parameter '{}' has mixed types", name); },
+                    _ => { error!(&self.loc, InvalidParameter, "parameter '{}' has mixed types", name); },
                 }
                 param.add_bool(true);
             } else if v.starts_with('f') && v == "false" {
                 match val_type {
                     ValueType::Unknown => val_type = ValueType::Boolean,
                     ValueType::Boolean => {}
-                    _ => { error!(&self.loc, "parameter '{}' has mixed types", name); },
+                    _ => { error!(&self.loc, InvalidParameter, "parameter '{}' has mixed types", name); },
                 }
                 param.add_bool(false);
             } else {
@@ -327,7 +327,7 @@ impl<'a> Param<'a> {
                     ValueType::Unknown => val_type = ValueType::Scalar,
                     ValueType::Scalar => {}
                     ValueType::Integer => {}
-                    _ => { error!(&self.loc, "parameter '{}' has mixed types", name); },
+                    _ => { error!(&self.loc, InvalidParameter, "parameter '{}' has mixed types", name); },
                 }
 
                 if val_type == ValueType::Integer {
@@ -415,7 +415,7 @@ impl ParameterDictionary {
             match p.param_type.as_str() {
                 BooleanParam::TYPE_NAME => {
                     if p.bools.is_empty() {
-                        error!(&p.loc, "no boolean values provided for boolean-valued parameter!");
+                        error!(&p.loc, MissingValue, "no boolean values provided for boolean-valued parameter!");
                     }
                 }
                 FloatParam::TYPE_NAME
@@ -430,6 +430,7 @@ impl ParameterDictionary {
                     if p.ints.is_empty() && p.floats.is_empty() {
                         error!(
                             &p.loc,
+                            InvalidValue,
                             "non-numeric values provided for numeric-valued parameter!",
                         );
                     }
@@ -438,17 +439,18 @@ impl ParameterDictionary {
                     if p.strings.is_empty() {
                         error!(
                             &p.loc,
+                            InvalidValue,
                             "non-string values provided for string-valued parameter!",
                         );
                     }
                 }
                 "spectrum" => {
                     if p.strings.is_empty() && p.ints.is_empty() && p.floats.is_empty() {
-                        error!(&p.loc, "expecting string or numeric-valued parameter for spectrum parameter.");
+                        error!(&p.loc, InvalidValue, "expecting string or numeric-valued parameter for spectrum parameter.");
                     }
                 }
                 param => {
-                    error!(&p.loc, "unknown parameter type '{}'", param);
+                    error!(&p.loc, UnknownValue, "unknown parameter type '{}'", param);
                 }
             }
         }
@@ -470,12 +472,13 @@ impl ParameterDictionary {
             let values = P::get_values(p);
 
             if values.is_empty() {
-                error!(&p.loc, "no values provided for parameter '{}'", p.name);
+                error!(&p.loc, MissingValue, "no values provided for parameter '{}'", p.name);
             }
 
             if values.len() != P::N_PER_ITEM as usize {
                 error!(
                     &p.loc,
+                    InvalidValueCount,
                     "expected {} values for parameter '{}'",
                     P::N_PER_ITEM,
                     p.name
@@ -547,6 +550,7 @@ impl ParameterDictionary {
                 if s.len() > 1 {
                     error!(
                         &p.loc,
+                        InvalidValueCount,
                         "more than one value provided for parameter '{}'",
                         p.name
                     );
@@ -586,6 +590,7 @@ impl ParameterDictionary {
                     if rgb.r < 0.0 || rgb.g < 0.0 || rgb.b < 0.0 {
                         error!(
                             loc,
+                            InvalidValue,
                             "rgb parameter '{}' has negative component",
                             param.name
                         );
@@ -600,6 +605,7 @@ impl ParameterDictionary {
                             if rgb.r > 1.0 || rgb.g > 1.0 || rgb.b > 1.0 {
                                 error!(
                                     loc,
+                                    InvalidValue,
                                     "rgb parameter '{}' has component value > 1.0",
                                     param.name
                                 );
@@ -629,6 +635,7 @@ impl ParameterDictionary {
             if param.floats.len() % 2 != 0 {
                 error!(
                     param.loc,
+                    InvalidValueCount,
                     "found odd number of values for '{}'",
                     param.name
                 );
@@ -648,7 +655,7 @@ impl ParameterDictionary {
                     let mut value = vec![0.0; n_samples];
                     for i in 0..n_samples {
                         if i > 0 && v[2 * i] <= lambda[i - 1] {
-                            error!(param.loc, "spectrum description invalid: at {}'th entry, wavelengths aren't increasing: {} >= {}", i - 1, lambda[i -1], v[2 * i]);
+                            error!(param.loc, InvalidValue, "spectrum description invalid: at {}'th entry, wavelengths aren't increasing: {} >= {}", i - 1, lambda[i -1], v[2 * i]);
                         }
                         lambda[i] = v[2 * i];
                         value[i] = v[2 * i + 1];
@@ -673,7 +680,7 @@ impl ParameterDictionary {
                     }
 
                     let Some(spd) = Spectrum::read(&s[0], cached_spectra) else {
-                        error!(loc, "unable to read/invalid spectrum file '{}'", &s[0]);
+                        error!(@file &s[0], InvalidFileContents, "unable to read/invalid spectrum file");
                     };
 
                     Ok(spd)
@@ -717,11 +724,12 @@ impl ParameterDictionary {
         C: FnMut(&[ValueType], &FileLoc) -> ParseResult<ReturnType,>
     {
         if values.is_empty() {
-            error!(loc, "no values provided for '{}'", name);
+            error!(loc, MissingValue, "no values provided for '{}'", name);
         }
         if values.len() % n_per_item as usize != 0 {
             error!(
                 loc,
+                InvalidValueCount,
                 "number of values provided for '{}' is not a multiple of {}",
                 name, n_per_item
             );
@@ -940,6 +948,7 @@ impl TextureParameterDictionary {
             if p.strings.is_empty() {
                 error!(
                     p.loc,
+                    MissingValue,
                     "no filename provided for texture parameter '{}'",
                     p.name
                 );
@@ -947,6 +956,7 @@ impl TextureParameterDictionary {
             if p.strings.len() != 1 {
                 error!(
                     p.loc,
+                    ValueConflict,
                     "more than one filename provided for texture parameter '{}'",
                     p.name
                 );
@@ -958,7 +968,7 @@ impl TextureParameterDictionary {
             if let Some(tex) = tex {
                 Ok(Some(tex.clone()))
             } else {
-                error!(p.loc, "couldn't find float texture '{}'", p.strings[0]);
+                error!(p.loc, UndefinedValue, "couldn't find float texture '{}'", p.strings[0]);
             }
         } else if p.param_type == "float" {
             let v = self.get_one_float(name, 0.0)?;
@@ -1010,6 +1020,7 @@ impl TextureParameterDictionary {
                     if p.strings.is_empty() {
                         error!(
                             p.loc,
+                            MissingValue,
                             "no filename provided for texture parameter '{}'",
                             p.name
                         );
@@ -1017,6 +1028,7 @@ impl TextureParameterDictionary {
                     if p.strings.len() > 1 {
                         error!(
                             p.loc,
+                            ValueConflict,
                             "more than one filename provided for texture parameter '{}'",
                             p.name
                         );
@@ -1028,13 +1040,14 @@ impl TextureParameterDictionary {
                     if let Some(spec) = spec {
                         Ok(Some(spec.clone()))
                     } else {
-                        error!(p.loc, "couldn't find spectrum texture '{}'", p.strings[0]);
+                        error!(p.loc, UndefinedValue, "couldn't find spectrum texture '{}'", p.strings[0]);
                     }
                 }
                 "rgb" => {
                     if p.floats.len() != 3 {
                         error!(
                             p.loc,
+                            InvalidValueCount,
                             "expected 3 values for rgb texture parameter '{}'",
                             p.name
                         );
@@ -1042,7 +1055,7 @@ impl TextureParameterDictionary {
                     p.looked_up = true;
                     let rgb = Rgb::new(p.floats[0], p.floats[1], p.floats[2]);
                     if rgb.r < 0.0 || rgb.g < 0.0 || rgb.b < 0.0 {
-                        error!(p.loc, "rgb parameter '{}' has negative component", p.name);
+                        error!(p.loc, InvalidValue, "rgb parameter '{}' has negative component", p.name);
                     }
                     let s = match spectrum_type {
                         SpectrumType::Illuminant => Spectrum::RgbIlluminant(
@@ -1062,7 +1075,7 @@ impl TextureParameterDictionary {
                 "spectrum" | "blackbody" => {
                     let loc = p.loc.clone();
                     let Some(s) = self.get_one_spectrum(name, None, spectrum_type, cached_spectra)?.clone() else {
-                        error!(loc, "expected spectrum '{}'", name);
+                        error!(loc, MissingValue, "expected spectrum '{}'", name);
                     };
 
                     Ok(Some(Arc::new(SpectrumTexture::Constant(

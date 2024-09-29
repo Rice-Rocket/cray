@@ -179,7 +179,7 @@ impl TriQuadMesh {
             match element.name.as_ref() {
                 "vertex" => vertex_list = vertex_parser.read_payload_for_element(&mut f, element, &header).unwrap(),
                 "face" => face_list = face_parser.read_payload_for_element(&mut f, element, &header).unwrap(),
-                _ => { error!(@file filename, "unexpected element '{}'", element.name); },
+                _ => { error!(@file filename, InvalidFileContents, "unexpected element '{}'", element.name); },
             }
         }
 
@@ -209,7 +209,7 @@ impl TriQuadMesh {
                 quad_indices.push(f.vertex_indices[3]);
                 quad_indices.push(f.vertex_indices[2]);
             } else if f.face_indices.is_empty() {
-                error!(@file filename, "only tris and quads are supported");
+                error!(@file filename, InvalidFileContents, "only tris and quads are supported");
             }
 
             if !f.face_indices.is_empty() {

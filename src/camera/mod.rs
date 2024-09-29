@@ -55,7 +55,7 @@ impl Camera {
                 options,
                 loc
             )?),
-            _ => { error!(loc, "camera type '{}' unknown", name); },
+            _ => { error!(loc, UnknownValue, "camera type '{}' unknown", name); },
         })
     }
 }

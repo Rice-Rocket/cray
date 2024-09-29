@@ -455,12 +455,12 @@ impl ColorEncoding {
             let params = name.split_whitespace().collect::<Vec<&str>>();
 
             if params.len() != 2 || params[0] != "gamma" {
-                error!(@noloc "expected gamma <value> for color encoding");
+                error!(@noloc MissingParameter, "expected gamma value for color encoding");
             }
 
             let gamma = params[1].parse::<Float>().expect("unable to parse gamma float value");
             if gamma == 0.0 {
-                error!(@noloc "gamma value cannot be 0.0");
+                error!(@noloc InvalidParameter, "gamma value cannot be 0.0");
             }
 
             let gamma = OrderedFloat(gamma);
@@ -474,7 +474,7 @@ impl ColorEncoding {
                     Ok(encoding)
                 }
             } else {
-                error!(@noloc "no gamma encoded cache provided");
+                error!(@noloc MissingParameter, "no gamma encoded cache provided");
             }
         }
     }

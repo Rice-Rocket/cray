@@ -6,6 +6,10 @@ use crate::{camera::{film::{AbstractFilm, Film}, filter::Filter, AbstractCamera,
 
 use super::{error::ParseResult, paramdict::{NamedTextures, ParameterDictionary, SpectrumType, TextureParameterDictionary}, target::{FileLoc, ParsedParameterVector, ParserTarget}, utils::normalize_arg};
 
+pub type NamedMedia = HashMap<String, Arc<Medium>>;
+pub type NamedMaterials = HashMap<String, Arc<Material>>;
+pub type ShapeIndexToAreaLights = HashMap<usize, Vec<Arc<Light>>>;
+
 #[derive(Debug, Default)]
 pub struct BasicScene {
     pub integrator: Option<SceneEntity>,
@@ -71,6 +75,7 @@ impl BasicScene {
         if exposure_time <= 0.0 {
             error!(
                 camera.base.loc,
+                InvalidValue,
                 "the specified camera shutter times imply the camera won't open",
             );
         }
@@ -130,7 +135,7 @@ impl BasicScene {
     ) -> ParseResult<()> {
         let ty = medium.base.parameters.get_one_string("type", "")?;
         if ty.is_empty() {
-            error!(medium.base.loc, "no parameter \"string type\" found for medium");
+            error!(medium.base.loc, MissingParameter, "no parameter \"string type\" found for medium");
         }
 
         let m = Arc::new(Medium::create(
@@ -177,12 +182,12 @@ impl BasicScene {
 
         let filename = resolve_filename(options, filename.as_str());
         if filename.is_empty() {
-            error!(texture.base.loc, "no filename provided for texture.");
+            error!(texture.base.loc, MissingParameter, "no filename provided for texture.");
         }
 
         let path = Path::new(filename.as_str());
         if !path.exists() {
-            error!(texture.base.loc, "texture \"{}\" not found.", filename);
+            error!(texture.base.loc, FileNotFound, "texture '{}' not found.", filename);
         }
 
         if self.loading_texture_filenames.contains(&filename) {
@@ -241,12 +246,12 @@ impl BasicScene {
         let filename = resolve_filename(options, filename.as_str());
 
         if filename.is_empty() {
-            error!(texture.base.loc, "no filename provided for texture.");
+            error!(texture.base.loc, MissingParameter, "no filename provided for texture.");
         }
 
         let path = Path::new(&filename);
         if !path.exists() {
-            error!(texture.base.loc, "texture \"{}\" not found.", filename);
+            error!(texture.base.loc, FileNotFound, "texture '{}' not found.", filename);
         }
 
         if self.loading_texture_filenames.contains(&filename) {
@@ -354,6 +359,7 @@ impl BasicScene {
             error!(
                 @file
                 filename.display(),
+                InvalidImage,
                 "normal map should have rgb channels.",
             );
         }
@@ -362,6 +368,7 @@ impl BasicScene {
             error!(
                 @file
                 filename.display(),
+                InvalidImage,
                 "normal map should have rgb channels.",
             );
         }
@@ -525,13 +532,12 @@ impl BasicScene {
         Ok(self.textures.clone())
     }
 
-    #[allow(clippy::type_complexity)]
     pub fn create_lights(
         &mut self,
         textures: &NamedTextures,
         string_interner: &StringInterner<DefaultBackend>,
         options: &Options,
-    ) -> ParseResult<(Arc<[Arc<Light>]>, HashMap<usize, Vec<Arc<Light>>>)> {
+    ) -> ParseResult<(Arc<[Arc<Light>]>, ShapeIndexToAreaLights)> {
         let find_medium = |s: &str, loc: &FileLoc| -> ParseResult<Option<&Arc<Medium>>> {
             if s.is_empty() {
                 return Ok(None);
@@ -539,7 +545,7 @@ impl BasicScene {
 
             match self.media.get(s) {
                 Some(m) => Ok(Some(m)),
-                None => { error!(loc, "medium '{}' not defined", s); },
+                None => { error!(loc, UndefinedValue, "medium '{}' not defined", s); },
             }
         };
 
@@ -559,6 +565,7 @@ impl BasicScene {
                 let Some(mut material) = self.named_materials.iter_mut().find(|m| m.0 == *material_name) else {
                     error!(
                         shape.base.loc,
+                        UndefinedValue,
                         "couldn't find named material '{}'",
                         material_name
                     );
@@ -644,19 +651,19 @@ impl BasicScene {
         string_interner: &StringInterner<DefaultBackend>,
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
         options: &Options,
-    ) -> ParseResult<(HashMap<String, Arc<Material>>, Vec<Arc<Material>>)> {
+    ) -> ParseResult<(NamedMaterials, Vec<Arc<Material>>)> {
         // TODO: Note that we'd create normal_maps here if/when we parallelize.
         //  For now they're already been loaded into self.normal_maps.
 
         let mut named_materials_out: HashMap<String, Arc<Material>> = HashMap::new();
         for (name, material) in &mut self.named_materials {
             if named_materials_out.iter().any(|nm| nm.0 == name) {
-                error!(material.loc, "named material '{}' redefined", name);
+                error!(material.loc, RedefinedValue, "named material '{}' redefined", name);
             }
 
             let ty = material.parameters.get_one_string("type", "")?;
             if ty.is_empty() {
-                error!(material.loc, "no type specified for material '{}'", name);
+                error!(material.loc, MissingParameter, "no type specified for material '{}'", name);
             }
 
             let filename = resolve_filename(
@@ -670,7 +677,7 @@ impl BasicScene {
             } else {
                 let image = self.normal_maps.get(&filename);
                 if image.is_none() {
-                    error!(material.loc, "normal map \"{}\" not found.", filename);
+                    error!(material.loc, UndefinedValue, "normal map '{}' not found.", filename);
                 }
                 Some(image.unwrap().clone())
             };
@@ -699,7 +706,7 @@ impl BasicScene {
             } else {
                 let image = self.normal_maps.get(&filename);
                 if image.is_none() {
-                    error!(mtl.loc, "normal map \"{}\" not found.", filename);
+                    error!(mtl.loc, UndefinedValue, "normal map '{}' not found.", filename);
                 }
                 Some(image.unwrap().clone())
             };
@@ -737,7 +744,7 @@ impl BasicScene {
             
             match media.get(s) {
                 Some(m) => Ok(Some(m)),
-                None => { error!(loc, "medium '{}' not defined", s); },
+                None => { error!(loc, UndefinedValue, "medium '{}' not defined", s); },
             }
         };
 
@@ -774,7 +781,7 @@ impl BasicScene {
                     let mtl = if let CurrentGraphicsMaterial::NamedMaterial(material_name) = &sh.material {
                         named_materials
                             .get(material_name.as_str())
-                            .ok_or(error!(@create sh.base.loc, "material '{}' undefined", material_name))?
+                            .ok_or(error!(@create sh.base.loc, UndefinedValue, "material '{}' undefined", material_name))?
                     } else {
                         let CurrentGraphicsMaterial::MaterialIndex(material_index) = sh.material else { unreachable!() };
                         assert!(
@@ -861,10 +868,9 @@ impl BasicScene {
         self.instance_definitions.shrink_to_fit();
 
         for inst in &self.instances {
-            let e = error!(@create @noloc "unknown instance name");
             let instance = instance_definitions
                 .get(string_interner.resolve(inst.name).unwrap())
-                .ok_or(error!(@create @noloc "unknown instance name"))?;
+                .ok_or(error!(@create @noloc UndefinedValue, "undefined instance name"))?;
 
             if instance.is_none() {
                 continue;
@@ -1384,66 +1390,66 @@ impl ParserTarget for BasicSceneBuilder {
             "disablepixeljitter" => match value {
                 "true" => options.disable_pixel_jitter = true,
                 "false" => options.disable_pixel_jitter = false,
-                _ => { error!(loc, "unknown option value '{}'", value); },
+                _ => { error!(loc, InvalidValue, "unknown option value '{}'", value); },
             },
             "disabletexturefiltering" => match value {
                 "true" => options.disable_texture_filtering = true,
                 "false" => options.disable_texture_filtering = false,
-                _ => { error!(loc, "unknown option value '{}'", value); },
+                _ => { error!(loc, InvalidValue, "unknown option value '{}'", value); },
             },
             "disablewavelengthjitter" => match value {
                 "true" => options.disable_wavelength_jitter = true,
                 "false" => options.disable_wavelength_jitter = false,
-                _ => { error!(loc, "unknown option_value '{}'", value); },
+                _ => { error!(loc, InvalidValue, "unknown option_value '{}'", value); },
             },
             "displacementedgescale" => {
                 options.displacement_edge_scale = value.parse()
-                    .map_err(|_| error!(@create loc, "unable to parse option value '{}'", value))?;
+                    .map_err(|_| error!(@create loc, InvalidValue, "unable to parse option value '{}'", value))?;
             },
             "msereferenceimage" => {
                 if value.len() < 3 || !value.starts_with('\"') || !value.ends_with('\"') {
-                    error!(loc, "expected quotes string for option value '{}'", value);
+                    error!(loc, InvalidValue, "expected quotes string for option value '{}'", value);
                 }
                 options.mse_reference_image = Some(value[1..value.len() - 1].to_owned());
             },
             "msereferenceout" => {
                 if value.len() < 3 || !value.starts_with('\"') || !value.ends_with('\"') {
-                    error!(loc, "expected quotes string for option value '{}'", value);
+                    error!(loc, InvalidValue, "expected quotes string for option value '{}'", value);
                 }
                 options.mse_reference_output = Some(value[1..value.len() - 1].to_owned());
             },
             "rendercoordsys" => {
                 if value.len() < 3 || !value.starts_with('\"') || !value.ends_with('\"') {
-                    error!(loc, "expected quotes string for option value '{}'", value);
+                    error!(loc, InvalidValue, "expected quotes string for option value '{}'", value);
                 }
                 let render_coord_sys = value[1..value.len() - 1].to_owned();
                 match render_coord_sys.as_str() {
                     "camera" => options.rendering_space = CameraRenderingSpace::Camera,
                     "cameraworld" => options.rendering_space = CameraRenderingSpace::CameraWorld,
                     "world" => options.rendering_space = CameraRenderingSpace::World,
-                    _ => { error!(loc, "unknown option value '{}'", value); },
+                    _ => { error!(loc, UnknownValue, "unknown rendercoordsys '{}'", value); },
                 }
             },
             "seed" => {
                 options.seed = value.parse()
-                    .map_err(|_| error!(@create loc, "unable to parse option value '{}'", value))?;
+                    .map_err(|_| error!(@create loc, InvalidValue, "unable to parse option value '{}'", value))?;
             },
             "forcediffuse" => match value {
                 "true" => options.force_diffuse = true,
                 "false" => options.force_diffuse = false,
-                _ => { error!(loc, "unknown option value '{}' (expected true|false)", value); },
+                _ => { error!(loc, InvalidValue, "unknown option value '{}' (expected true|false)", value); },
             },
             "pixelstats" => match value {
                 "true" => options.record_pixel_statistics = true,
                 "false" => options.record_pixel_statistics = false,
-                _ => { error!(loc, "unknown option value '{}' (expected true|false)", value); },
+                _ => { error!(loc, InvalidValue, "unknown option value '{}' (expected true|false)", value); },
             },
             "wavefront" => match value {
                 "true" => options.wavefront = true,
                 "false" => options.wavefront = false,
-                _ => { error!(loc, "unknown option value '{}' (expected true|false)", value); },
+                _ => { error!(loc, InvalidValue, "unknown option value '{}' (expected true|false)", value); },
             },
-            _ => { error!(loc, "unknown option '{}'", name); },
+            _ => { error!(loc, UnknownValue, "unknown option '{}'", name); },
         }
 
         Ok(())
@@ -1506,7 +1512,7 @@ impl ParserTarget for BasicSceneBuilder {
             if let Some(m_inv) = m.try_inverse() {
                 *t = Transform::new(m, m_inv).transpose();
             } else {
-                error!(loc, "matrix {:?} is not inversible", transform);
+                error!(loc, InvalidValue, "matrix {:?} is not inversible", transform);
             }
             
             Ok(())
@@ -1519,7 +1525,7 @@ impl ParserTarget for BasicSceneBuilder {
             if let Some(m_inv) = m.try_inverse() {
                 *t = t.apply(Transform::new(m, m_inv).transpose())
             } else {
-                error!(loc, "matrix {:?} is not inversible", transform);
+                error!(loc, InvalidValue, "matrix {:?} is not inversible", transform);
             }
 
             Ok(())
@@ -1661,7 +1667,7 @@ impl ParserTarget for BasicSceneBuilder {
             );
         } else {
             // TODO: defer error instead
-            error!(loc, "named medium '{}' redefined", name);
+            error!(loc, RedefinedValue, "named medium '{}' redefined", name);
         }
 
         Ok(())
@@ -1721,14 +1727,14 @@ impl ParserTarget for BasicSceneBuilder {
     fn attribute_end(&mut self, loc: FileLoc) -> ParseResult<()> {
         // TODO: verify world
         if self.push_stack.is_empty() {
-            error!(loc, "unmatched attribute_end statement");
+            error!(loc, InvalidDirective, "unmatched attribute_end statement");
         }
 
         // NOTE: Keep the following consistent with code in ObjectEnd
         self.graphics_state = self.pushed_graphics_states.pop().unwrap();
 
         if self.push_stack.last().unwrap().0 == b'o' {
-            error!(loc, "mismatched nesting: open ObjectBegin from {} at attribute_end", self.push_stack.last().unwrap().1);
+            error!(loc, InvalidDirective, "mismatched nesting: open ObjectBegin from {} at attribute_end", self.push_stack.last().unwrap().1);
         } else {
             assert!(self.push_stack.last().unwrap().0 == b'a');
         }
@@ -1745,7 +1751,7 @@ impl ParserTarget for BasicSceneBuilder {
             "material" => &mut self.graphics_state.material_attributes,
             "medium" => &mut self.graphics_state.medium_attributes,
             "texture" => &mut self.graphics_state.texture_attributes,
-            _ => { error!(loc, "unknown attribute target '{}'", target); },
+            _ => { error!(loc, UnknownValue, "unknown attribute target '{}'", target); },
         };
 
         for p in params.iter_mut() {
@@ -1780,7 +1786,7 @@ impl ParserTarget for BasicSceneBuilder {
         );
 
         if texture_type != "float" && texture_type != "spectrum" {
-            error!(loc, "texture type '{}' unknown.", texture_type);
+            error!(loc, UnknownValue, "texture type '{}' unknown.", texture_type);
         }
 
         let names = if texture_type == "float" {
@@ -1824,11 +1830,11 @@ impl ParserTarget for BasicSceneBuilder {
                         gamma_encoding_cache,
                     )
                 },
-                _ => { error!(loc, "unknown texture type '{}'", texture_type); },
+                _ => { error!(loc, UnknownValue, "unknown texture type '{}'", texture_type); },
             }
         } else {
             // TODO: defer error instead
-            error!(loc, "texture '{}' redefined", name);
+            error!(loc, RedefinedValue, "texture '{}' redefined", name);
         }
     }
 
@@ -1871,7 +1877,7 @@ impl ParserTarget for BasicSceneBuilder {
             self.scene.add_named_material(name, SceneEntity::new(name, loc, dict, string_interner), options);
         } else {
             // TODO: defer error instead
-            error!(loc, "named material '{}' redefined", name);
+            error!(loc, RedefinedValue, "named material '{}' redefined", name);
         }
 
         Ok(())
@@ -1938,12 +1944,12 @@ impl ParserTarget for BasicSceneBuilder {
         self.push_stack.push((b'o', loc.clone()));
 
         if self.active_instance_definition.is_some() {
-            error!(loc, "ObjectBegin called inside of instance definition");
+            error!(loc, InvalidDirective, "ObjectBegin called inside of instance definition");
         }
 
         let inserted = self.instance_names.insert(name.to_owned());
         if !inserted {
-            error!(loc, "ObjectBegin trying to redefine object instance '{}'", name);
+            error!(loc, RedefinedValue, "ObjectBegin trying to redefine object instance '{}'", name);
         }
 
         self.active_instance_definition = Some(ActiveInstanceDefinition::new(name, loc, string_interner));
@@ -1954,22 +1960,22 @@ impl ParserTarget for BasicSceneBuilder {
     fn object_end(&mut self, loc: FileLoc) -> ParseResult<()> {
         // TODO: verify world
         if self.active_instance_definition.is_none() {
-            error!(loc, "ObjectEnd called outside an instance definition");
+            error!(loc, InvalidDirective, "ObjectEnd called outside an instance definition");
         }
 
         if self.active_instance_definition.as_ref().unwrap().parent.is_some() {
-            error!(loc, "ObjectEnd called inside import for instance definition");
+            error!(loc, InvalidDirective, "ObjectEnd called inside import for instance definition");
         }
 
         // NOTE: Keep the following consistent with AttributeEnd
         if self.pushed_graphics_states.last().is_none() {
-            error!(loc, "unmatched ObjectEnd statement");
+            error!(loc, InvalidDirective, "unmatched ObjectEnd statement");
         }
 
         self.graphics_state = self.pushed_graphics_states.pop().unwrap();
 
         if self.push_stack.last().unwrap().0 == b'a' {
-            error!(loc, "mismatched nesting: open AttributeBegin from {} at ObjectEnd", self.push_stack.last().unwrap().1);
+            error!(loc, InvalidDirective, "mismatched nesting: open AttributeBegin from {} at ObjectEnd", self.push_stack.last().unwrap().1);
         } else {
             assert!(self.push_stack.last().unwrap().0 == b'o');
         }
@@ -1993,7 +1999,7 @@ impl ParserTarget for BasicSceneBuilder {
         // TODO: verify world
 
         if self.active_instance_definition.is_some() {
-            error!(loc, "ObjectInstance called inside of instance definition");
+            error!(loc, InvalidDirective, "ObjectInstance called inside of instance definition");
         }
 
         let world_from_render = self.render_from_world.inverse();
@@ -2012,11 +2018,11 @@ impl ParserTarget for BasicSceneBuilder {
 
     fn end_of_files(&mut self) -> ParseResult<()> {
         if self.current_block != BlockState::WorldBlock {
-            error!(@noloc "End of files before WorldBegin");
+            error!(@noloc InvalidDirective, "End of files before WorldBegin");
         }
 
         if !self.pushed_graphics_states.is_empty() {
-            error!(@noloc "Missing end to AttributeBegin");
+            error!(@noloc InvalidDirective, "Missing end to AttributeBegin");
         }
 
         // TODO: when defered errors are implemented, check for them here.

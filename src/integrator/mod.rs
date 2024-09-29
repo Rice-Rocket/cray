@@ -57,7 +57,7 @@ impl Integrator {
             "debug" => Integrator::Debug(DebugIntegrator::create(
                 parameters, camera, sampler, aggregate, lights,
             )?),
-            _ => { error!(@noloc "unknown integrator '{}'", name); },
+            _ => { error!(@noloc UnknownValue, "unknown integrator '{}'", name); },
         })
     }
 }
@@ -467,11 +467,11 @@ impl DebugIntegrator {
             "normal" => DebugMode::Normal,
             "uv" => DebugMode::UV,
             "material" => DebugMode::Material,
-            s => { error!(@noloc "unknown debug mode '{}'", s); },
+            s => { error!(@noloc UnknownValue, "unknown debug mode '{}'", s); },
         };
         
         let Film::Debug(_) = camera.get_film().as_ref() else {
-            error!(@noloc "debug integrator must be used with debug film");
+            error!(@noloc ValueConflict, "debug integrator must be used with debug film");
         };
 
         Ok(DebugIntegrator {

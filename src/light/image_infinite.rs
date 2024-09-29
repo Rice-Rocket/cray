@@ -129,13 +129,13 @@ impl ImageInfiniteLight {
         log!("Creating image infinite light from file '{}'...", truncate_filename(filename));
 
         let Some(channel_desc) = image.get_channel_desc(&["R", "G", "B"]) else {
-            error!(@file filename, "image used for ImageInfiniteLight doesn't have RGB channels");
+            error!(@file filename, InvalidImage, "image used for ImageInfiniteLight doesn't have RGB channels");
         };
 
         assert!(channel_desc.size() == 3);
         assert!(channel_desc.is_identity());
         if image.resolution().x != image.resolution().y {
-            error!(@file filename, "image resolution is non-square; it is unlikely that it is an environment map");
+            error!(@file filename, InvalidImage, "image resolution is non-square; it is unlikely that it is an environment map");
         }
 
         let mut d = image.get_default_sampling_distribution();

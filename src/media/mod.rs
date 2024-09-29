@@ -45,7 +45,7 @@ impl Medium {
             "homogeneous" => Medium::Homogeneous(Box::new(HomogeneousMedium::create(parameters, cached_spectra, loc)?)),
             "uniformgrid" => Medium::Grid(Box::new(GridMedium::create(parameters, render_from_medium, cached_spectra, loc)?)),
             "rgbgrid" => Medium::RgbGrid(Box::new(RgbGridMedium::create(parameters, render_from_medium, cached_spectra, loc)?)),
-            _ => { error!(loc, "unknown medium '{}'", name); },
+            _ => { error!(loc, UnknownValue, "unknown medium '{}'", name); },
         })
     }
 }

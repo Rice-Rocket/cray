@@ -101,18 +101,63 @@ impl ParseError {
 
 #[derive(Error, Debug, PartialEq, PartialOrd)]
 pub enum ParseErrorKind {
+    /// A parameter contains an invalid value.
+    #[error("invalid parameter value")]
+    InvalidValue,
+
+    /// A parameter contains the wrong number of values.
+    #[error("invalid number of values")]
+    InvalidValueCount,
+
+    /// A parameter invalid (bad name or type).
     #[error("invalid parameter")]
     InvalidParameter,
 
-    #[error("invalid file")]
-    InvalidFile,
+    /// A required value for a parameter is missing.
+    #[error("missing parameter value")]
+    MissingValue,
 
+    /// The given value is unknown.
+    #[error("unknown parameter value")]
+    UnknownValue,
+
+    /// Two values/parameters provided that conflict with each other.
+    #[error("conflicting values")]
+    ValueConflict,
+
+    /// Value is undefined (undefined material or medium name).
+    #[error("undefined value")]
+    UndefinedValue,
+
+    /// Value is redefined (redefined material or medium name).
+    #[error("redefined value")]
+    RedefinedValue,
+
+    /// A required parameter is missing.
+    #[error("missing required parameter")]
+    MissingParameter,
+
+    /// A filename is invalid (e.g. missing an extension).
+    #[error("invalid filename")]
+    InvalidFilename,
+
+    /// The contents of a file are invalid (e.g. bad plymesh or spectrum).
+    #[error("invalid file contents")]
+    InvalidFileContents,
+
+    /// An image file is invalid.
     #[error("invalid image")]
     InvalidImage,
 
+    /// A file cannot be found.
     #[error("file not found")]
-    NotFound,
+    FileNotFound,
 
+    /// A directive call is invalid.
+    #[error("invalid directive call")]
+    InvalidDirective,
+
+    /// A syntax error.
     #[error("syntax")]
     Syntax,
 }

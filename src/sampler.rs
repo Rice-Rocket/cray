@@ -37,7 +37,7 @@ impl Sampler {
             // "pmj02bn" => Sampler::PMJ02BN(PMJ02BNSampler::create(parameters, options, loc)),
             "independent" => Sampler::Independent(IndependentSampler::create(parameters, options, loc)?),
             "stratified" => Sampler::Stratified(StratifiedSampler::create(parameters, options, loc)?),
-            _ => { error!(loc, "unknown sampler type '{}'", name); }
+            _ => { error!(loc, UnknownValue, "unknown sampler type '{}'", name); }
         })
     }
 }
@@ -279,7 +279,7 @@ impl ZSobolSampler {
             "permutedigits" => RandomizeStrategy::PermuteDigits,
             "fastowen" => RandomizeStrategy::FastOwen,
             "owen" => RandomizeStrategy::Owen,
-            s => { error!(loc, "unknown randomization strategy given to ZSobolSampler '{}'", s); },
+            s => { error!(loc, UnknownValue, "unknown randomization strategy given to ZSobolSampler '{}'", s); },
         };
 
         Ok(ZSobolSampler::new(n_samples, full_res, randomize, seed))

@@ -39,7 +39,7 @@ impl PointLight {
             Some(color_space.illuminant.clone()),
             SpectrumType::Illuminant,
             cached_spectra,
-        )?.ok_or(error!(@create loc, "point light requires 'i' parameter"))?;
+        )?.ok_or(error!(@create loc, MissingParameter, "point light requires 'i' parameter"))?;
 
         let mut sc = parameters.get_one_float("scale", 1.0)?;
         sc /= spectrum_to_photometric(&i);
