@@ -94,6 +94,9 @@ pub enum ParseErrorKind {
 
     #[error("file not found")]
     NotFound,
+
+    #[error("syntax")]
+    Syntax,
 }
 
 pub struct SyntaxError {
@@ -105,6 +108,15 @@ pub struct SyntaxError {
 impl SyntaxError {
     pub fn new(kind: SyntaxErrorKind, loc: FileLoc, msg: Option<String>) -> SyntaxError {
         SyntaxError { kind, loc, msg }
+    }
+
+    #[inline]
+    pub fn with_loc(self, loc: FileLoc) -> SyntaxError {
+        SyntaxError {
+            kind: self.kind,
+            loc,
+            msg: self.msg,
+        }
     }
 
     pub fn format(&self, s: &str) -> String {

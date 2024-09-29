@@ -3,7 +3,7 @@ use std::{collections::HashMap, env, fs::{self, File}, io::{BufReader, Read}, pa
 use flate2::bufread::GzDecoder;
 use string_interner::{DefaultBackend, StringInterner};
 
-use crate::{clear_log, color::{rgb_xyz::ColorEncodingCache, spectrum::Spectrum}, file::set_search_directory, log, mipmap::MIPMap, new_syntax_err, options::Options, texture::TexInfo, Float};
+use crate::{clear_log, color::{rgb_xyz::ColorEncodingCache, spectrum::Spectrum}, error, file::set_search_directory, log, mipmap::MIPMap, new_syntax_err, options::Options, texture::TexInfo, Float};
 
 use super::{error::{ParseResult, SyntaxError, SyntaxErrorKind}, param::{Param, ParamList}, target::{FileLoc, ParserTarget}, token::{Directive, Token}, tokenizer::Tokenizer};
 
@@ -57,7 +57,7 @@ pub fn parse_str<T: ParserTarget>(
                     continue;
                 } else {
                     println!("{}", err.format(parser.tokenizer.str));
-                    break;
+                    error!(@noloc "");
                 }
             }
         };

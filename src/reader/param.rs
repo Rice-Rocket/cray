@@ -88,7 +88,7 @@ impl<'a> Param<'a> {
         let mut split = type_and_name.split_whitespace();
 
         let ty_name = split.next().ok_or(new_syntax_err!(InvalidParamName, loc.clone(), "{type_and_name}"))?;
-        let ty = ParamType::from_str(ty_name)?;
+        let ty = ParamType::from_str(ty_name).map_err(|e| e.with_loc(loc.clone()))?;
 
         let name = split.next().ok_or(new_syntax_err!(InvalidParamName, loc.clone(), "{type_and_name}"))?;
 

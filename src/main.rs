@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf, sync::{Arc, Mutex}, time::Instant
 use clap::Parser;
 use console::style;
 use cray::{
-    color::rgb_xyz::ColorEncodingCache, math::{Bounds2f, Bounds2i, Float, Point2f, Point2i}, options::{CameraRenderingSpace, Options}, reader::{parser::parse_files, scene::{BasicScene, BasicSceneBuilder}}, render::render_cpu
+    color::rgb_xyz::ColorEncodingCache, math::{Bounds2f, Bounds2i, Float, Point2f, Point2i}, options::{CameraRenderingSpace, Options}, reader::{error::ParseErrorKind, parser::parse_files, scene::{BasicScene, BasicSceneBuilder}}, render::render_cpu
 };
 use string_interner::StringInterner;
 
@@ -186,6 +186,9 @@ fn main() {
     match parse_result {
         Ok(_) => (),
         Err(err) => {
+            if let ParseErrorKind::Syntax = err.kind {
+                return;
+            }
             if let Some(msg) = err.msg {
                 println!("error: {}", msg);
             }
