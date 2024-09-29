@@ -26,12 +26,7 @@ impl<'a> ParamList<'a> {
 pub struct FileLoc {
     pub(crate) filename: String,
     pub(crate) offset: usize,
-    pub(crate) line: i32,
-    pub(crate) n_lines: i32,
-    /// The starting column of the span
-    pub(crate) start: i32,
-    /// The length of the span
-    pub(crate) len: i32,
+    pub(crate) len: usize,
 }
 
 impl Default for FileLoc {
@@ -39,22 +34,16 @@ impl Default for FileLoc {
         Self {
             filename: String::default(),
             offset: 0,
-            line: 0,
-            n_lines: 1,
-            start: 0,
             len: 1,
         }
     }
 }
 
 impl FileLoc {
-    pub fn new<S: ToString>(filename: S, offset: usize, line: i32, n_lines: i32, start: i32, len: i32) -> FileLoc {
+    pub fn new<S: ToString>(filename: S, offset: usize, len: usize) -> FileLoc {
         FileLoc {
             filename: filename.to_string(),
             offset,
-            line,
-            n_lines,
-            start,
             len,
         }
     }
@@ -63,17 +52,14 @@ impl FileLoc {
         FileLoc {
             filename: filename.to_string(),
             offset: 0,
-            line: 0,
-            n_lines: 0,
-            start: 0,
-            len: 0,
+            len: 1,
         }
     }
 }
 
 impl Display for FileLoc {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {} {}", self.filename, self.line, self.start)
+        write!(f, "{} {} {}", self.filename, self.offset, self.len)
     }
 }
 

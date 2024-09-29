@@ -62,7 +62,7 @@ impl FromStr for ParamType {
             "blackbody" => ParamType::Blackbody,
             "string" => ParamType::String,
             "texture" => ParamType::Texture,
-            s => return Err(new_syntax_err!(InvalidParamType, FileLoc::default(), "{s}")),
+            s => return Err(new_syntax_err!(InvalidParamType, FileLoc::default(), "unknown parameter type '{s}'")),
         };
 
         Ok(ty)

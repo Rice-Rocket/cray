@@ -30,17 +30,26 @@ impl ParseError {
         }
     }
 
+    pub fn file(&self) -> &str {
+        &self.loc.filename
+    }
+
     pub fn format(&self, s: &str) -> String {
         use termion::{color, style};
 
-        let line_digits = self.loc.line.checked_ilog10().unwrap_or(0) + 1;
+        let substr = &s[..self.loc.offset];
+        let len = substr.chars().count();
+        let line = substr.chars().filter(|&c| c == '\n' || c == '\r').count();
+        let col = (len - substr.chars().enumerate().filter(|(_, c)| *c == '\n' || *c == '\r')
+            .last().map(|v| v.0).unwrap_or(len)) - 1;
+
+        let line_digits = line.checked_ilog10().unwrap_or(0) + 1;
         let indent = " ".repeat(line_digits as usize);
 
         let mut res = format!(
             // error: [reason]
             //     --> [filename]:[line]:[col]
-            //      |
-            "{}{}error: {}{}\n{indent}{}-->{}{} {}:{}:{}\n{indent} {}{}|\n",
+            "{}{}error: {}{}\n{indent}{}-->{}{} {}:{}:{}\n",
             color::Fg(color::Red),
             style::Bold,
             color::Fg(color::Reset),
@@ -49,26 +58,24 @@ impl ParseError {
             color::Fg(color::Reset),
             style::Reset,
             self.loc.filename,
-            self.loc.line,
-            self.loc.start,
-            color::Fg(color::Blue),
-            style::Bold,
+            line,
+            col,
         );
 
-        let line_contents = s.lines().nth(self.loc.line as usize).unwrap_or("");
+        let line_contents = s.lines().nth(line).unwrap_or("");
 
         res += &format!(
-            "{}{}{} |{}{} {}\n",
+            "{indent} {}{}|\n{} |{}{} {}\n",
             color::Fg(color::Blue),
             style::Bold,
-            self.loc.line,
+            line,
             color::Fg(color::Reset),
             style::Reset,
             line_contents,
         );
 
-        let indent_offset = " ".repeat(self.loc.start as usize);
-        let arrows = "^".repeat(self.loc.len as usize);
+        let indent_offset = " ".repeat(col);
+        let arrows = "^".repeat(self.loc.len);
 
         res += &format!(
             "{indent} {}{}|{} {indent_offset}{arrows}\n",
@@ -76,6 +83,17 @@ impl ParseError {
             style::Bold,
             color::Fg(color::Yellow),
         );
+
+        if let Some(msg) = &self.msg {
+            res += &format!(
+                "{indent} {}{}={} note{}: {}",
+                color::Fg(color::Blue),
+                style::Bold,
+                color::Fg(color::Reset),
+                style::Reset,
+                msg,
+            );
+        }
 
         res
     }
@@ -122,14 +140,19 @@ impl SyntaxError {
     pub fn format(&self, s: &str) -> String {
         use termion::{color, style};
 
-        let line_digits = self.loc.line.checked_ilog10().unwrap_or(0) + 1;
+        let substr = &s[..self.loc.offset];
+        let len = substr.chars().count();
+        let line = substr.chars().filter(|&c| c == '\n' || c == '\r').count();
+        let col = (len - substr.chars().enumerate().filter(|(_, c)| *c == '\n' || *c == '\r')
+            .last().map(|v| v.0).unwrap_or(len)) - 1;
+
+        let line_digits = line.checked_ilog10().unwrap_or(0) + 1;
         let indent = " ".repeat(line_digits as usize);
 
         let mut res = format!(
             // error: [reason]
             //     --> [filename]:[line]:[col]
-            //      |
-            "{}{}error: {}{}\n{indent}{}-->{}{} {}:{}:{}\n{indent} {}{}|\n",
+            "{}{}error: {}{}\n{indent}{}-->{}{} {}:{}:{}\n",
             color::Fg(color::Red),
             style::Bold,
             color::Fg(color::Reset),
@@ -138,26 +161,24 @@ impl SyntaxError {
             color::Fg(color::Reset),
             style::Reset,
             self.loc.filename,
-            self.loc.line,
-            self.loc.start,
-            color::Fg(color::Blue),
-            style::Bold,
+            line,
+            col,
         );
 
-        let line_contents = s.lines().nth(self.loc.line as usize).unwrap_or("");
+        let line_contents = s.lines().nth(line).unwrap_or("");
 
         res += &format!(
-            "{}{}{} |{}{} {}\n",
+            "{indent} {}{}|\n{} |{}{} {}\n",
             color::Fg(color::Blue),
             style::Bold,
-            self.loc.line,
+            line,
             color::Fg(color::Reset),
             style::Reset,
             line_contents,
         );
 
-        let indent_offset = " ".repeat(self.loc.start as usize);
-        let arrows = "^".repeat(self.loc.len as usize);
+        let indent_offset = " ".repeat(col);
+        let arrows = "^".repeat(self.loc.len);
 
         res += &format!(
             "{indent} {}{}|{} {indent_offset}{arrows}\n",
@@ -165,6 +186,17 @@ impl SyntaxError {
             style::Bold,
             color::Fg(color::Yellow),
         );
+
+        if let Some(msg) = &self.msg {
+            res += &format!(
+                "{indent} {}{}={} note{}: {}",
+                color::Fg(color::Blue),
+                style::Bold,
+                color::Fg(color::Reset),
+                style::Reset,
+                msg,
+            );
+        }
 
         res
     }

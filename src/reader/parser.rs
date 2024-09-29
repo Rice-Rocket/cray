@@ -3,7 +3,7 @@ use std::{collections::HashMap, env, fs::{self, File}, io::{BufReader, Read}, pa
 use flate2::bufread::GzDecoder;
 use string_interner::{DefaultBackend, StringInterner};
 
-use crate::{clear_log, color::{rgb_xyz::ColorEncodingCache, spectrum::Spectrum}, error, file::set_search_directory, log, mipmap::MIPMap, new_syntax_err, options::Options, texture::TexInfo, Float};
+use crate::{clear_log, color::{rgb_xyz::ColorEncodingCache, spectrum::Spectrum}, error, file::set_search_directory, log, mipmap::MIPMap, new_syntax_err, options::Options, reader::error::{ParseError, ParseErrorKind}, texture::TexInfo, Float};
 
 use super::{error::{ParseResult, SyntaxError, SyntaxErrorKind}, param::{Param, ParamList}, target::{FileLoc, ParserTarget}, token::{Directive, Token}, tokenizer::Tokenizer};
 
@@ -15,6 +15,7 @@ pub fn parse_files<T: ParserTarget>(
     cached_spectra: &mut HashMap<String, Arc<Spectrum>>,
     texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
     gamma_encoding_cache: &mut ColorEncodingCache,
+    includes: &mut HashMap<String, String>,
 ) -> ParseResult<()> {
     if files.is_empty() {
         todo!("read from stdin when no files are provided")
@@ -26,7 +27,8 @@ pub fn parse_files<T: ParserTarget>(
         }
 
         let data = fs::read_to_string(file).unwrap();
-        parse_str(&data, target, options, string_interner, cached_spectra, texture_cache, gamma_encoding_cache, file.to_string())?;
+        includes.insert(file.to_string(), data.clone());
+        parse_str(&data, target, options, string_interner, cached_spectra, texture_cache, gamma_encoding_cache, file.to_string(), includes)?;
     }
 
     Ok(())
@@ -41,11 +43,10 @@ pub fn parse_str<T: ParserTarget>(
     texture_cache: &Arc<Mutex<HashMap<TexInfo, Arc<MIPMap>>>>,
     gamma_encoding_cache: &mut ColorEncodingCache,
     filename: String,
+    includes: &mut HashMap<String, String>,
 ) -> ParseResult<()> {
     let mut parsers = Vec::new();
     parsers.push(Parser::new(data, filename));
-
-    let mut includes = Vec::new();
 
     while let Some(parser) = parsers.last_mut() {
         let element = match parser.parse_next() {
@@ -56,8 +57,8 @@ pub fn parse_str<T: ParserTarget>(
                     parsers.pop();
                     continue;
                 } else {
-                    println!("{}", err.format(parser.tokenizer.str));
-                    error!(@noloc "");
+                    println!("\n{}", err.format(parser.tokenizer.str));
+                    return Err(ParseError::new(ParseErrorKind::Syntax, FileLoc::default(), None));
                 }
             }
         };
@@ -92,7 +93,7 @@ pub fn parse_str<T: ParserTarget>(
                     let raw_ptr = raw.as_ptr();
                     let raw_len = raw.len();
 
-                    includes.push(s);
+                    includes.insert(path_name.to_string(), s);
 
                     clear_log!();
 
@@ -107,8 +108,8 @@ pub fn parse_str<T: ParserTarget>(
                     let raw = s.as_bytes();
                     let raw_ptr = raw.as_ptr();
                     let raw_len = raw.len();
-                    
-                    includes.push(s);
+
+                    includes.insert(path_name.to_string(), s);
 
                     Parser::new(unsafe {
                         let byte_slice = slice::from_raw_parts(raw_ptr, raw_len);
@@ -501,7 +502,9 @@ impl<'a> Parser<'a> {
     }
 
     fn read_param(&mut self) -> Result<Param<'a>, SyntaxError> {
-        let type_and_name = self.read_str()?;
+        let type_and_name_token = self.read_token()?;
+        let type_and_name = type_and_name_token.unquote().ok_or(new_syntax_err!(InvalidString, type_and_name_token.loc()))?;
+        let type_and_name_loc = type_and_name_token.loc();
 
         let mut start = self.tokenizer.offset();
         let end;
@@ -528,7 +531,7 @@ impl<'a> Parser<'a> {
         }
 
         let token = self.tokenizer.token(start, end);
-        let param = Param::new(type_and_name, token.value(), token.loc())?;
+        let param = Param::new(type_and_name, token.value(), type_and_name_loc)?;
 
         Ok(param)
     }

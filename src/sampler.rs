@@ -218,7 +218,7 @@ impl AbstractSampler for StratifiedSampler {
         let stratum = permutation_element(self.sample_index as u32, self.samples_per_pixel() as u32, hash as u32);
 
         self.dimension += 1;
-        let delta= if self.jitter { self.rng.gen() } else { 0.5 };
+        let delta = if self.jitter { self.rng.gen() } else { 0.5 };
         (stratum as Float + delta) / self.samples_per_pixel() as Float
     }
 

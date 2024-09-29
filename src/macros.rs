@@ -36,13 +36,11 @@ macro_rules! warn {
         );
         print!($($arg)*);
         print!(
-            "\n  {}-->{}{} {}:{}:{}\n",
+            "\n  {}-->{}{} {}\n",
             termion::color::Fg(termion::color::Blue),
             termion::color::Fg(termion::color::Reset),
             termion::style::Reset,
             $loc.filename,
-            $loc.line,
-            $loc.start,
         );
         std::io::Write::flush(&mut std::io::stdout());
     };

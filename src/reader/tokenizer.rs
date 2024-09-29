@@ -12,18 +12,9 @@ impl<'a> Tokenizer<'a> {
     }
 
     pub fn loc(&self) -> FileLoc {
-        let substr = &self.str[..self.offset];
-        let len = substr.chars().count();
-        let line = substr.chars().filter(|&c| c == '\n' || c == '\r').count();
-        let col = len - substr.chars().enumerate().filter(|(_, c)| *c == '\n' || *c == '\r')
-            .last().map(|v| v.0).unwrap_or(len);
-
         FileLoc::new(
             self.filename.clone(),
             self.offset,
-            line as i32,
-            1,
-            col as i32,
             1,
         )
     }
@@ -76,20 +67,12 @@ impl<'a> Tokenizer<'a> {
     }
 
     pub fn token(&self, start: usize, end: usize) -> Token<'a> {
-        let len = self.str[..start].chars().count();
-        let line = self.str[..start].chars().filter(|&c| c == '\n' || c == '\r').count();
-        let col = len - self.str[..start].chars().enumerate().filter(|(_, c)| *c == '\n' || *c == '\r')
-            .last().map(|v| v.0).unwrap_or(len);
-
         Token::new(
             &self.str[start..end],
             FileLoc::new(
                 self.filename.clone(),
                 start,
-                line as i32,
-                1,
-                col as i32 - 1,
-                (end - start) as i32,
+                end - start,
             ),
         )
     }

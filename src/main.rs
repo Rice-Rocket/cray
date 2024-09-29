@@ -173,6 +173,7 @@ fn main() {
         PathBuf::from(&cli.scene_file).file_name().and_then(|s| s.to_str()).unwrap_or(""),
     );
 
+    let mut includes = HashMap::new();
     let parse_result = parse_files(
         &[&cli.scene_file],
         &mut scene_builder,
@@ -181,6 +182,7 @@ fn main() {
         &mut cached_spectra,
         &texture_cache,
         &mut gamma_encoding_cache,
+        &mut includes,
     );
 
     match parse_result {
@@ -189,8 +191,8 @@ fn main() {
             if let ParseErrorKind::Syntax = err.kind {
                 return;
             }
-            if let Some(msg) = err.msg {
-                println!("error: {}", msg);
+            if let Some(s) = includes.get(err.file()) {
+                println!("\n{}", err.format(s.as_str()));
             }
             return;
         }
@@ -204,8 +206,8 @@ fn main() {
     match render_result {
         Ok(_) => (),
         Err(err) => {
-            if let Some(msg) = err.msg {
-                println!("error: {}", msg);
+            if let Some(s) = includes.get(err.file()) {
+                println!("\n{}", err.format(s.as_str()));
             }
             return;
         }

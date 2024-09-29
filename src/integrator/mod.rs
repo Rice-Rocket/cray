@@ -417,10 +417,10 @@ impl ImageTileIntegrator {
 
             if l.has_nan() {
                 l = SampledSpectrum::from_const(0.0);
-                error!(@panic "ray integrator produced NaN value");
+                // error!(@panic "ray integrator produced NaN value");
             } else if l.y(&lambda).is_infinite() {
                 l = SampledSpectrum::from_const(0.0);
-                error!(@panic "ray integrator produced infinite value");
+                // error!(@panic "ray integrator produced infinite value");
             }
 
             l
