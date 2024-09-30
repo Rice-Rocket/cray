@@ -114,7 +114,7 @@ fn rotr(x: u32, r: u32) -> u32 {
 
 /// Hash a single 32-bit value
 #[inline]
-pub fn fmix(mut h: u32) -> u32 {
+pub fn mix_bits_32(mut h: u32) -> u32 {
     h ^= h.wrapping_shr(16);
     h = h.wrapping_mul(0x85ebca6b);
     h ^= h.wrapping_shr(13);
@@ -159,7 +159,7 @@ pub fn ihash31(mut x: u32, mut y: u32, mut z: u32) -> u32 {
     let b = LEN * 5 + bswap32(z);
     let c = 9 + bswap32(y);
 
-    fmix(mur(c, mur(b, mur(a, b))))
+    mix_bits_32(mur(c, mur(b, mur(a, b))))
 }
 
 #[inline]
@@ -170,7 +170,7 @@ pub fn ihash41(mut x: u32, mut y: u32, mut z: u32, mut w: u32) -> u32 {
     let c = bswap32(z);
     let e = bswap32(x);
 
-    fmix(mur(a, mur(e, mur(c, mur(c, mur(b, mur(a, LEN)))))))
+    mix_bits_32(mur(a, mur(e, mur(c, mur(c, mur(b, mur(a, LEN)))))))
 }
 
 #[inline]

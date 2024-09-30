@@ -18,6 +18,7 @@ pub mod vec2d;
 pub mod scattering;
 pub mod lowdiscrepancy;
 pub mod sobol;
+pub mod primes;
 pub mod compensated_float;
 #[macro_use]
 pub mod hashing;
@@ -373,15 +374,13 @@ where
 
 pub fn modulo<T>(a: T, b: T) -> T
 where
-    T: Div<T, Output = T> + Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T> + Copy + std::cmp::PartialOrd<i32>,
+    T: Div<T, Output = T> + Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T> + Copy + std::cmp::PartialOrd<T>
+    + num::traits::identities::ConstZero
 {
     let result = a - (a / b) * b;
-    if result < 0
-    {
+    if result < T::ZERO {
         result + b
-    }
-    else
-    {
+    } else {
         result
     }
 }

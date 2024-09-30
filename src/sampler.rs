@@ -2,7 +2,7 @@ use hexf::hexf32;
 use num::integer::Roots;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 
-use crate::{error, hash, hashing::{combine_bits_64, encode_morton_2, fmix, ihash21, ihash41, mix_bits, mur, permutation_element, split_u64}, lowdiscrepancy::{sobol_sample, BinaryPermuteScrambler, FastOwenScrambler, NoScrambler, OwenScrambler}, options::Options, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, round_up_pow_2, transmute, warn, Float, Point2f, Point2i, Vec2u, ONE_MINUS_EPSILON};
+use crate::{error, hash, hashing::{combine_bits_64, encode_morton_2, ihash21, ihash41, mix_bits, mix_bits_32, mur, permutation_element, split_u64}, lowdiscrepancy::{compute_radical_inverse_permutations, inverse_radical_inverse, owen_scrambled_radical_inverse, radical_inverse, scrambled_radical_inverse, sobol_sample, BinaryPermuteScrambler, DigitPermutation, FastOwenScrambler, NoScrambler, OwenScrambler}, modulo, options::Options, primes::PRIME_TABLE_SIZE, reader::{error::ParseResult, paramdict::ParameterDictionary, target::FileLoc}, round_up_pow_2, transmute, warn, Float, Point2f, Point2i, Vec2u, ONE_MINUS_EPSILON};
 
 pub trait AbstractSampler {
     fn samples_per_pixel(&self) -> i32;
@@ -18,6 +18,7 @@ pub trait AbstractSampler {
 pub enum Sampler {
     Independent(IndependentSampler),
     Stratified(StratifiedSampler),
+    Halton(HaltonSampler),
     ZSobol(ZSobolSampler),
 }
 
@@ -32,7 +33,7 @@ impl Sampler {
         Ok(match name {
             "zsobol" => Sampler::ZSobol(ZSobolSampler::create(parameters, full_res, options, loc)?),
             // "paddedsobol" => Sampler::PaddedSobol(PaddedSobolSampler::create(parameters, options, loc)),
-            // "halton" => Sampler::Halton(HaltonSampler::create(parameters, options, loc)),
+            "halton" => Sampler::Halton(HaltonSampler::create(parameters, full_res, options, loc)?),
             // "sobol" => Sampler::Sobol(SobolSampler::create(parameters, options, loc)),
             // "pmj02bn" => Sampler::PMJ02BN(PMJ02BNSampler::create(parameters, options, loc)),
             "independent" => Sampler::Independent(IndependentSampler::create(parameters, options, loc)?),
@@ -47,6 +48,7 @@ impl AbstractSampler for Sampler {
         match self {
             Sampler::Independent(s) => s.samples_per_pixel(),
             Sampler::Stratified(s) => s.samples_per_pixel(),
+            Sampler::Halton(s) => s.samples_per_pixel(),
             Sampler::ZSobol(s) => s.samples_per_pixel(),
         }
     }
@@ -55,6 +57,7 @@ impl AbstractSampler for Sampler {
        match self {
            Sampler::Independent(s) => s.start_pixel_sample(p, sample_index, dimension),
            Sampler::Stratified(s) => s.start_pixel_sample(p, sample_index, dimension),
+           Sampler::Halton(s) => s.start_pixel_sample(p, sample_index, dimension),
            Sampler::ZSobol(s) => s.start_pixel_sample(p, sample_index, dimension),
        }
     }
@@ -63,6 +66,7 @@ impl AbstractSampler for Sampler {
         match self {
             Sampler::Independent(s) => s.get_1d(),
             Sampler::Stratified(s) => s.get_1d(),
+            Sampler::Halton(s) => s.get_1d(),
             Sampler::ZSobol(s) => s.get_1d(),
         }
     }
@@ -71,6 +75,7 @@ impl AbstractSampler for Sampler {
         match self {
             Sampler::Independent(s) => s.get_2d(),
             Sampler::Stratified(s) => s.get_2d(),
+            Sampler::Halton(s) => s.get_2d(),
             Sampler::ZSobol(s) => s.get_2d(),
         }
     }
@@ -79,6 +84,7 @@ impl AbstractSampler for Sampler {
         match self {
             Sampler::Independent(s) => s.get_pixel_2d(),
             Sampler::Stratified(s) => s.get_pixel_2d(),
+            Sampler::Halton(s) => s.get_pixel_2d(),
             Sampler::ZSobol(s) => s.get_pixel_2d(),
         }
     }
@@ -243,6 +249,184 @@ impl AbstractSampler for StratifiedSampler {
 
     fn get_pixel_2d(&mut self) -> Point2f {
         self.get_2d()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct HaltonSampler {
+    samples_per_pixel: i32,
+    randomize: RandomizeStrategy,
+    digit_permutations: Vec<DigitPermutation>,
+    base_scales: Point2i,
+    base_exponents: Point2i,
+    mul_inverse: [i32; 2],
+    halton_index: u64,
+    dimension: u32,
+}
+
+impl HaltonSampler {
+    pub const MAX_HALTON_RESOLUTION: i32 = 128;
+
+    pub fn create(
+        parameters: &mut ParameterDictionary,
+        full_res: Point2i,
+        options: &Options,
+        loc: &FileLoc,
+    ) -> ParseResult<HaltonSampler> {
+        let mut n_samples = parameters.get_one_int("pixelsamples", 16)?;
+        if let Some(s) = options.pixel_samples {
+            n_samples = s;
+        }
+
+        let seed = parameters.get_one_int("seed", options.seed)?;
+        if options.quick_render {
+            n_samples = 1;
+        }
+
+        let random = parameters.get_one_string("randomization", "permutedigits")?;
+        let randomizer = match random.as_ref() {
+            "none" => RandomizeStrategy::None,
+            "permutedigits" => RandomizeStrategy::PermuteDigits,
+            "fastowen" => { error!(loc, InvalidValue, "'fastowen' randomization not supported by HaltonSampler."); },
+            "owen" => RandomizeStrategy::Owen,
+            _ => { error!(loc, UnknownValue, "unknown randomization '{}'", random); }
+        };
+
+        Ok(HaltonSampler::new(
+            n_samples,
+            full_res,
+            randomizer,
+            seed,
+        ))
+    }
+
+    pub fn new(
+        samples_per_pixel: i32,
+        full_res: Point2i,
+        randomize: RandomizeStrategy,
+        seed: i32,
+    ) -> HaltonSampler {
+        let digit_permutations = if let RandomizeStrategy::PermuteDigits = randomize {
+            compute_radical_inverse_permutations(seed)
+        } else {
+            Vec::new()
+        };
+
+        let mut base_scales = Point2i::ZERO;
+        let mut base_exponents = Point2i::ZERO;
+
+        for i in 0..2 {
+            let base = if i == 0 { 2 } else { 3 };
+            let mut scale = 1;
+            let mut exp = 0;
+
+            while scale < full_res[i].min(Self::MAX_HALTON_RESOLUTION) {
+                scale *= base;
+                exp += 1;
+            }
+
+            base_scales[i] = scale;
+            base_exponents[i] = exp;
+        }
+
+        let mul_inverse = [
+            Self::multiplicative_inverse(base_scales[1] as i64, base_scales[0] as i64) as i32,
+            Self::multiplicative_inverse(base_scales[0] as i64, base_scales[1] as i64) as i32,
+        ];
+
+        HaltonSampler {
+            samples_per_pixel,
+            randomize,
+            digit_permutations,
+            base_scales,
+            base_exponents,
+            mul_inverse,
+            halton_index: 0,
+            dimension: 0,
+        }
+    }
+
+    fn sample_dimension(&self, dimension: u32) -> Float {
+        match self.randomize {
+            RandomizeStrategy::None => radical_inverse(dimension, self.halton_index),
+            RandomizeStrategy::PermuteDigits => scrambled_radical_inverse(dimension, self.halton_index, &self.digit_permutations[dimension as usize]),
+            RandomizeStrategy::Owen => owen_scrambled_radical_inverse(dimension, self.halton_index, mix_bits(1 + ((dimension as u64) << 4)) as u32),
+            RandomizeStrategy::FastOwen => unreachable!(),
+        }
+    }
+
+    fn multiplicative_inverse(a: i64, n: i64) -> u64 {
+        let (x, y) = Self::extended_gcd(a, n);
+        x.rem_euclid(n) as u64
+    }
+
+    fn extended_gcd(a: i64, b: i64) -> (i64, i64) {
+        if b == 0 {
+            return (1, 0);
+        }
+
+        let d = a / b;
+        let (xp, yp) = Self::extended_gcd(b, a % b);
+        (yp, xp - (d * yp))
+    }
+}
+
+impl AbstractSampler for HaltonSampler {
+    fn samples_per_pixel(&self) -> i32 {
+        self.samples_per_pixel
+    }
+
+    fn start_pixel_sample(&mut self, p: Point2i, sample_index: i32, dimension: u32) {
+        self.halton_index = 0;
+        let sample_stride = self.base_scales[0] * self.base_scales[1];
+
+        if sample_stride > 1 {
+            let pm = Point2i::new(p[0].rem_euclid(Self::MAX_HALTON_RESOLUTION), p[1].rem_euclid(Self::MAX_HALTON_RESOLUTION));
+
+            for i in 0..2 {
+                let dim_offset = if i == 0 {
+                    inverse_radical_inverse(pm[i] as u64, 2, self.base_exponents[i])
+                } else {
+                    inverse_radical_inverse(pm[i] as u64, 3, self.base_exponents[i])
+                };
+
+                self.halton_index += dim_offset * ((sample_stride / self.base_scales[i]) * self.mul_inverse[i]) as u64;
+            }
+
+            self.halton_index %= sample_stride as u64;
+        }
+
+        self.halton_index += (sample_index * sample_stride) as u64;
+        self.dimension = u32::max(2, dimension);
+    }
+
+    fn get_1d(&mut self) -> Float {
+        if self.dimension >= PRIME_TABLE_SIZE {
+            self.dimension = 2;
+        }
+
+        let dim = self.dimension;
+        self.dimension += 1;
+
+        self.sample_dimension(dim)
+    }
+
+    fn get_2d(&mut self) -> Point2f {
+        if self.dimension + 1 >= PRIME_TABLE_SIZE {
+            self.dimension = 2;
+        }
+
+        let dim = self.dimension;
+        self.dimension += 2;
+
+        Point2f::new(self.sample_dimension(dim), self.sample_dimension(dim + 1))
+    }
+
+    fn get_pixel_2d(&mut self) -> Point2f {
+        Point2f::new(
+            radical_inverse(0, self.halton_index >> self.base_exponents[0]),
+            radical_inverse(1, self.halton_index / self.base_scales[1] as u64),
+        )
     }
 }
 
