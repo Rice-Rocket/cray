@@ -350,7 +350,7 @@ impl HaltonSampler {
         match self.randomize {
             RandomizeStrategy::None => radical_inverse(dimension, self.halton_index),
             RandomizeStrategy::PermuteDigits => scrambled_radical_inverse(dimension, self.halton_index, &self.digit_permutations[dimension as usize]),
-            RandomizeStrategy::Owen => owen_scrambled_radical_inverse(dimension, self.halton_index, mix_bits(1 + ((dimension as u64) << 4)) as u32),
+            RandomizeStrategy::Owen => owen_scrambled_radical_inverse(dimension, self.halton_index, mix_bits(1 + ((dimension as u64) << 4))),
             RandomizeStrategy::FastOwen => unreachable!(),
         }
     }

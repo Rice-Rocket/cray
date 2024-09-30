@@ -112,10 +112,10 @@ impl DigitPermutation {
     }
 
     #[inline]
-    pub fn permute(&self, digit_index: u32, digit_value: u32) -> i32 {
+    pub fn permute(&self, digit_index: u32, digit_value: u32) -> u16 {
         debug_assert!(digit_index < self.n_digits);
         debug_assert!(digit_value < self.base);
-        self.permutations[(digit_index * self.base + digit_value) as usize] as i32
+        self.permutations[(digit_index * self.base + digit_value) as usize]
     }
 }
 
@@ -201,7 +201,7 @@ pub fn scrambled_radical_inverse(base_index: u32, mut a: u64, perm: &DigitPermut
     Float::min(inv_base_m * reversed_digits as Float, ONE_MINUS_EPSILON)
 }
 
-pub fn owen_scrambled_radical_inverse(base_index: u32, mut a: u64, hash: u32) -> Float {
+pub fn owen_scrambled_radical_inverse(base_index: u32, mut a: u64, hash: u64) -> Float {
     let base = PRIMES[base_index as usize] as u64;
     let limit = (!0u64) / base - base;
     let inv_base = 1.0 / base as Float;
@@ -211,10 +211,10 @@ pub fn owen_scrambled_radical_inverse(base_index: u32, mut a: u64, hash: u32) ->
 
     while 1.0 - inv_base_m < 1.0 && reversed_digits < limit {
         let next = a / base;
-        let mut digit_value = (a - next * base) as i32;
-        let digit_hash = mix_bits((hash as u64) ^ reversed_digits) as u32;
-        digit_value = permutation_element(digit_value as u32, base as u32, digit_hash);
-        reversed_digits = reversed_digits * base + digit_value as u64;
+        let mut digit_value = a - next * base;
+        let digit_hash = mix_bits(hash ^ reversed_digits) as u32;
+        digit_value = permutation_element(digit_value as u32, base as u32, digit_hash) as u64;;
+        reversed_digits = reversed_digits * base + digit_value;
         inv_base_m *= inv_base;
         digit_index += 1;
         a = next;
