@@ -1093,6 +1093,12 @@ pub fn sample_spherical_rectangle(
     p_ref + r.from_local(Vec3f::new(xu, yv, z0))
 }
 
-pub fn sample_exponential(x: Float, a: Float) -> Float {
+pub fn sample_exponential(u: Float, a: Float) -> Float {
+    debug_assert!(a > 0.0);
+    -Float::ln(1.0 - u) / a
+}
+
+pub fn exponential_pdf(x: Float, a: Float) -> Float {
+    debug_assert!(a > 0.0);
     a * Float::exp(-a * x)
 }

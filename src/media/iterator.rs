@@ -158,14 +158,16 @@ impl MajorantGrid {
         }
     }
 
+    #[inline]
     pub fn lookup(&self, x: i32, y: i32, z: i32) -> Float {
         debug_assert!(x >= 0 && x < self.res.x && y >= 0 && y < self.res.y && z >= 0 && z < self.res.z);
-        self.voxels[(x + self.res.x * (y + self.res.y * z)) as usize]
+        unsafe { *self.voxels.get_unchecked((x + self.res.x * (y + self.res.y * z)) as usize) }
     }
 
+    #[inline]
     pub fn set(&mut self, x: i32, y: i32, z: i32, v: Float) {
         debug_assert!(x >= 0 && x < self.res.x && y >= 0 && y < self.res.y && z >= 0 && z < self.res.z);
-        self.voxels[(x + self.res.x * (y + self.res.y * z)) as usize] = v;
+        unsafe { self.voxels[(x + self.res.x * (y + self.res.y * z)) as usize] = v };
     }
 
     pub fn voxel_bounds(&self, x: i32, y: i32, z: i32) -> Bounds3f {

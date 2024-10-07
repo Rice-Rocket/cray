@@ -101,8 +101,8 @@ impl Ray {
     }
 
     pub fn offset_ray_origin(pi: Point3fi, n: Normal3f, w: Vec3f) -> Point3f {
-        let d = Point3f::from(n).abs().dot(pi.error());
-        let mut offset = Vec3f::from(n) * d;
+        let d = n.abs().dot(pi.error());
+        let mut offset = n * d;
 
         if w.dot(n) < 0.0 {
             offset = -offset;

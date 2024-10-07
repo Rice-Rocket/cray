@@ -120,7 +120,7 @@ impl ImageInfiniteLight {
         filename: &str,
         loc: &FileLoc,
     ) -> ParseResult<ImageInfiniteLight> {
-        let base = LightBase{
+        let base = LightBase {
             ty: LightType::Infinite,
             render_from_light,
             medium: None,

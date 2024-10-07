@@ -28,7 +28,7 @@ impl DielectricMaterial {
             ))))
         } else {
             parameters.get_one_spectrum("eta", None, SpectrumType::Unbounded, cached_spectra)?
-        }.unwrap_or(Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.5))));
+        }.unwrap_or_else(|| Arc::new(Spectrum::Constant(ConstantSpectrum::new(1.5))));
 
         let u_roughness = if let Some(roughness) = parameters.get_float_texture_or_none("uroughness", textures)? {
             roughness

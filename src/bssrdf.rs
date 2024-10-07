@@ -102,7 +102,7 @@ pub fn beam_diffusion_ss(sigma_s: Float, sigma_a: Float, g: Float, eta: Float, r
     const N_SAMPLES: usize = 100;
     for i in 0..N_SAMPLES {
         let ti = t_crit + sample_exponential((i as Float + 0.5) / N_SAMPLES as Float, sigma_t);
-        let d = (sqr(r) + sqr(ti)).sqrt();
+        let d = Float::sqrt(sqr(r) + sqr(ti));
         let cos_theta_o = ti / d;
 
         ess += rho * Float::exp(-sigma_t * (d + t_crit)) / sqr(d)
@@ -118,7 +118,7 @@ pub fn beam_diffusion_ms(sigma_s: Float, sigma_a: Float, g: Float, eta: Float, r
 
     let mut ed = 0.0;
     let sigmap_s = sigma_s * (1.0 - g);
-    let sigmap_t = sigma_a * sigmap_s;
+    let sigmap_t = sigma_a + sigmap_s;
     let rhop = sigmap_s / sigmap_t;
 
     let d_g = (2.0 * sigma_a + sigmap_s) / (3.0 * sigmap_t * sigmap_t);
@@ -134,13 +134,13 @@ pub fn beam_diffusion_ms(sigma_s: Float, sigma_a: Float, g: Float, eta: Float, r
     for i in 0..N_SAMPLES {
         let zr = sample_exponential((i as Float + 0.5) / N_SAMPLES as Float, sigmap_t);
         let zv = -zr + 2.0 * ze;
-        let dr = (sqr(r) + sqr(zr)).sqrt();
-        let dv = (sqr(r) + sqr(zv)).sqrt();
+        let dr = Float::sqrt(sqr(r) + sqr(zr));
+        let dv = Float::sqrt(sqr(r) + sqr(zv));
 
         // TODO: fast_exp()
         let phi_d = FRAC_1_4PI / d_g * (Float::exp(-sigma_tr * dr) / dr - Float::exp(-sigma_tr * dv) / dv);
         let edn = FRAC_1_4PI * (zr * (1.0 + sigma_tr * dr) * Float::exp(-sigma_tr * dr) / dr.powi(3))
-            - (zv * (1.0 + sigma_tr * dv) * Float::exp(-sigma_tr * dv) / dv.powi(3));
+            - zv * (1.0 + sigma_tr * dv) * Float::exp(-sigma_tr * dv) / dv.powi(3);
 
         let e = phi_d * cphi + edn * ce;
         let kappa = 1.0 - Float::exp(-2.0 * sigmap_t * (dr + zr));
@@ -172,6 +172,7 @@ impl BSSRDFTable {
             self.radius_samples[i] = self.radius_samples[i - 1] * 1.2;
         }
 
+        // TODO: fast_exp()
         for i in 0..self.rho_samples.len() {
             self.rho_samples[i] = (1.0 - Float::exp(-8.0 * i as Float / (self.rho_samples.len() - 1) as Float))
                 / (1.0 - Float::exp(-8.0));
@@ -184,8 +185,8 @@ impl BSSRDFTable {
                 let rho = self.rho_samples[i];
                 let r = self.radius_samples[j];
                 self.profile[i * n_samples + j] = 2.0 * PI * r
-                    * beam_diffusion_ss(rho, 1.0 - rho, g, eta, r) 
-                    + beam_diffusion_ms(rho, 1.0 - rho, g, eta, r);
+                    * (beam_diffusion_ss(rho, 1.0 - rho, g, eta, r) 
+                    + beam_diffusion_ms(rho, 1.0 - rho, g, eta, r));
             }
 
             self.rho_eff[i] = integrate_catmull_rom(
@@ -266,7 +267,6 @@ impl TabulatedBSSRDF {
             || !catmull_rom_weights(&self.table.radius_samples, r_optical, &mut radius_offset, &mut radius_weights) {
                 continue;
             }
-            // let (mut rho_offset, mut radius_offset) = (0.0, 0.0);
 
             let mut sr0 = 0.0;
 
@@ -352,9 +352,9 @@ impl TabulatedBSSRDF {
         let n_local = f.localize(ni.into());
 
         let r_proj = [
-            (sqr(d_local.y) + sqr(d_local.z)).sqrt(),
-            (sqr(d_local.z) + sqr(d_local.x)).sqrt(),
-            (sqr(d_local.x) + sqr(d_local.y)).sqrt(),
+            Float::sqrt(sqr(d_local.y) + sqr(d_local.z)),
+            Float::sqrt(sqr(d_local.z) + sqr(d_local.x)),
+            Float::sqrt(sqr(d_local.x) + sqr(d_local.y)),
         ];
 
         let mut pdf = SampledSpectrum::from_const(0.0);
@@ -387,7 +387,7 @@ impl AbstractBSSRDF for TabulatedBSSRDF {
             return None;
         }
 
-        let l = 2.0 * (r_max * r_max - r * r).sqrt();
+        let l = 2.0 * Float::sqrt(r_max * r_max - r * r);
         let p_start = self.po + r * (f.x * phi.cos() + f.y * phi.sin()) - l * f.z / 2.0;
         let p_target = p_start + l * f.z;
 

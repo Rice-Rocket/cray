@@ -24,7 +24,7 @@ pub mod compensated_float;
 pub mod hashing;
 
 use compensated_float::CompensatedFloat;
-use fast_polynomial::poly;
+use fast_polynomial::{poly, poly_array};
 use hexf::hexf32;
 pub use mat::{TMat2, TMat3, TMat4};
 pub use vect::{Vec2, Vec3, Vec4, Point2, Point3, Point4, Normal2, Normal3, Dot};
@@ -549,8 +549,8 @@ pub fn sample_catmull_rom_2d(
         0.0,
         1.0,
         |t: Float, fhat0: &mut Float, fhat1: &mut Float| -> (Float, Float) {
-            *fhat0 = poly(t, &[0.0, f0, 0.5 * d0, (1.0 / 3.0) * (-2.0 * d0 - d1) + f1 - f0, 0.25 * (d0 + d1) + 0.5 * (f0 - f1)]);
-            *fhat1 = poly(t, &[f0, d0, -2.0 * d0 - d1 + 3.0 * (f1 - f0), d0 + d1 + 2.0 * (f0 - f1)]);
+            *fhat0 = poly_array(t, &[0.0, f0, 0.5 * d0, (1.0 / 3.0) * (-2.0 * d0 - d1) + f1 - f0, 0.25 * (d0 + d1) + 0.5 * (f0 - f1)]);
+            *fhat1 = poly_array(t, &[f0, d0, -2.0 * d0 - d1 + 3.0 * (f1 - f0), d0 + d1 + 2.0 * (f0 - f1)]);
             (*fhat0 - u, *fhat1)
         },
         1e-6,
