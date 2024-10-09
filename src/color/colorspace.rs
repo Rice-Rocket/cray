@@ -2,9 +2,9 @@ use std::{str::FromStr, sync::Arc};
 
 use once_cell::sync::Lazy;
 
-use crate::{color::rgb_to_spectra, error, mat::mul_mat_vec, reader::error::{ParseError, ParseResult}, Mat3, Point2f};
+use crate::{color::rgb_to_spectra, error, mat::mul_mat_vec, reader::error::{ParseError, ParseResult}, Float, Mat3, Point2f};
 
-use super::{named_spectrum::NamedSpectrum, rgb_xyz::{Rgb, RgbSigmoidPolynomial, Xyz}, rgb_to_spectra::Gamut, spectrum::{DenselySampledSpectrum, Spectrum}};
+use super::{named_spectrum::NamedSpectrum, rgb_to_spectra::Gamut, rgb_xyz::{Rgb, RgbSigmoidPolynomial, Xyz}, spectrum::{spectrum_to_xyz, DenselySampledSpectrum, Spectrum}};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct RgbColorSpace {
@@ -20,7 +20,7 @@ pub struct RgbColorSpace {
 
 impl RgbColorSpace {
     pub fn new(r: Point2f, g: Point2f, b: Point2f, illuminant: &Spectrum, gamut: Gamut) -> RgbColorSpace {
-        let w = Xyz::from_spectrum(illuminant);
+        let w = spectrum_to_xyz(illuminant);
 
         let whitepoint = w.xy();
         let r_xyz = Xyz::from_xyy_default(&r);
@@ -99,6 +99,22 @@ impl RgbColorSpace {
             self.xyz_from_rgb[(0, 2)]
         )
     }
+
+    pub fn lookup(r: Point2f, g: Point2f, b: Point2f, w: Point2f) -> Option<Arc<RgbColorSpace>> {
+        let close_enough = |a: Point2f, b: Point2f| {
+            (a.x == b.x || Float::abs((a.x - b.x) / b.x) < 1e-3)
+            && (a.y == b.y || Float::abs((a.y - b.y) / b.y) < 1e-3)
+        };
+
+        for cs in [&ACES2065_1, &REC_2020, &SRGB].into_iter() {
+            if close_enough(r, cs.r) && close_enough(g, cs.g) 
+            && close_enough(b, cs.b) && close_enough(w, cs.whitepoint) {
+                return Some(Lazy::force(cs).clone());
+            }
+        }
+
+        None
+    }
 }
 
 pub enum NamedColorSpace {
@@ -129,6 +145,8 @@ pub static SRGB: Lazy<Arc<RgbColorSpace>> = Lazy::new(|| {
         Gamut::SRgb,
     ))
 });
+
+// TODO: DCI_P3 (display p3) ColorSpace
 
 pub static REC_2020: Lazy<Arc<RgbColorSpace>> = Lazy::new(|| {
     Arc::new(RgbColorSpace::new(

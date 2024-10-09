@@ -1241,7 +1241,7 @@ impl Image {
     }
 
     fn read_exr(path: &PathBuf, encoding: Option<ColorEncodingPtr>) -> ParseResult<ImageAndMetadata> {
-        use exr::prelude::{ReadChannels, ReadLayers};
+        use exr::prelude::{ReadChannels, ReadLayers, Text, AttributeValue};
 
         let image_name = truncate_filename(path);
 
@@ -1267,10 +1267,13 @@ impl Image {
         let mut channel_names = Vec::new();
         let mut pixel_format = PixelFormat::Float32;
 
+        let data_window = im_exr.layer_data.absolute_bounds();
+        let display_window = attrs.display_window;
+
         if im_exr.layer_data.channel_data.list.is_empty() {
             error!(@file path.display(), InvalidImage, "EXR images with no channels not supported");
         }
-
+        
         for channel in im_exr.layer_data.channel_data.list.iter() {
             let name = &channel.name;
             channel_names.push(name.to_string())
@@ -1309,19 +1312,77 @@ impl Image {
 
         bar.finish_and_clear();
 
-        let color_space = if channel_names.contains(&"R".to_owned()) 
-            && channel_names.contains(&"G".to_owned()) 
-            && channel_names.contains(&"B".to_owned())
-        {
-            Some(RgbColorSpace::get_named(NamedColorSpace::SRgb).clone())
-        } else {
-            None
-        };
+        let mut metadata = ImageMetadata::default();
 
-        let metadata = ImageMetadata {
-            color_space,
-            ..Default::default()
-        };
+        if let Some(render_time_seconds) = attrs.other.get(&Text::new_or_panic("renderTimeSeconds")) {
+            match render_time_seconds {
+                AttributeValue::F32(v) => metadata.render_time_seconds = Some(*v as Float),
+                AttributeValue::F64(v) => metadata.render_time_seconds = Some(*v as Float),
+                _ => ()
+            }
+        }
+
+        if let Some(AttributeValue::Matrix4x4(world_to_camera)) = attrs.other.get(&Text::new_or_panic("worldToCamera")) {
+            let mut m = Mat4::IDENTITY;
+            for i in 0..4 {
+                for j in 0..4 {
+                    m[(i, j)] = world_to_camera[4 * i + j] as Float;
+                }
+            }
+            metadata.camera_from_world = Some(m);
+        }
+
+        if let Some(AttributeValue::Matrix4x4(world_to_ndc)) = attrs.other.get(&Text::new_or_panic("worldToNDC")) {
+            let mut m = Mat4::IDENTITY;
+            for i in 0..4 {
+                for j in 0..4 {
+                    m[(i, j)] = world_to_ndc[4 * i + j] as Float;
+                }
+            }
+            metadata.ndc_from_world = Some(m);
+        }
+
+        metadata.pixel_bounds = Some(Bounds2i::new(
+            Point2i::new(data_window.position.x(), data_window.position.y()),
+            Point2i::new(
+                data_window.max().x(),
+                data_window.max().y(),
+            )
+        ));
+
+        metadata.full_resolution = Some(Point2i::new(
+            display_window.max().x() - display_window.position.x(),
+            display_window.max().y() - display_window.position.y(),
+        ));
+
+        if let Some(AttributeValue::I32(spp)) = attrs.other.get(&Text::new_or_panic("samplesPerPixel")) {
+            metadata.samples_per_pixel = Some(*spp);
+        }
+
+        if let Some(mse_attr) = attrs.other.get(&Text::new_or_panic("MSE")) {
+            match mse_attr {
+                AttributeValue::F32(v) => metadata.mse = Some(*v as Float),
+                AttributeValue::F64(v) => metadata.mse = Some(*v as Float),
+                _ => ()
+            }
+        }
+
+        if let Some(c) = attrs.chromaticities {
+            if let Some(cs) = RgbColorSpace::lookup(
+                Point2f::new(c.red.x() as Float, c.red.y() as Float), 
+                Point2f::new(c.green.x() as Float, c.green.y() as Float),
+                Point2f::new(c.blue.x() as Float, c.blue.y() as Float), 
+                Point2f::new(c.white.x() as Float, c.white.y() as Float),
+            ) {
+                metadata.color_space = Some(cs);
+            } else {
+                warn!(@image image_name, "couldn't find supported color space that matches chromaticities of image, using sRGB.");
+                metadata.color_space = Some(RgbColorSpace::get_named(NamedColorSpace::SRgb).clone());
+            }
+        } else {
+            warn!(@image image_name, "no chromaticities for image, using sRGB color space.");
+            metadata.color_space = Some(RgbColorSpace::get_named(NamedColorSpace::SRgb).clone());
+        }
 
         Ok(ImageAndMetadata { image, metadata })
     }
