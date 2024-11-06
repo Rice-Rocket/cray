@@ -61,7 +61,7 @@ impl<'a> DDAMajorantIterator<'a> {
         t_max: Float,
         grid: &'a MajorantGrid,
         sigma_t: SampledSpectrum,
-    ) -> DDAMajorantIterator {
+    ) -> DDAMajorantIterator<'a> {
         let diag = grid.bounds.diagonal();
         let mut ray_grid = Ray::new(
             grid.bounds.offset(ray.origin),
