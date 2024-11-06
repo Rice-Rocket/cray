@@ -77,6 +77,7 @@ macro_rules! hash {
 macro_rules! transmute {
     ($v:expr => $to:ident) => {
         {
+            #[allow(clippy::macro_metavars_in_unsafe)]
             unsafe {
                 std::mem::transmute_copy::<_, $to>(&$v)
             }

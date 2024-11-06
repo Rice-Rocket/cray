@@ -9,7 +9,7 @@ use super::{error::{ParseError, ParseResult}, param::ParamList, paramdict::Parse
 
 pub type ParsedParameterVector = ArrayVec<ParsedParameter, 16>;
 
-impl<'a> ParamList<'a> {
+impl ParamList<'_> {
     pub fn parse(self) -> ParseResult<ParsedParameterVector> {
         let mut params = ArrayVec::new();
 

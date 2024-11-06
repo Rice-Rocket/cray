@@ -735,7 +735,7 @@ where
     bottom: Option<&'a BottomBxDF>,
 }
 
-impl<'a, TopBxDF, BottomBxDF> TopOrBottomBxDF<'a, TopBxDF, BottomBxDF>
+impl<TopBxDF, BottomBxDF> TopOrBottomBxDF<'_, TopBxDF, BottomBxDF>
 where
     TopBxDF: AbstractBxDF,
     BottomBxDF: AbstractBxDF,

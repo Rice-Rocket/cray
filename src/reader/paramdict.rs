@@ -242,7 +242,7 @@ impl ParsedParameter {
     }
 }
 
-impl<'a> Param<'a> {
+impl Param<'_> {
     pub fn parse(self) -> ParseResult<ParsedParameter> {
         let name = self.name;
         let param_type = match self.ty {
@@ -571,10 +571,10 @@ impl ParameterDictionary {
         cached_spectra: &mut HashMap<String, Arc<Spectrum>>
     ) -> ParseResult<Vec<Arc<Spectrum>>> {
         if param.param_type == "rgb" {
-            // TODO We could also handle "color" in this block with an upgrade option, but
+            // TODO: We could also handle "color" in this block with an upgrade option, but
             //  I don't intend to use old PBRT scene files for now.
 
-            return Self::return_array(
+            Self::return_array(
                 param.floats.as_slice(),
                 &param.loc,
                 &param.name,
@@ -619,7 +619,7 @@ impl ParameterDictionary {
                         )),
                     })
                 },
-            );
+            )
         } else if param.param_type == "blackbody" {
             return Self::return_array(
                 param.floats.as_slice(),
@@ -660,12 +660,12 @@ impl ParameterDictionary {
                         lambda[i] = v[2 * i];
                         value[i] = v[2 * i + 1];
                     }
-                    return Ok(Arc::new(Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new(
+                    Ok(Arc::new(Spectrum::PiecewiseLinear(PiecewiseLinearSpectrum::new(
                                     lambda.as_slice(),
                                     value.as_slice(),
-                    ))));
+                    ))))
                 },
-                );
+            );
         } else if param.param_type == "spectrum" && !param.strings.is_empty() {
             return Self::return_array(
                 param.strings.as_slice(),
